@@ -1,0 +1,75 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #0f172a;
+  --color-secondary: #2d86b8;
+  --color-accent: #429184;
+  --font-sans: 'Inter', sans-serif;
+  --animate-marquee: marquee 25s linear infinite;
+  --animate-marquee-seamless: marquee-seamless 40s linear infinite;
+
+  /* Brand overrides to match the Sphere Logo */
+  --color-blue-50: #ebf3f7;
+  --color-blue-100: #d6e8f0;
+  --color-blue-200: #add1e1;
+  --color-blue-300: #84bad1;
+  --color-blue-400: #5ba3c2;
+  --color-blue-500: #2d86b8; /* Brand Steel Blue */
+  --color-blue-600: #246b93;
+  --color-blue-700: #1b506e;
+  --color-blue-800: #12364a;
+  --color-blue-900: #091b25;
+
+  --color-emerald-500: #429184; /* Brand Teal */
+  --color-emerald-600: #35746a;
+
+  --color-green-500: #5e9550; /* Brand Leaf Green */
+  --color-green-600: #4b7740;
+}
+
+@keyframes marquee {
+  0% { transform: translateX(100vw); }
+  100% { transform: translateX(-100vw); }
+}
+
+@keyframes marquee-seamless {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: #f8fafc;
+  color: #334155;
+}
+
+/* Frappe Gantt Custom Styles */
+.gantt .bar-wrapper.bar-completed .bar {
+  fill: #10b981;
+}
+.gantt .bar-wrapper.bar-completed .bar-progress {
+  fill: #059669;
+}
+.gantt .bar-wrapper.bar-stopped .bar {
+  fill: #ef4444;
+}
+.gantt .bar-wrapper.bar-stopped .bar-progress {
+  fill: #dc2626;
+}
+.gantt .bar-wrapper.bar-active .bar {
+  fill: #3b82f6;
+}
+.gantt .bar-wrapper.bar-active .bar-progress {
+  fill: #2563eb;
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+.hide-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}

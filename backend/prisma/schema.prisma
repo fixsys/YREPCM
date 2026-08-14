@@ -1,0 +1,488 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Department {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  users       User[]
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+  
+  workflowNodes WorkflowNode[]
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  level       Int      @default(0) // 權限等級 e.g. 100=最高管理層, 50=部門主管, 10=一般員工
+  description String?
+  users       User[]
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+}
+
+model User {
+  id            String      @id @default(uuid())
+  account       String      @unique
+  password_hash String
+  name          String
+  email         String?
+  department_id String?
+  role_id       String?
+  is_active     Boolean     @default(true)
+  created_at    DateTime    @default(now())
+  updated_at    DateTime    @updatedAt
+
+  department    Department? @relation(fields: [department_id], references: [id])
+  role          Role?       @relation(fields: [role_id], references: [id])
+
+  // Relations
+  salesProjects       Project[]   @relation("SalesRepresentative")
+  engProjects         Project[]   @relation("EngineeringRepresentative")
+  designProjects      Project[]   @relation("DesignRepresentative")
+  procurementProjects Project[]   @relation("ProcurementRepresentative")
+  steelProjects       Project[]   @relation("SteelRepresentative")
+  dailyLogs           DailyLog[]
+  workLogs            WorkLog[]
+  projectFiles        ProjectFile[]
+  
+  assignedTasks       Task[]      @relation("TaskAssignees")
+  acceptedTasks       Task[]      @relation("TaskAcceptedBy")
+  createdTasks        Task[]      @relation("CreatedTasks")
+  notifications       Notification[]
+
+  assignedLeads       Lead[]      @relation("LeadAssignee")
+  createdLeads        Lead[]      @relation("LeadCreator")
+  createdInteractions InteractionLog[] @relation("InteractionCreator")
+  createdRequirements RequirementTicket[] @relation("RequirementCreator")
+  salesDailyLogs      SalesDailyLog[] @relation("SalesDailyLogCreator")
+
+  toolboxMeetings     ToolboxMeeting[] @relation("ToolboxRecorder")
+  laborReports        DailyLaborReport[] @relation("LaborReportRecorder")
+  managedLaborReports DailyLaborReport[] @relation("LaborReportPM")
+}
+
+model Project {
+  id                 String      @id @default(uuid())
+  project_code       String      @unique
+  name               String
+  status             String      @default("評估中") // 評估中, 施工中, 已完工, 停工
+  start_date         DateTime?   @db.Date
+  target_date        DateTime?   @db.Date
+  progress_pct       Int         @default(0)
+  owner              String?
+  content            String?     @db.Text
+  sales_rep_id       String?
+  eng_rep_id         String?
+  design_rep_id      String?
+  procurement_rep_id String?
+  steel_rep_id       String?
+  notes              String?     @db.Text
+  created_at         DateTime    @default(now())
+  updated_at         DateTime    @updatedAt
+
+  // Relations
+  salesRep       User?       @relation("SalesRepresentative", fields: [sales_rep_id], references: [id])
+  engRep         User?       @relation("EngineeringRepresentative", fields: [eng_rep_id], references: [id])
+  designRep      User?       @relation("DesignRepresentative", fields: [design_rep_id], references: [id])
+  procurementRep User?       @relation("ProcurementRepresentative", fields: [procurement_rep_id], references: [id])
+  steelRep       User?       @relation("SteelRepresentative", fields: [steel_rep_id], references: [id])
+  dailyLogs      DailyLog[]
+  tasks          Task[]
+  workLogs       WorkLog[]
+  files          ProjectFile[]
+  toolboxMeetings ToolboxMeeting[]
+  laborReports   DailyLaborReport[]
+  
+  workflow       ProjectWorkflow?
+  requirementTicket RequirementTicket?
+}
+
+model WorkflowTemplate {
+  id          String         @id @default(uuid())
+  name        String
+  description String?
+  is_active   Boolean        @default(true)
+  nodes       WorkflowNode[]
+  edges       WorkflowEdge[]
+  projects    ProjectWorkflow[]
+  created_at  DateTime       @default(now())
+  updated_at  DateTime       @updatedAt
+}
+
+model WorkflowNode {
+  id                String           @id @default(uuid())
+  template_id       String
+  name              String
+  department_id     String?          
+  requires_file     Boolean          @default(false)
+  type              String           @default("TASK") // START, TASK, CONDITION, END
+  position_x        Float            @default(0)
+  position_y        Float            @default(0)
+  
+  template          WorkflowTemplate @relation(fields: [template_id], references: [id])
+  department        Department?      @relation(fields: [department_id], references: [id])
+  
+  sourceEdges       WorkflowEdge[]   @relation("SourceNode")
+  targetEdges       WorkflowEdge[]   @relation("TargetNode")
+  
+  activeInProjects  ProjectWorkflow[]
+  tasks             Task[]
+}
+
+model WorkflowEdge {
+  id             String           @id @default(uuid())
+  template_id    String
+  source_node_id String
+  target_node_id String
+  source_handle  String?
+  target_handle  String?
+  condition      String?          // JSON or string condition
+  
+  template       WorkflowTemplate @relation(fields: [template_id], references: [id])
+  sourceNode     WorkflowNode     @relation("SourceNode", fields: [source_node_id], references: [id])
+  targetNode     WorkflowNode     @relation("TargetNode", fields: [target_node_id], references: [id])
+}
+
+model ProjectWorkflow {
+  id              String           @id @default(uuid())
+  project_id      String           @unique
+  template_id     String
+  current_node_id String?
+  status          String           @default("IN_PROGRESS") // IN_PROGRESS, COMPLETED, SUSPENDED
+  
+  project         Project          @relation(fields: [project_id], references: [id])
+  template        WorkflowTemplate @relation(fields: [template_id], references: [id])
+  currentNode     WorkflowNode?    @relation(fields: [current_node_id], references: [id])
+}
+
+model DailyLog {
+  id           String    @id @default(uuid())
+  project_id   String
+  executor_id  String
+  department   String    
+  task_item    String
+  sub_task     String?
+  start_time   DateTime
+  est_end_time DateTime?
+  act_end_time DateTime?
+  est_days     Decimal?  @db.Decimal(10, 2)
+  attachment   String?   
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @updatedAt
+
+  project      Project   @relation(fields: [project_id], references: [id])
+  executor     User      @relation(fields: [executor_id], references: [id])
+}
+
+model Task {
+  id              String      @id @default(uuid())
+  project_id      String?     
+  name            String
+  description     String?     @db.Text
+  status          String      @default("未開始") // 未開始, 進行中, 已完成
+  estimated_hours Decimal?    @db.Decimal(10, 2)
+  weight          Int         @default(1)
+  
+  task_type       String      @default("PROJECT") // PROJECT, GENERAL
+  priority        String      @default("MEDIUM")  // LOW, MEDIUM, HIGH
+  due_date        DateTime?
+  creator_id      String?
+  
+  created_at      DateTime    @default(now())
+  updated_at      DateTime    @updatedAt
+
+  project         Project?    @relation(fields: [project_id], references: [id])
+  workflow_node_id String?
+  workflowNode    WorkflowNode? @relation(fields: [workflow_node_id], references: [id])
+  assignees       User[]      @relation("TaskAssignees")
+  accepted_by     User[]      @relation("TaskAcceptedBy")
+  creator         User?       @relation("CreatedTasks", fields: [creator_id], references: [id])
+  workLogs        WorkLog[]
+}
+
+model WorkLog {
+  id              String      @id @default(uuid())
+  task_id         String
+  user_id         String
+  project_id      String?
+  work_date       DateTime    @db.Date
+  logged_hours    Decimal     @db.Decimal(10, 2)
+  description     String?     @db.Text
+  created_at      DateTime    @default(now())
+  updated_at      DateTime    @updatedAt
+
+  task            Task        @relation(fields: [task_id], references: [id])
+  user            User        @relation(fields: [user_id], references: [id])
+  project         Project?    @relation(fields: [project_id], references: [id])
+}
+
+model ProjectFile {
+  id          String   @id @default(uuid())
+  project_id  String
+  category    String
+  file_name   String
+  file_path   String
+  uploaded_by String
+  uploaded_at DateTime @default(now())
+
+  project     Project  @relation(fields: [project_id], references: [id])
+  uploader    User     @relation(fields: [uploaded_by], references: [id])
+}
+
+model Notification {
+  id         String   @id @default(uuid())
+  user_id    String
+  title      String
+  content    String   @db.Text
+  type       String   @default("INFO") // INFO, WARNING, SUCCESS, ERROR
+  link       String?
+  is_read    Boolean  @default(false)
+  created_at DateTime @default(now())
+
+  user       User     @relation(fields: [user_id], references: [id])
+}
+
+model SystemSetting {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       String   @db.Text
+  description String?
+  updated_at  DateTime @updatedAt
+}
+
+// ==========================================
+// CRM 業務開發模組 (Business Development)
+// ==========================================
+
+model Lead {
+  id         String   @id @default(uuid())
+  name       String
+  company    String?
+  site_name  String? // 案場名稱
+  phone      String?
+  email      String?
+  source     String   @default("A") // A: 自行開發, D: 官網投放, E: 行銷, M: 公司交派, C: 客戶轉介
+  referrer_name String? // 介紹人名稱
+  status     String   @default("NEW") // NEW: 新潛在, CONTACTED: 聯繫中, REQUIREMENT: 已建需求單, CONVERTED: 已結案(轉專案), LOST: 流失
+  
+  assignee_id String?
+  created_by  String
+  
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  assignee   User?    @relation("LeadAssignee", fields: [assignee_id], references: [id])
+  creator    User     @relation("LeadCreator", fields: [created_by], references: [id])
+  
+  interactions      InteractionLog[]
+  requirementTicket RequirementTicket?
+}
+
+model InteractionLog {
+  id                String   @id @default(uuid())
+  lead_id           String
+  action_type       String   // B: 拜訪客戶, C: 電話拜訪, F: 簡報
+  summary           String   @db.Text
+  result            String?  @db.Text
+  next_contact_date DateTime @db.Date
+  
+  created_by        String
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  lead              Lead     @relation(fields: [lead_id], references: [id])
+  creator           User     @relation("InteractionCreator", fields: [created_by], references: [id])
+}
+
+model RequirementTicket {
+  id                    String   @id @default(uuid())
+  lead_id               String   @unique
+  project_id            String?  @unique
+  design_status         String   @default("待安排") // 待安排, 現勘中, 已完成
+  budget_status         String   @default("待分析") // 待分析, 分析中, 已完成
+  design_assignee_names String?
+  budget_assignee_names String?
+  budgetBook            BudgetBook?
+  
+  // 1. 設置資訊 (Installation Info)
+  contract_type         String?
+  grid_connection_type  String?
+  module_model          String?
+  module_count          Int?
+  installation_capacity Decimal? @db.Decimal(10, 2)
+  power_type            String?
+  land_area             Decimal? @db.Decimal(10, 2)
+  has_existing_pv       Boolean  @default(false)
+  existing_pv_capacity  Decimal? @db.Decimal(10, 2)
+  other_notes           String?  @db.Text
+
+  // 2. 需求大樣 (Basic Requirements)
+  foundation_type       String?
+  concrete_strength     String?
+
+  // 3. 結構支架 (Structural Support)
+  is_guaranteed_power   Boolean  @default(false)
+  guaranteed_power_percent Decimal? @db.Decimal(5, 2)
+  required_height       String?
+  required_slope        String?
+  required_span         String?
+  required_spacing      String?
+  wind_resistance       String?
+  is_coastal            Boolean  @default(false)
+  coastal_distance      Decimal? @db.Decimal(10, 2)
+  main_structure_column_type     String?
+  main_structure_column_material String?
+  main_structure_column_surface  String?
+  main_structure_beam_type       String?
+  main_structure_beam_material   String?
+  main_structure_beam_surface    String?
+  module_fixing_method           String?
+  has_length_limit               Boolean @default(false)
+  length_limit_m                 Decimal? @db.Decimal(10, 2)
+
+  // 4. 浪板 (Corrugated Board)
+  needs_corrugated_board         Boolean @default(false)
+  corrugated_board_area          Decimal? @db.Decimal(10, 2)
+  corrugated_board_method        String?
+  corrugated_board_material      String?
+  corrugated_board_type          String?
+  corrugated_board_color         String?
+
+  // 5. 安全/維修設施 (Safety/Maintenance)
+  has_maintenance_walkway        Boolean @default(false)
+  maintenance_walkway_material   String?
+  maintenance_walkway_width      String?
+  safety_rope_material           String?
+  safety_fence_type              String?
+  climbing_equipment             String?
+
+  // 6. 電力相關 (Electrical)
+  cable_brand                    String?
+  inverter_brand                 String?
+  transformer                    String?
+  electrical_equipment           String?
+
+  // 7. 配電盤體 (Distribution Panel)
+  panel_type                     String?
+  panel_brand                    String?
+  waterproof_level               String?
+  panel_material                 String?
+  panel_thickness                String?
+  panel_surface                  String?
+
+  // 8. 其他 (Others)
+  design_basis                   String?  @db.Text
+  client_provided_files          String?  @db.Text
+  road_width                     String?
+  crane_tonnage                  String?
+  needs_excavation               Boolean  @default(false)
+  excavation_depth               Decimal? @db.Decimal(10, 2)
+  new_distribution_site          String?  @db.Text
+
+  // 9. 委外設計清單 (Outsourced Design List)
+  certification_drawing          String?  @db.Text
+  manufacturing_drawing          String?  @db.Text
+  mep_drawing                    String?  @db.Text
+  delivery_date                  DateTime? @db.Date
+
+  created_by            String
+  created_at            DateTime @default(now())
+  updated_at            DateTime @updatedAt
+
+  lead                  Lead     @relation(fields: [lead_id], references: [id])
+  project               Project? @relation(fields: [project_id], references: [id])
+  creator               User     @relation("RequirementCreator", fields: [created_by], references: [id])
+}
+
+model SalesDailyLog {
+  id         String   @id @default(uuid())
+  content    String   @db.Text
+  creator_id String
+  created_at DateTime @default(now())
+
+  creator    User     @relation("SalesDailyLogCreator", fields: [creator_id], references: [id])
+}
+
+model BudgetBook {
+  id                    String   @id @default(uuid())
+  requirement_ticket_id String   @unique
+  requirementTicket     RequirementTicket @relation(fields: [requirement_ticket_id], references: [id])
+  
+  items                 Json?    // Flexible JSON table for budget items
+  total_amount          Decimal? @db.Decimal(15, 2)
+  notes                 String?  @db.Text
+  analysis_data         Json?    // Store cost analysis params like development_fee_unit_price
+  
+  created_at            DateTime @default(now())
+  updated_at            DateTime @updatedAt
+  
+  quotation             Quotation?
+}
+
+model Quotation {
+  id                    String   @id @default(uuid())
+  budget_id             String   @unique
+  budget                BudgetBook @relation(fields: [budget_id], references: [id])
+  
+  items                 Json?    // Flexible JSON table for quotation items
+  total_price           Decimal? @db.Decimal(15, 2)
+  notes                 String?  @db.Text
+  
+  created_at            DateTime @default(now())
+  updated_at            DateTime @updatedAt
+}
+
+// ==========================================
+// 現場報工模組 (On-site Labor Reporting)
+// ==========================================
+
+model ToolboxMeeting {
+  id              String   @id @default(uuid())
+  project_id      String?  
+  record_date     DateTime @db.Date
+  recorder_id     String
+  worker_count    Int
+  work_category   String
+  work_content    String   @db.Text
+  safety_check_1  Boolean  @default(false)
+  safety_check_2  Boolean  @default(false)
+  safety_check_3  Boolean  @default(false)
+  photos          Json?    
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  project         Project? @relation(fields: [project_id], references: [id])
+  recorder        User     @relation("ToolboxRecorder", fields: [recorder_id], references: [id])
+}
+
+model DailyLaborReport {
+  id              String   @id @default(uuid())
+  project_id      String?  
+  report_date     DateTime @db.Date
+  weather         String
+  recorder_id     String
+  pm_id           String?
+  engineers       Json?    // Array of engineer IDs or names
+  work_category   String
+  work_items              Json?    // Specific work items progress
+  drawing_number          String?
+  drawing_revision        String?
+  construction_location   String?
+  drawing_check_result    String?
+  drawing_check_confirmed Boolean  @default(false)
+  created_at              DateTime @default(now())
+  updated_at              DateTime @updatedAt
+
+  project         Project? @relation(fields: [project_id], references: [id])
+  recorder        User     @relation("LaborReportRecorder", fields: [recorder_id], references: [id])
+  pm              User?    @relation("LaborReportPM", fields: [pm_id], references: [id])
+}
+
