@@ -478,6 +478,11 @@ model DailyLaborReport {
   construction_location   String?
   drawing_check_result    String?
   drawing_check_confirmed Boolean  @default(false)
+  photos                  Json?    // Required uploaded photos (Array of URLs)
+  safety_check_1          Boolean  @default(false)
+  safety_check_2          Boolean  @default(false)
+  safety_check_3          Boolean  @default(false)
+  additional_notes        String?  @db.Text
   created_at              DateTime @default(now())
   updated_at              DateTime @updatedAt
 

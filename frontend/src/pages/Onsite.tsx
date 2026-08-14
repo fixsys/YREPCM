@@ -52,12 +52,21 @@ const Onsite = () => {
     drawing_revision: '',
     construction_location: '',
     drawing_check_result: '符合圖說',
-    drawing_check_confirmed: false
+    drawing_check_confirmed: false,
+    safety_check_1: false,
+    safety_check_2: false,
+    safety_check_3: false,
+    additional_notes: ''
   });
+  const [laborPhotosClose, setLaborPhotosClose] = useState<File[]>([]);
+  const [laborPhotosMid, setLaborPhotosMid] = useState<File[]>([]);
+  const [laborPhotosFar, setLaborPhotosFar] = useState<File[]>([]);
   const [engineers, setEngineers] = useState<string[]>(['']);
   type WorkItem = {
     name: string;
     progress: string;
+    worker_count?: string;
+    work_hours?: string;
     inspection?: {
       fields: Record<string, string>;
       checks: boolean[];
@@ -66,20 +75,20 @@ const Onsite = () => {
       photo?: string | File;
     }
   };
-  const [workItems, setWorkItems] = useState<WorkItem[]>([{name: '', progress: ''}]);
+  const [workItems, setWorkItems] = useState<WorkItem[]>([{name: '', progress: '', worker_count: '', work_hours: ''}]);
 
   const INSPECTION_TEMPLATES: Record<string, { fields: string[], checks: string[], results: string[], photoLabel: string }> = {
-    '放樣': {
+    'PC': {
       fields: ['控制點/基準點', '軸線/座標', '設計高程/實測高程', '允許誤差/實測差值'],
       checks: ['已核對圖號、版次、尺寸與施工範圍', '儀器、控制點、軸線、座標與高程正確', '測量結果在允許誤差內並完成複核', '材料、機具及施工面已確認可施工'],
       results: ['合格，可繼續施工', '不合格'],
-      photoLabel: '施工前放樣照片'
+      photoLabel: 'PC自主檢查照片'
     },
-    '鋼筋綁紮': {
+    '板模': {
       fields: [],
       checks: ['鋼筋號數、間距、數量及搭接長度符合圖說', '保護層墊塊、綁紮固定及預留筋位置正確', '鋼筋表面無油污、浮鏽及影響品質之雜物', '模板內清潔、預埋件及基礎螺栓位置已確認'],
       results: ['符合，可繼續施工', '不符合'],
-      photoLabel: '鋼筋綁紮自主檢查照片'
+      photoLabel: '板模自主檢查照片'
     },
     '回填': {
       fields: [],
@@ -202,12 +211,18 @@ const Onsite = () => {
     if (!laborForm.drawing_check_confirmed) {
       return alert('未確認不得正式保存施工日報');
     }
+    if ((laborPhotosClose.length < 2 || laborPhotosMid.length < 2 || laborPhotosFar.length < 2) && !editingLaborId) {
+      return alert('近照、中距離照、遠距照皆須至少上傳 2 張');
+    }
     try {
       const formData = new FormData();
       Object.entries(laborForm).forEach(([key, value]) => {
         formData.append(key, String(value));
       });
       formData.append('engineers', JSON.stringify(engineers.filter(e => e)));
+      laborPhotosClose.forEach(file => formData.append('photos_close', file));
+      laborPhotosMid.forEach(file => formData.append('photos_mid', file));
+      laborPhotosFar.forEach(file => formData.append('photos_far', file));
       
       const workItemsToSave = workItems.filter(w => w.name && w.progress).map((w, idx) => {
         const itemCopy = { ...w };
@@ -237,9 +252,12 @@ const Onsite = () => {
 
   const handleAddLabor = () => {
     setEditingLaborId(null);
-    setLaborForm({ project_id: '', report_date: new Date().toISOString().slice(0, 10), weather: '晴', recorder_id: user?.id || '', pm_id: '', work_category: '土木', drawing_number: '', drawing_revision: '', construction_location: '', drawing_check_result: '符合圖說', drawing_check_confirmed: false });
+    setLaborForm({ project_id: '', report_date: new Date().toISOString().slice(0, 10), weather: '晴', recorder_id: user?.id || '', pm_id: '', work_category: '土木', drawing_number: '', drawing_revision: '', construction_location: '', drawing_check_result: '符合圖說', drawing_check_confirmed: false, safety_check_1: false, safety_check_2: false, safety_check_3: false, additional_notes: '' });
+    setLaborPhotosClose([]);
+    setLaborPhotosMid([]);
+    setLaborPhotosFar([]);
     setEngineers(['']);
-    setWorkItems([{name: categoryToItems['土木'][0], progress: ''}]);
+    setWorkItems([{name: categoryToItems['土木'][0], progress: '', worker_count: '', work_hours: ''}]);
     setIsLaborModalOpen(true);
   };
 
@@ -256,12 +274,19 @@ const Onsite = () => {
       drawing_revision: l.drawing_revision || '',
       construction_location: l.construction_location || '',
       drawing_check_result: l.drawing_check_result || '符合圖說',
-      drawing_check_confirmed: l.drawing_check_confirmed || false
+      drawing_check_confirmed: l.drawing_check_confirmed || false,
+      safety_check_1: l.safety_check_1 || false,
+      safety_check_2: l.safety_check_2 || false,
+      safety_check_3: l.safety_check_3 || false,
+      additional_notes: l.additional_notes || ''
     });
+    setLaborPhotosClose([]);
+    setLaborPhotosMid([]);
+    setLaborPhotosFar([]);
     if (l.engineers) setEngineers(safeParseJSON(l.engineers, ['']));
     else setEngineers(['']);
-    if (l.work_items) setWorkItems(safeParseJSON(l.work_items, [{name: categoryToItems[l.work_category][0], progress: ''}]));
-    else setWorkItems([{name: categoryToItems[l.work_category][0], progress: ''}]);
+    if (l.work_items) setWorkItems(safeParseJSON(l.work_items, [{name: categoryToItems[l.work_category][0], progress: '', worker_count: '', work_hours: ''}]));
+    else setWorkItems([{name: categoryToItems[l.work_category][0], progress: '', worker_count: '', work_hours: ''}]);
     setIsLaborModalOpen(true);
   };
 
@@ -387,9 +412,26 @@ const Onsite = () => {
                   <strong className="block mb-1">施工項目進度:</strong>
                   <ul className="list-disc pl-4 space-y-1">
                     {l.work_items && safeParseJSON(l.work_items, []).map((w: any, i: number) => (
-                      <li key={i}><span className="font-medium">{w.name}</span>: {w.progress}</li>
+                      <li key={i}>
+                        <span className="font-medium">{w.name}</span>: {w.progress}
+                        {(w.worker_count || w.work_hours) && (
+                          <span className="text-xs text-slate-500 ml-2">({w.worker_count || 0}人 / {w.work_hours || 0}小時)</span>
+                        )}
+                      </li>
                     ))}
                   </ul>
+                  <div className="mt-3 pt-3 border-t border-slate-100 flex gap-2 items-center flex-wrap">
+                    {l.safety_check_1 && l.safety_check_2 && l.safety_check_3 && (
+                      <span className="text-xs bg-green-50 text-green-700 px-2 py-1 rounded flex items-center gap-1"><CheckSquare size={12}/> 工安齊全</span>
+                    )}
+                    {l.photos && (
+                      <span className="text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded flex items-center gap-1">📷 {
+                        Array.isArray(safeParseJSON(l.photos, [])) 
+                          ? safeParseJSON(l.photos, []).length 
+                          : ((safeParseJSON(l.photos, {}).close?.length || 0) + (safeParseJSON(l.photos, {}).mid?.length || 0) + (safeParseJSON(l.photos, {}).far?.length || 0))
+                      } 張照片</span>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
@@ -565,7 +607,7 @@ const Onsite = () => {
                   <label className="block text-sm font-bold text-slate-700 mb-2">工作類別與工項進度</label>
                   <select value={laborForm.work_category} onChange={e => {
                     setLaborForm({...laborForm, work_category: e.target.value});
-                    setWorkItems([{name: categoryToItems[e.target.value][0], progress: ''}]);
+                    setWorkItems([{name: categoryToItems[e.target.value][0], progress: '', worker_count: '', work_hours: ''}]);
                   }} className="w-full px-3 py-2 border rounded-lg outline-none mb-4 font-medium bg-slate-50">
                     {WORK_CATEGORIES.map(c => <option key={c} value={c}>{c}工程</option>)}
                   </select>
@@ -597,6 +639,16 @@ const Onsite = () => {
                             newItems[idx].progress = e.target.value;
                             setWorkItems(newItems);
                           }} placeholder="填寫進度說明 (例: 已完成50%)" required className="flex-1 px-3 py-2 border rounded-lg outline-none" />
+                          <input type="number" min="0" value={item.worker_count || ''} onChange={e => {
+                            const newItems = [...workItems];
+                            newItems[idx].worker_count = e.target.value;
+                            setWorkItems(newItems);
+                          }} placeholder="人數" className="w-20 px-3 py-2 border rounded-lg outline-none" />
+                          <input type="number" min="0" step="0.5" value={item.work_hours || ''} onChange={e => {
+                            const newItems = [...workItems];
+                            newItems[idx].work_hours = e.target.value;
+                            setWorkItems(newItems);
+                          }} placeholder="工時" className="w-20 px-3 py-2 border rounded-lg outline-none" />
                           <button type="button" onClick={() => setWorkItems(workItems.filter((_, i) => i !== idx))} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 size={20}/></button>
                         </div>
                         {item.inspection && laborForm.work_category === '土木' && INSPECTION_TEMPLATES[item.name] && (
@@ -672,7 +724,7 @@ const Onsite = () => {
                   </div>
                   <button type="button" onClick={() => {
                     const defaultName = categoryToItems[laborForm.work_category][0];
-                    const newItem: WorkItem = { name: defaultName, progress: '' };
+                    const newItem: WorkItem = { name: defaultName, progress: '', worker_count: '', work_hours: '' };
                     if (laborForm.work_category === '土木' && INSPECTION_TEMPLATES[defaultName]) {
                       const tpl = INSPECTION_TEMPLATES[defaultName];
                       newItem.inspection = {
@@ -715,6 +767,107 @@ const Onsite = () => {
                       <input type="checkbox" checked={laborForm.drawing_check_confirmed} onChange={e => setLaborForm({...laborForm, drawing_check_confirmed: e.target.checked})} className="mt-1 w-4 h-4 text-teal-600 rounded" />
                       <span className="text-sm text-slate-600 font-medium">我已核對核准圖號、最新版次、尺寸、高程及施工位置，確認結果如上。</span>
                     </label>
+                  </div>
+                </div>
+
+                <div className="border border-teal-200 bg-teal-50/10 rounded-xl p-4 mt-6 shadow-sm relative">
+                  <div className="absolute top-4 right-4 bg-orange-100 text-orange-800 font-bold px-3 py-1 rounded-full text-sm">
+                    {laborPhotosClose.length + laborPhotosMid.length + laborPhotosFar.length} / 6 張
+                  </div>
+                  <h4 className="font-bold text-teal-800 mb-4 text-lg flex items-center gap-2">
+                    施工日誌照片 <span className="text-sm font-bold text-teal-600">(必填至少 6 張)</span>
+                  </h4>
+                  <p className="text-xs text-slate-500 font-normal mb-4">近照 2 張＋中距離 2 張＋遠距離 2 張</p>
+                  
+                  <div className="space-y-4">
+                    {/* 近照 */}
+                    <div className="border border-dashed border-teal-300 bg-white rounded-xl p-4">
+                      <h5 className="font-bold text-slate-700">近照 <span className="text-slate-500 font-normal text-sm">(至少 2 張)</span></h5>
+                      <p className="text-xs text-slate-400 mb-3">細部、接點、尺寸或施工品質</p>
+                      <input type="file" multiple accept="image/*" onChange={e => {
+                        if (e.target.files) {
+                          const files = Array.from(e.target.files);
+                          if (files.length > 4) { alert('近照最多只能上傳 4 張'); setLaborPhotosClose(files.slice(0, 4)); }
+                          else setLaborPhotosClose(files);
+                        }
+                      }} className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-bold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 p-2 border border-slate-200 rounded-lg bg-slate-50" />
+                      <div className={`mt-2 font-bold text-sm ${laborPhotosClose.length >= 2 ? 'text-teal-600' : 'text-red-500'}`}>{laborPhotosClose.length} / 2 張</div>
+                      {laborPhotosClose.length > 0 && (
+                        <div className="mt-2 flex gap-2 flex-wrap">
+                          {laborPhotosClose.map((f, i) => <div key={i} className="text-xs px-2 py-1 bg-slate-100 rounded text-slate-600 truncate max-w-[150px]">{f.name}</div>)}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 中距離照 */}
+                    <div className="border border-dashed border-teal-300 bg-white rounded-xl p-4">
+                      <h5 className="font-bold text-slate-700">中距離照 <span className="text-slate-500 font-normal text-sm">(至少 2 張)</span></h5>
+                      <p className="text-xs text-slate-400 mb-3">施工人員、工作面與工項範圍</p>
+                      <input type="file" multiple accept="image/*" onChange={e => {
+                        if (e.target.files) {
+                          const files = Array.from(e.target.files);
+                          if (files.length > 4) { alert('中距離照最多只能上傳 4 張'); setLaborPhotosMid(files.slice(0, 4)); }
+                          else setLaborPhotosMid(files);
+                        }
+                      }} className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-bold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 p-2 border border-slate-200 rounded-lg bg-slate-50" />
+                      <div className={`mt-2 font-bold text-sm ${laborPhotosMid.length >= 2 ? 'text-teal-600' : 'text-red-500'}`}>{laborPhotosMid.length} / 2 張</div>
+                      {laborPhotosMid.length > 0 && (
+                        <div className="mt-2 flex gap-2 flex-wrap">
+                          {laborPhotosMid.map((f, i) => <div key={i} className="text-xs px-2 py-1 bg-slate-100 rounded text-slate-600 truncate max-w-[150px]">{f.name}</div>)}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 遠距照 */}
+                    <div className="border border-dashed border-teal-300 bg-white rounded-xl p-4">
+                      <h5 className="font-bold text-slate-700">遠距照 <span className="text-slate-500 font-normal text-sm">(至少 2 張)</span></h5>
+                      <p className="text-xs text-slate-400 mb-3">案場全景、區域位置與整體進度</p>
+                      <input type="file" multiple accept="image/*" onChange={e => {
+                        if (e.target.files) {
+                          const files = Array.from(e.target.files);
+                          if (files.length > 4) { alert('遠距照最多只能上傳 4 張'); setLaborPhotosFar(files.slice(0, 4)); }
+                          else setLaborPhotosFar(files);
+                        }
+                      }} className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-bold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 p-2 border border-slate-200 rounded-lg bg-slate-50" />
+                      <div className={`mt-2 font-bold text-sm ${laborPhotosFar.length >= 2 ? 'text-teal-600' : 'text-red-500'}`}>{laborPhotosFar.length} / 2 張</div>
+                      {laborPhotosFar.length > 0 && (
+                        <div className="mt-2 flex gap-2 flex-wrap">
+                          {laborPhotosFar.map((f, i) => <div key={i} className="text-xs px-2 py-1 bg-slate-100 rounded text-slate-600 truncate max-w-[150px]">{f.name}</div>)}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  {editingLaborId && <p className="text-xs text-orange-500 mt-3 text-center">重新上傳會完全覆蓋舊有照片</p>}
+                </div>
+
+                <div className="border border-orange-200 bg-orange-50/30 rounded-xl p-4 mt-6">
+                  <h4 className="font-bold text-orange-800 mb-3">工安確認 (必填)</h4>
+                  <div className="space-y-3">
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input type="checkbox" required checked={laborForm.safety_check_1} onChange={e => setLaborForm({...laborForm, safety_check_1: e.target.checked})} className="mt-1 w-4 h-4 text-orange-600 rounded" />
+                      <span className="text-sm text-slate-700">已落實勤前教育、危害告知與工具箱會議</span>
+                    </label>
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input type="checkbox" required checked={laborForm.safety_check_2} onChange={e => setLaborForm({...laborForm, safety_check_2: e.target.checked})} className="mt-1 w-4 h-4 text-orange-600 rounded" />
+                      <span className="text-sm text-slate-700">人員已確實配戴個人防護具 (安全帽、反光背心等)</span>
+                    </label>
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input type="checkbox" required checked={laborForm.safety_check_3} onChange={e => setLaborForm({...laborForm, safety_check_3: e.target.checked})} className="mt-1 w-4 h-4 text-orange-600 rounded" />
+                      <span className="text-sm text-slate-700">施工環境安全檢查無虞，動線及防護設施已就位</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="mt-6">
+                  <label className="block text-sm font-bold text-slate-700 mb-2">補充說明 (選填)</label>
+                  <textarea value={laborForm.additional_notes} onChange={e => setLaborForm({...laborForm, additional_notes: e.target.value})} placeholder="填寫其他需紀錄之事項、異常狀況或協調內容..." className="w-full px-3 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 h-24 resize-none"></textarea>
+                </div>
+
+                <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-xl mt-6 flex justify-between items-center">
+                  <span className="font-bold text-indigo-900">總計</span>
+                  <div className="flex gap-4 text-sm font-medium">
+                    <span className="text-indigo-800">總人數: <span className="text-indigo-600 text-lg">{workItems.reduce((acc, w) => acc + (Number(w.worker_count) || 0), 0)}</span> 人</span>
+                    <span className="text-indigo-800">總工時: <span className="text-indigo-600 text-lg">{workItems.reduce((acc, w) => acc + (Number(w.work_hours) || 0), 0)}</span> 小時</span>
                   </div>
                 </div>
               </form>
