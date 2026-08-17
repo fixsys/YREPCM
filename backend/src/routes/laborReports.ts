@@ -96,7 +96,7 @@ router.post('/', authenticateToken, upload.any(), async (req: AuthRequest, res) 
         safety_check_2: safety_check_2 === true || safety_check_2 === 'true',
         safety_check_3: safety_check_3 === true || safety_check_3 === 'true',
         additional_notes,
-        photos: hasPhotos ? JSON.stringify(photosObj) : null
+        photos: hasPhotos ? JSON.stringify(photosObj) : undefined
       }
     });
     res.json(report);

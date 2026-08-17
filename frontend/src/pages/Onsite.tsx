@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuthStore } from '../store/authStore';
-import { CheckSquare, Plus, Clock, Search, FolderKanban, Camera, X, Trash2 } from 'lucide-react';
+import { CheckSquare, Plus, Clock, Search, FolderKanban, Camera, X, Trash2, FileText, Edit2, Printer } from 'lucide-react';
 
 const safeParseJSON = (data: any, fallback: any = []) => {
   if (!data) return fallback;
@@ -62,6 +62,7 @@ const Onsite = () => {
   const [laborPhotosMid, setLaborPhotosMid] = useState<File[]>([]);
   const [laborPhotosFar, setLaborPhotosFar] = useState<File[]>([]);
   const [engineers, setEngineers] = useState<string[]>(['']);
+  const [viewingRecord, setViewingRecord] = useState<{type: 'toolbox' | 'labor', data: any} | null>(null);
   type WorkItem = {
     name: string;
     progress: string;
@@ -351,32 +352,38 @@ const Onsite = () => {
         {activeTab === 'TOOLBOX' ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredToolbox.map(t => (
-              <div key={t.id} onClick={() => handleEditToolbox(t)} className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-all flex flex-col cursor-pointer">
-                <div className="flex flex-col gap-2 mb-2">
-                  <div className="flex justify-between items-start">
-                    <span className="text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded text-sm">{t.project?.project_code || '無專案'}</span>
-                    <span className="text-xs text-slate-500 flex items-center gap-1 shrink-0">
-                      <Clock size={12}/> {new Date(t.record_date).toLocaleDateString()}
-                    </span>
+              <div key={t.id} className="bg-white rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-all flex flex-col">
+                <div className="p-4 flex flex-col flex-1">
+                  <div className="flex flex-col gap-2 mb-2">
+                    <div className="flex justify-between items-start">
+                      <span className="text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded text-sm">{t.project?.project_code || '無專案'}</span>
+                      <span className="text-xs text-slate-500 flex items-center gap-1 shrink-0">
+                        <Clock size={12}/> {new Date(t.record_date).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <h4 className="font-bold text-slate-800 text-lg">
+                      {t.work_category}工程 會議
+                    </h4>
                   </div>
-                  <h4 className="font-bold text-slate-800 text-lg">
-                    {t.work_category}工程 會議
-                  </h4>
-                </div>
-                <p className="text-sm text-slate-600 mb-4 line-clamp-2">
-                  {t.work_content}
-                </p>
-                <div className="mt-auto border-t border-slate-100 pt-3 flex justify-between items-center text-xs text-slate-500">
-                  <span>紀錄: {t.recorder?.name}</span>
-                  <span>人數: {t.worker_count} 人</span>
-                </div>
-                {t.photos && (
-                  <div className="mt-3 flex gap-2 overflow-x-auto">
-                    {safeParseJSON(t.photos, []).map((p: string, i: number) => (
-                      <img key={i} src={`http://localhost:3001${p}`} alt="會議紀錄" className="w-12 h-12 rounded object-cover border" />
-                    ))}
+                  <p className="text-sm text-slate-600 mb-4 line-clamp-2">
+                    {t.work_content}
+                  </p>
+                  <div className="mt-auto border-t border-slate-100 pt-3 flex justify-between items-center text-xs text-slate-500">
+                    <span>紀錄: {t.recorder?.name}</span>
+                    <span>人數: {t.worker_count} 人</span>
                   </div>
-                )}
+                  {t.photos && (
+                    <div className="mt-3 flex gap-2 overflow-x-auto">
+                      {safeParseJSON(t.photos, []).map((p: string, i: number) => (
+                        <img key={i} src={`http://localhost:3001${p}`} alt="會議紀錄" className="w-12 h-12 rounded object-cover border" />
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="flex border-t border-slate-100 divide-x divide-slate-100 bg-slate-50 rounded-b-xl overflow-hidden shrink-0">
+                  <button onClick={() => setViewingRecord({type: 'toolbox', data: t})} className="flex-1 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-100 hover:text-indigo-700 flex items-center justify-center gap-2 transition-colors"><FileText size={16}/> 檢視報表</button>
+                  <button onClick={() => handleEditToolbox(t)} className="flex-1 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-100 hover:text-teal-700 flex items-center justify-center gap-2 transition-colors"><Edit2 size={16}/> 編輯</button>
+                </div>
               </div>
             ))}
             {filteredToolbox.length === 0 && (
@@ -386,52 +393,63 @@ const Onsite = () => {
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 @md:grid-cols-2 @lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredLabor.map(l => (
-              <div key={l.id} onClick={() => handleEditLabor(l)} className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-all flex flex-col cursor-pointer">
-                <div className="flex flex-col gap-2 mb-2">
-                  <div className="flex justify-between items-start">
-                    <span className="text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded text-sm">{l.project?.project_code || '無專案'}</span>
-                    <span className="text-xs text-slate-500 flex items-center gap-1 shrink-0">
-                      <Clock size={12}/> {new Date(l.report_date).toLocaleDateString()}
-                    </span>
+              <div key={l.id} className="bg-white rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-all flex flex-col">
+                <div className="p-4 flex flex-col flex-1">
+                  <div className="flex flex-col gap-2 mb-2">
+                    <div className="flex justify-between items-start">
+                      <span className="text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded text-sm">{l.project?.project_code || '無專案'}</span>
+                      <span className="text-xs text-slate-500 flex items-center gap-1 shrink-0">
+                        <Clock size={12}/> {new Date(l.report_date).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <h4 className="font-bold text-slate-800 text-lg">
+                      {l.work_category}工程 報工
+                    </h4>
                   </div>
-                  <h4 className="font-bold text-slate-800 text-lg">
-                    {l.work_category}工程 報工
-                  </h4>
-                </div>
-                <div className="flex gap-2 mb-3">
-                  <span className="px-2 py-1 bg-slate-100 text-slate-600 text-xs rounded">天氣: {l.weather}</span>
-                  <span className="px-2 py-1 bg-slate-100 text-slate-600 text-xs rounded">工務經理: {l.pm?.name || '無'}</span>
-                </div>
-                <div className="text-sm text-slate-600 mb-2">
-                  <strong className="block mb-1">現場工程師:</strong>
-                  {l.engineers ? safeParseJSON(l.engineers, []).join(', ') : '無'}
-                </div>
-                <div className="text-sm text-slate-600 mt-auto border-t border-slate-100 pt-3">
-                  <strong className="block mb-1">施工項目進度:</strong>
-                  <ul className="list-disc pl-4 space-y-1">
-                    {l.work_items && safeParseJSON(l.work_items, []).map((w: any, i: number) => (
-                      <li key={i}>
-                        <span className="font-medium">{w.name}</span>: {w.progress}
-                        {(w.worker_count || w.work_hours) && (
-                          <span className="text-xs text-slate-500 ml-2">({w.worker_count || 0}人 / {w.work_hours || 0}小時)</span>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                  <div className="mt-3 pt-3 border-t border-slate-100 flex gap-2 items-center flex-wrap">
-                    {l.safety_check_1 && l.safety_check_2 && l.safety_check_3 && (
-                      <span className="text-xs bg-green-50 text-green-700 px-2 py-1 rounded flex items-center gap-1"><CheckSquare size={12}/> 工安齊全</span>
-                    )}
-                    {l.photos && (
-                      <span className="text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded flex items-center gap-1">📷 {
-                        Array.isArray(safeParseJSON(l.photos, [])) 
-                          ? safeParseJSON(l.photos, []).length 
-                          : ((safeParseJSON(l.photos, {}).close?.length || 0) + (safeParseJSON(l.photos, {}).mid?.length || 0) + (safeParseJSON(l.photos, {}).far?.length || 0))
-                      } 張照片</span>
-                    )}
+                  <div className="flex gap-2 mb-3">
+                    <span className="px-2 py-1 bg-slate-100 text-slate-600 text-xs rounded">天氣: {l.weather}</span>
+                    <span className="px-2 py-1 bg-slate-100 text-slate-600 text-xs rounded">工務經理: {l.pm?.name || '無'}</span>
                   </div>
+                  <div className="text-sm text-slate-600 mb-2">
+                    <strong className="block mb-1">現場工程師:</strong>
+                    {l.engineers ? safeParseJSON(l.engineers, []).join(', ') : '無'}
+                  </div>
+                  <div className="text-sm text-slate-600 mt-auto border-t border-slate-100 pt-3">
+                    <strong className="block mb-1">施工項目進度:</strong>
+                    <ul className="list-disc pl-4 space-y-1">
+                      {l.work_items && safeParseJSON(l.work_items, []).map((w: any, i: number) => (
+                        <li key={i} className="mb-2 last:mb-0">
+                          <div>
+                            <span className="font-medium">{w.name}</span>
+                            {(w.worker_count || w.work_hours) && (
+                              <span className="text-xs text-slate-500 ml-2">({w.worker_count || 0}人 / {w.work_hours || 0}小時)</span>
+                            )}
+                          </div>
+                          {w.progress && (
+                            <div className="text-slate-500 mt-0.5 whitespace-pre-wrap">{w.progress}</div>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="mt-3 pt-3 border-t border-slate-100 flex gap-2 items-center flex-wrap">
+                      {l.safety_check_1 && l.safety_check_2 && l.safety_check_3 && (
+                        <span className="text-xs bg-green-50 text-green-700 px-2 py-1 rounded flex items-center gap-1"><CheckSquare size={12}/> 工安齊全</span>
+                      )}
+                      {l.photos && (
+                        <span className="text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded flex items-center gap-1">📷 {
+                          Array.isArray(safeParseJSON(l.photos, [])) 
+                            ? safeParseJSON(l.photos, []).length 
+                            : ((safeParseJSON(l.photos, {}).close?.length || 0) + (safeParseJSON(l.photos, {}).mid?.length || 0) + (safeParseJSON(l.photos, {}).far?.length || 0))
+                        } 張照片</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex border-t border-slate-100 divide-x divide-slate-100 bg-slate-50 rounded-b-xl overflow-hidden shrink-0">
+                  <button onClick={() => setViewingRecord({type: 'labor', data: l})} className="flex-1 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-100 hover:text-indigo-700 flex items-center justify-center gap-2 transition-colors"><FileText size={16}/> 檢視報表</button>
+                  <button onClick={() => handleEditLabor(l)} className="flex-1 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-100 hover:text-teal-700 flex items-center justify-center gap-2 transition-colors"><Edit2 size={16}/> 編輯</button>
                 </div>
               </div>
             ))}
@@ -631,25 +649,27 @@ const Onsite = () => {
                               delete newItems[idx].inspection;
                             }
                             setWorkItems(newItems);
-                          }} className="w-1/3 px-3 py-2 border rounded-lg outline-none">
+                          }} className="flex-1 px-3 py-2 border rounded-lg outline-none">
                             {categoryToItems[laborForm.work_category].map(opts => <option key={opts} value={opts}>{opts}</option>)}
                           </select>
-                          <input type="text" value={item.progress} onChange={e => {
-                            const newItems = [...workItems];
-                            newItems[idx].progress = e.target.value;
-                            setWorkItems(newItems);
-                          }} placeholder="填寫進度說明 (例: 已完成50%)" required className="flex-1 px-3 py-2 border rounded-lg outline-none" />
                           <input type="number" min="0" value={item.worker_count || ''} onChange={e => {
                             const newItems = [...workItems];
                             newItems[idx].worker_count = e.target.value;
                             setWorkItems(newItems);
-                          }} placeholder="人數" className="w-20 px-3 py-2 border rounded-lg outline-none" />
+                          }} placeholder="人數" className="w-24 px-3 py-2 border rounded-lg outline-none" />
                           <input type="number" min="0" step="0.5" value={item.work_hours || ''} onChange={e => {
                             const newItems = [...workItems];
                             newItems[idx].work_hours = e.target.value;
                             setWorkItems(newItems);
-                          }} placeholder="工時" className="w-20 px-3 py-2 border rounded-lg outline-none" />
-                          <button type="button" onClick={() => setWorkItems(workItems.filter((_, i) => i !== idx))} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 size={20}/></button>
+                          }} placeholder="工時" className="w-24 px-3 py-2 border rounded-lg outline-none" />
+                          <button type="button" onClick={() => setWorkItems(workItems.filter((_, i) => i !== idx))} className="p-2 text-red-500 hover:bg-red-50 rounded-lg shrink-0"><Trash2 size={20}/></button>
+                        </div>
+                        <div className="mt-2">
+                          <input type="text" value={item.progress} onChange={e => {
+                            const newItems = [...workItems];
+                            newItems[idx].progress = e.target.value;
+                            setWorkItems(newItems);
+                          }} placeholder="填寫進度說明 (例: 已完成50%)" required className="w-full px-3 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500" />
                         </div>
                         {item.inspection && laborForm.work_category === '土木' && INSPECTION_TEMPLATES[item.name] && (
                           <div className="mt-3 border-l-4 border-indigo-500 pl-4 py-2 bg-slate-50 rounded-r-xl">
@@ -875,6 +895,209 @@ const Onsite = () => {
             <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3 shrink-0 pb-safe">
               <button type="button" onClick={() => setIsLaborModalOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-200 rounded-lg">取消</button>
               <button type="submit" form="laborForm" className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">送出紀錄</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 報表檢視 Modal */}
+      {viewingRecord && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex justify-center items-start p-0 md:p-8 overflow-y-auto print:p-0 print:bg-white">
+          <style>{`
+            @media print {
+              body > *:not(#print-root) { display: none !important; }
+              #print-root { display: block !important; position: absolute; left: 0; top: 0; width: 100%; height: auto; background: white; margin: 0; padding: 0; }
+              .no-print { display: none !important; }
+              @page { size: auto; margin: 20mm; }
+            }
+          `}</style>
+          <div id="print-root" className="bg-white w-full max-w-4xl min-h-screen md:min-h-0 md:rounded-2xl shadow-2xl relative">
+            <div className="flex justify-between items-center p-4 border-b border-slate-100 shrink-0 sticky top-0 bg-white z-10 md:rounded-t-2xl no-print">
+              <h2 className="text-xl font-bold text-slate-800">
+                {viewingRecord.type === 'toolbox' ? '工具箱會議報表' : '施工日誌報表'}
+              </h2>
+              <div className="flex gap-2">
+                <button onClick={() => window.print()} className="p-2 text-slate-600 hover:bg-slate-100 hover:text-indigo-600 rounded-lg flex items-center gap-2 font-bold transition-colors">
+                  <Printer size={20} /> <span className="hidden sm:inline">列印報表</span>
+                </button>
+                <button onClick={() => setViewingRecord(null)} className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors">
+                  <X size={24} />
+                </button>
+              </div>
+            </div>
+            
+            <div className="p-6 md:p-10 space-y-8 text-slate-800 bg-white">
+              {viewingRecord.type === 'toolbox' && (
+                <>
+                  <div className="text-center mb-8 border-b-2 border-slate-800 pb-4">
+                    <h1 className="text-3xl font-black tracking-widest">{viewingRecord.data.project?.project_name || '無專案'}</h1>
+                    <h2 className="text-2xl font-bold mt-2 tracking-widest">勞工安全衛生工具箱會議紀錄表</h2>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 text-lg border-b border-slate-200 pb-6">
+                    <div><strong>會議日期：</strong> {new Date(viewingRecord.data.record_date).toLocaleDateString()}</div>
+                    <div><strong>工程名稱：</strong> {viewingRecord.data.work_category}工程</div>
+                    <div><strong>工務經理：</strong> {viewingRecord.data.pm?.name || '無'}</div>
+                    <div><strong>記錄人員：</strong> {viewingRecord.data.recorder?.name}</div>
+                    <div><strong>與會人數：</strong> {viewingRecord.data.worker_count} 人</div>
+                    <div className="col-span-2"><strong>參與人員：</strong> {viewingRecord.data.participants ? safeParseJSON(viewingRecord.data.participants, []).join(', ') : '無'}</div>
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold mb-3 border-l-4 border-indigo-600 pl-3">會議與宣導內容</h3>
+                    <p className="whitespace-pre-wrap leading-relaxed text-lg bg-slate-50 p-4 rounded-xl border border-slate-200">{viewingRecord.data.work_content}</p>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="border rounded-xl p-4 flex flex-col justify-between items-center text-center">
+                      <span className="font-bold mb-2">機具/設備檢查</span>
+                      {viewingRecord.data.safety_check_1 ? <CheckSquare className="text-green-600 w-8 h-8"/> : <div className="w-8 h-8 border-2 border-slate-300 rounded"></div>}
+                    </div>
+                    <div className="border rounded-xl p-4 flex flex-col justify-between items-center text-center">
+                      <span className="font-bold mb-2">安全防護具著裝</span>
+                      {viewingRecord.data.safety_check_2 ? <CheckSquare className="text-green-600 w-8 h-8"/> : <div className="w-8 h-8 border-2 border-slate-300 rounded"></div>}
+                    </div>
+                    <div className="border rounded-xl p-4 flex flex-col justify-between items-center text-center">
+                      <span className="font-bold mb-2">施工動線與環境安全</span>
+                      {viewingRecord.data.safety_check_3 ? <CheckSquare className="text-green-600 w-8 h-8"/> : <div className="w-8 h-8 border-2 border-slate-300 rounded"></div>}
+                    </div>
+                  </div>
+                  {viewingRecord.data.photos && safeParseJSON(viewingRecord.data.photos, []).length > 0 && (
+                    <div>
+                      <h3 className="text-xl font-bold mb-3 border-l-4 border-indigo-600 pl-3">會議照片</h3>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {safeParseJSON(viewingRecord.data.photos, []).map((p: string, i: number) => (
+                          <img key={i} src={`http://localhost:3001${p}`} alt="會議照片" className="w-full h-48 object-cover rounded-xl border shadow-sm" />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {viewingRecord.type === 'labor' && (
+                <>
+                  <div className="text-center mb-8 border-b-2 border-slate-800 pb-4">
+                    <h1 className="text-3xl font-black tracking-widest">{viewingRecord.data.project?.project_name || '無專案'}</h1>
+                    <h2 className="text-2xl font-bold mt-2 tracking-widest">施工日誌報表</h2>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 text-lg border-b border-slate-200 pb-6">
+                    <div><strong>報工日期：</strong> {new Date(viewingRecord.data.report_date).toLocaleDateString()}</div>
+                    <div><strong>天氣狀況：</strong> {viewingRecord.data.weather}</div>
+                    <div><strong>工程類別：</strong> {viewingRecord.data.work_category}工程</div>
+                    <div><strong>工務經理：</strong> {viewingRecord.data.pm?.name || '無'}</div>
+                    <div><strong>記錄人員：</strong> {viewingRecord.data.recorder?.name}</div>
+                    <div className="col-span-2"><strong>現場工程師：</strong> {viewingRecord.data.engineers ? safeParseJSON(viewingRecord.data.engineers, []).join(', ') : '無'}</div>
+                  </div>
+                  
+                  <div>
+                    <h3 className="text-xl font-bold mb-3 border-l-4 border-indigo-600 pl-3">施工項目與出工人數</h3>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse border border-slate-300">
+                        <thead>
+                          <tr className="bg-slate-100">
+                            <th className="border border-slate-300 p-2">工項名稱</th>
+                            <th className="border border-slate-300 p-2">施工進度</th>
+                            <th className="border border-slate-300 p-2 text-right">出工人數</th>
+                            <th className="border border-slate-300 p-2 text-right">施工時數</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {safeParseJSON(viewingRecord.data.work_items, []).map((w: any, i: number) => (
+                            <tr key={i}>
+                              <td className="border border-slate-300 p-2">{w.name}</td>
+                              <td className="border border-slate-300 p-2">{w.progress}</td>
+                              <td className="border border-slate-300 p-2 text-right">{w.worker_count || 0}</td>
+                              <td className="border border-slate-300 p-2 text-right">{w.work_hours || 0}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr className="bg-indigo-50 font-bold">
+                            <td colSpan={2} className="border border-slate-300 p-2 text-right">總計：</td>
+                            <td className="border border-slate-300 p-2 text-right text-indigo-700">{safeParseJSON(viewingRecord.data.work_items, []).reduce((acc: number, w: any) => acc + (Number(w.worker_count) || 0), 0)} 人</td>
+                            <td className="border border-slate-300 p-2 text-right text-indigo-700">{safeParseJSON(viewingRecord.data.work_items, []).reduce((acc: number, w: any) => acc + (Number(w.work_hours) || 0), 0)} 小時</td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div>
+                      <h3 className="text-xl font-bold mb-3 border-l-4 border-teal-600 pl-3">圖說確認</h3>
+                      <div className="bg-teal-50 border border-teal-200 p-4 rounded-xl space-y-2 text-teal-900">
+                        <div><strong>核准圖號：</strong> {viewingRecord.data.drawing_number}</div>
+                        <div><strong>最新版次：</strong> {viewingRecord.data.drawing_revision}</div>
+                        <div><strong>施工位置：</strong> {viewingRecord.data.construction_location}</div>
+                        <div><strong>核對結果：</strong> <span className="font-bold">{viewingRecord.data.drawing_check_result}</span></div>
+                        <div className="mt-2 pt-2 border-t border-teal-200/50 flex items-center gap-2 text-sm">
+                          {viewingRecord.data.drawing_check_confirmed ? <CheckSquare size={16}/> : <div className="w-4 h-4 border border-slate-400"></div>}
+                          我已核對核准圖號、最新版次、尺寸、高程及施工位置，確認結果如上。
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold mb-3 border-l-4 border-orange-600 pl-3">工安確認</h3>
+                      <div className="bg-orange-50 border border-orange-200 p-4 rounded-xl space-y-3 text-orange-900">
+                        <div className="flex items-start gap-2">
+                          {viewingRecord.data.safety_check_1 ? <CheckSquare size={20} className="shrink-0 text-orange-600"/> : <div className="w-5 h-5 shrink-0 border border-slate-400"></div>}
+                          <span>已落實勤前教育、危害告知與工具箱會議</span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          {viewingRecord.data.safety_check_2 ? <CheckSquare size={20} className="shrink-0 text-orange-600"/> : <div className="w-5 h-5 shrink-0 border border-slate-400"></div>}
+                          <span>人員已確實配戴個人防護具 (安全帽、反光背心等)</span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          {viewingRecord.data.safety_check_3 ? <CheckSquare size={20} className="shrink-0 text-orange-600"/> : <div className="w-5 h-5 shrink-0 border border-slate-400"></div>}
+                          <span>施工環境安全檢查無虞，動線及防護設施已就位</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {viewingRecord.data.photos && (
+                    <div>
+                      <h3 className="text-xl font-bold mb-3 border-l-4 border-indigo-600 pl-3">施工照片</h3>
+                      
+                      {safeParseJSON(viewingRecord.data.photos, {}).close?.length > 0 && (
+                        <div className="mb-4">
+                          <h4 className="font-bold text-slate-600 mb-2">近照</h4>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            {safeParseJSON(viewingRecord.data.photos, {}).close.map((p: string, i: number) => (
+                              <img key={i} src={`http://localhost:3001${p}`} alt="近照" className="w-full h-48 object-cover rounded-xl border shadow-sm" />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {safeParseJSON(viewingRecord.data.photos, {}).mid?.length > 0 && (
+                        <div className="mb-4">
+                          <h4 className="font-bold text-slate-600 mb-2">中距離照</h4>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            {safeParseJSON(viewingRecord.data.photos, {}).mid.map((p: string, i: number) => (
+                              <img key={i} src={`http://localhost:3001${p}`} alt="中距離照" className="w-full h-48 object-cover rounded-xl border shadow-sm" />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {safeParseJSON(viewingRecord.data.photos, {}).far?.length > 0 && (
+                        <div className="mb-4">
+                          <h4 className="font-bold text-slate-600 mb-2">遠距照</h4>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            {safeParseJSON(viewingRecord.data.photos, {}).far.map((p: string, i: number) => (
+                              <img key={i} src={`http://localhost:3001${p}`} alt="遠距照" className="w-full h-48 object-cover rounded-xl border shadow-sm" />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {viewingRecord.data.additional_notes && (
+                    <div>
+                      <h3 className="text-xl font-bold mb-3 border-l-4 border-slate-600 pl-3">補充說明</h3>
+                      <p className="whitespace-pre-wrap leading-relaxed text-lg bg-slate-50 p-4 rounded-xl border border-slate-200">{viewingRecord.data.additional_notes}</p>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </div>
         </div>
