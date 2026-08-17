@@ -29,9 +29,9 @@ const SystemSettings = () => {
   const fetchData = async () => {
     try {
       const [settingsRes, deptRes, roleRes] = await Promise.all([
-        axios.get('http://localhost:3001/api/settings', { headers: { Authorization: `Bearer ${token}` } }),
-        axios.get('http://localhost:3001/api/settings/departments', { headers: { Authorization: `Bearer ${token}` } }),
-        axios.get('http://localhost:3001/api/settings/roles', { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get('/api/settings', { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get('/api/settings/departments', { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get('/api/settings/roles', { headers: { Authorization: `Bearer ${token}` } }),
       ]);
       
       const settings = settingsRes.data;
@@ -49,7 +49,7 @@ const SystemSettings = () => {
 
   const handleSaveSmtp = async () => {
     try {
-      await axios.post('http://localhost:3001/api/settings', {
+      await axios.post('/api/settings', {
         settings: [
           { key: 'SMTP_HOST', value: smtpHost },
           { key: 'SMTP_PORT', value: smtpPort },
@@ -66,7 +66,7 @@ const SystemSettings = () => {
   const handleAddDept = async () => {
     if (!newDeptName) return;
     try {
-      await axios.post('http://localhost:3001/api/settings/departments', { name: newDeptName }, { headers: { Authorization: `Bearer ${token}` } });
+      await axios.post('/api/settings/departments', { name: newDeptName }, { headers: { Authorization: `Bearer ${token}` } });
       setNewDeptName('');
       fetchData();
     } catch (error) {
@@ -77,7 +77,7 @@ const SystemSettings = () => {
   const handleDeleteDept = async (id: string) => {
     if (!confirm('確定刪除此部門？')) return;
     try {
-      await axios.delete(`http://localhost:3001/api/settings/departments/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+      await axios.delete(`/api/settings/departments/${id}`, { headers: { Authorization: `Bearer ${token}` } });
       fetchData();
     } catch (error) {
       alert('刪除失敗，可能有使用者正在使用該部門');
@@ -87,7 +87,7 @@ const SystemSettings = () => {
   const handleAddRole = async () => {
     if (!newRoleName || !newRoleLevel) return;
     try {
-      await axios.post('http://localhost:3001/api/settings/roles', { name: newRoleName, level: newRoleLevel }, { headers: { Authorization: `Bearer ${token}` } });
+      await axios.post('/api/settings/roles', { name: newRoleName, level: newRoleLevel }, { headers: { Authorization: `Bearer ${token}` } });
       setNewRoleName('');
       setNewRoleLevel('');
       fetchData();
@@ -99,7 +99,7 @@ const SystemSettings = () => {
   const handleDeleteRole = async (id: string) => {
     if (!confirm('確定刪除此角色？')) return;
     try {
-      await axios.delete(`http://localhost:3001/api/settings/roles/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+      await axios.delete(`/api/settings/roles/${id}`, { headers: { Authorization: `Bearer ${token}` } });
       fetchData();
     } catch (error) {
       alert('刪除失敗，可能有使用者正在使用該角色');

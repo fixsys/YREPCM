@@ -18,8 +18,8 @@ const Projects = () => {
   const fetchData = async () => {
     try {
       const [projRes, tplRes] = await Promise.all([
-        axios.get('http://localhost:3001/api/projects', { headers: { Authorization: `Bearer ${token}` } }),
-        axios.get('http://localhost:3001/api/workflows/templates', { headers: { Authorization: `Bearer ${token}` } })
+        axios.get('/api/projects', { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get('/api/workflows/templates', { headers: { Authorization: `Bearer ${token}` } })
       ]);
       setProjects(projRes.data);
       setTemplates(tplRes.data);
@@ -53,7 +53,7 @@ const Projects = () => {
         start_date: newProject.start_date ? new Date(newProject.start_date).toISOString() : undefined,
         target_date: newProject.target_date ? new Date(newProject.target_date).toISOString() : undefined
       };
-      await axios.post('http://localhost:3001/api/projects', payload, {
+      await axios.post('/api/projects', payload, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setIsModalOpen(false);
@@ -69,7 +69,7 @@ const Projects = () => {
     if (!code) return;
     
     try {
-      await axios.post(`http://localhost:3001/api/projects/${id}/takeover`, { project_code: code.trim() }, {
+      await axios.post(`/api/projects/${id}/takeover`, { project_code: code.trim() }, {
         headers: { Authorization: `Bearer ${token}` }
       });
       alert('已成功接取並指派代碼！');
@@ -84,7 +84,7 @@ const Projects = () => {
     if (!reason) return;
     
     try {
-      await axios.post(`http://localhost:3001/api/projects/${id}/reject`, { reason: reason.trim() }, {
+      await axios.post(`/api/projects/${id}/reject`, { reason: reason.trim() }, {
         headers: { Authorization: `Bearer ${token}` }
       });
       alert('已成功退回專案給業務人員！');

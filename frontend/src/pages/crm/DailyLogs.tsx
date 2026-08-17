@@ -11,7 +11,7 @@ export default function DailyLogs() {
 
   const fetchHistory = async () => {
     try {
-      const res = await axios.get('http://localhost:3001/api/leads/utils/daily-logs', {
+      const res = await axios.get('/api/leads/utils/daily-logs', {
         headers: { Authorization: `Bearer ${JSON.parse(localStorage.getItem('auth-storage') || '{}').state?.token}` }
       });
       setHistory(res.data);
@@ -30,7 +30,7 @@ export default function DailyLogs() {
   const handleAutoGenerate = async () => {
     setIsGenerating(true);
     try {
-      const res = await axios.get('http://localhost:3001/api/leads/utils/daily-log-auto', {
+      const res = await axios.get('/api/leads/utils/daily-log-auto', {
         headers: { Authorization: `Bearer ${JSON.parse(localStorage.getItem('auth-storage') || '{}').state?.token}` }
       });
       // Append the auto text to existing content or replace it
@@ -45,7 +45,7 @@ export default function DailyLogs() {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await axios.post('http://localhost:3001/api/leads/utils/daily-log-save', { content: logContent }, {
+      await axios.post('/api/leads/utils/daily-log-save', { content: logContent }, {
         headers: { Authorization: `Bearer ${JSON.parse(localStorage.getItem('auth-storage') || '{}').state?.token}` }
       });
       alert('日誌已成功送出！主管(Chairman/TopManagement) 將會收到系統通知。');

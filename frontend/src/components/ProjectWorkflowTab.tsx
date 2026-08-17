@@ -17,9 +17,9 @@ const ProjectWorkflowTab = ({ projectId }: { projectId: string }) => {
   const fetchWorkflow = async () => {
     try {
       const [wfRes, deptRes, tasksRes] = await Promise.all([
-        axios.get(`http://localhost:3001/api/projects/${projectId}/workflow`, { headers: { Authorization: `Bearer ${token}` } }),
-        axios.get('http://localhost:3001/api/settings/departments', { headers: { Authorization: `Bearer ${token}` } }),
-        axios.get(`http://localhost:3001/api/tasks?project_id=${projectId}`, { headers: { Authorization: `Bearer ${token}` } })
+        axios.get(`/api/projects/${projectId}/workflow`, { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get('/api/settings/departments', { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get(`/api/tasks?project_id=${projectId}`, { headers: { Authorization: `Bearer ${token}` } })
       ]);
       
       const departments = deptRes.data;

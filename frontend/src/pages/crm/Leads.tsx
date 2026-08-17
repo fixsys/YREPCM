@@ -18,7 +18,7 @@ export default function Leads() {
 
   const fetchLeads = async () => {
     try {
-      const res = await axios.get('http://localhost:3001/api/leads', {
+      const res = await axios.get('/api/leads', {
         headers: { Authorization: `Bearer ${JSON.parse(localStorage.getItem('auth-storage') || '{}').state?.token}` }
       });
       setLeads(res.data);
@@ -29,7 +29,7 @@ export default function Leads() {
 
   const fetchUsers = async () => {
     try {
-      const res = await axios.get('http://localhost:3001/api/users', {
+      const res = await axios.get('/api/users', {
         headers: { Authorization: `Bearer ${JSON.parse(localStorage.getItem('auth-storage') || '{}').state?.token}` }
       });
       setUsers(res.data);
@@ -46,7 +46,7 @@ export default function Leads() {
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await axios.post('http://localhost:3001/api/leads', formData, {
+      await axios.post('/api/leads', formData, {
         headers: { Authorization: `Bearer ${JSON.parse(localStorage.getItem('auth-storage') || '{}').state?.token}` }
       });
       setShowAdd(false);

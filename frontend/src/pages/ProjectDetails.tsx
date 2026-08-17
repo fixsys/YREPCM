@@ -117,13 +117,13 @@ const ProjectDetails = () => {
   const fetchData = async () => {
     try {
       const [projectRes, logsRes, tasksRes, contribRes, filesRes, tplRes, wfRes] = await Promise.all([
-        axios.get(`http://localhost:3001/api/projects/${id}`, { headers: { Authorization: `Bearer ${token}` } }),
-        axios.get(`http://localhost:3001/api/logs/project/${id}`, { headers: { Authorization: `Bearer ${token}` } }),
-        axios.get(`http://localhost:3001/api/tasks?project_id=${id}`, { headers: { Authorization: `Bearer ${token}` } }),
-        axios.get(`http://localhost:3001/api/projects/${id}/contribution`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => ({ data: null })),
-        axios.get(`http://localhost:3001/api/projects/${id}/files`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => ({ data: [] })),
-        axios.get(`http://localhost:3001/api/workflows/templates`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => ({ data: [] })),
-        axios.get(`http://localhost:3001/api/projects/${id}/workflow`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => ({ data: null }))
+        axios.get(`/api/projects/${id}`, { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get(`/api/logs/project/${id}`, { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get(`/api/tasks?project_id=${id}`, { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get(`/api/projects/${id}/contribution`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => ({ data: null })),
+        axios.get(`/api/projects/${id}/files`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => ({ data: [] })),
+        axios.get(`/api/workflows/templates`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => ({ data: [] })),
+        axios.get(`/api/projects/${id}/workflow`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => ({ data: null }))
       ]);
       setProject(projectRes.data);
       setLogs(logsRes.data);
@@ -135,7 +135,7 @@ const ProjectDetails = () => {
       
       // Fetch users for assignment dropdowns
       try {
-        const usersRes = await axios.get('http://localhost:3001/api/users', { headers: { Authorization: `Bearer ${token}` } });
+        const usersRes = await axios.get('/api/users', { headers: { Authorization: `Bearer ${token}` } });
         setUsers(usersRes.data);
       } catch(e) {
         // Ignored if user doesn't have permission to list users
@@ -184,7 +184,7 @@ const ProjectDetails = () => {
         steel_rep_id: editProjectData.steel_rep_id || null,
         template_id: editProjectData.template_id || null
       };
-      await axios.put(`http://localhost:3001/api/projects/${id}`, payload, {
+      await axios.put(`/api/projects/${id}`, payload, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setIsEditProjectModalOpen(false);
@@ -218,7 +218,7 @@ const ProjectDetails = () => {
   const handleLogDelete = async (logId: string) => {
     if (!window.confirm('確定要刪除此工作日誌嗎？')) return;
     try {
-      await axios.delete(`http://localhost:3001/api/logs/${logId}`, {
+      await axios.delete(`/api/logs/${logId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       fetchData();
@@ -242,11 +242,11 @@ const ProjectDetails = () => {
 
     try {
       if (selectedLog) {
-        await axios.put(`http://localhost:3001/api/logs/${selectedLog.id}`, payload, {
+        await axios.put(`/api/logs/${selectedLog.id}`, payload, {
           headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' }
         });
       } else {
-        await axios.post(`http://localhost:3001/api/logs`, payload, {
+        await axios.post(`/api/logs`, payload, {
           headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' }
         });
       }
@@ -261,7 +261,7 @@ const ProjectDetails = () => {
     e.preventDefault();
     setTaskSubmitError('');
     try {
-      await axios.post('http://localhost:3001/api/tasks', { ...taskFormData, project_id: id }, {
+      await axios.post('/api/tasks', { ...taskFormData, project_id: id }, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setIsTaskModalOpen(false);
@@ -276,7 +276,7 @@ const ProjectDetails = () => {
     e.preventDefault();
     setWorkLogSubmitError('');
     try {
-      await axios.post('http://localhost:3001/api/work-logs', { ...workLogFormData, task_id: selectedTaskId, project_id: id }, {
+      await axios.post('/api/work-logs', { ...workLogFormData, task_id: selectedTaskId, project_id: id }, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setIsWorkLogModalOpen(false);
@@ -295,7 +295,7 @@ const ProjectDetails = () => {
     formData.append('category', fileCategory);
     formData.append('file', uploadFile);
     try {
-      await axios.post(`http://localhost:3001/api/projects/${id}/files`, formData, {
+      await axios.post(`/api/projects/${id}/files`, formData, {
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' }
       });
       setIsFileModalOpen(false);
@@ -309,7 +309,7 @@ const ProjectDetails = () => {
   const handleDeleteFile = async (fileId: string) => {
     if (!window.confirm('確定刪除此檔案？')) return;
     try {
-      await axios.delete(`http://localhost:3001/api/projects/${id}/files/${fileId}`, {
+      await axios.delete(`/api/projects/${id}/files/${fileId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       fetchData();
@@ -448,11 +448,11 @@ const ProjectDetails = () => {
                           return paths.map((path: string, idx: number) => {
                             const isImage = path.match(/\.(jpeg|jpg|gif|png|webp)$/i);
                             return isImage ? (
-                              <a key={idx} href={`http://localhost:3001${path}`} target="_blank" rel="noopener noreferrer" className="block relative w-16 h-16 rounded-md overflow-hidden border border-slate-200 hover:border-blue-500 transition-colors shadow-sm">
-                                <img src={`http://localhost:3001${path}`} alt={`附件 ${idx + 1}`} loading="lazy" className="w-full h-full object-cover" />
+                              <a key={idx} href={`${path}`} target="_blank" rel="noopener noreferrer" className="block relative w-16 h-16 rounded-md overflow-hidden border border-slate-200 hover:border-blue-500 transition-colors shadow-sm">
+                                <img src={`${path}`} alt={`附件 ${idx + 1}`} loading="lazy" className="w-full h-full object-cover" />
                               </a>
                             ) : (
-                              <a key={idx} href={`http://localhost:3001${path}`} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline flex items-center gap-1 bg-slate-50 px-2 py-1 rounded border border-slate-200 h-fit">
+                              <a key={idx} href={`${path}`} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline flex items-center gap-1 bg-slate-50 px-2 py-1 rounded border border-slate-200 h-fit">
                                 <Paperclip size={12} /> 附件 {idx + 1}
                               </a>
                             );
@@ -462,11 +462,11 @@ const ProjectDetails = () => {
                       
                       const isLegacyImage = log.attachment.match(/\.(jpeg|jpg|gif|png|webp)$/i);
                       return isLegacyImage ? (
-                        <a href={`http://localhost:3001${log.attachment}`} target="_blank" rel="noopener noreferrer" className="block relative w-16 h-16 rounded-md overflow-hidden border border-slate-200 hover:border-blue-500 transition-colors shadow-sm">
-                          <img src={`http://localhost:3001${log.attachment}`} alt="附件" loading="lazy" className="w-full h-full object-cover" />
+                        <a href={`${log.attachment}`} target="_blank" rel="noopener noreferrer" className="block relative w-16 h-16 rounded-md overflow-hidden border border-slate-200 hover:border-blue-500 transition-colors shadow-sm">
+                          <img src={`${log.attachment}`} alt="附件" loading="lazy" className="w-full h-full object-cover" />
                         </a>
                       ) : (
-                        <a href={`http://localhost:3001${log.attachment}`} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline flex items-center gap-1 bg-slate-50 px-2 py-1 rounded border border-slate-200 h-fit">
+                        <a href={`${log.attachment}`} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline flex items-center gap-1 bg-slate-50 px-2 py-1 rounded border border-slate-200 h-fit">
                           <Paperclip size={12} /> 查看附件
                         </a>
                       );
@@ -680,7 +680,7 @@ const ProjectDetails = () => {
                             <div className="flex items-center gap-3 overflow-hidden">
                               <FileIcon size={20} className="text-slate-400 flex-shrink-0" />
                               <div className="overflow-hidden">
-                                <a href={`http://localhost:3001${file.file_path}`} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-blue-600 hover:underline truncate block">
+                                <a href={`${file.file_path}`} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-blue-600 hover:underline truncate block">
                                   {file.file_name}
                                 </a>
                                 <p className="text-xs text-slate-500 mt-0.5">{new Date(file.uploaded_at).toLocaleDateString()} · 上傳者: {file.uploader?.name}</p>
@@ -895,11 +895,11 @@ const ProjectDetails = () => {
                               return paths.map((path: string, idx: number) => {
                                 const isImage = path.match(/\.(jpeg|jpg|gif|png|webp)$/i);
                                 return isImage ? (
-                                  <a key={idx} href={`http://localhost:3001${path}`} target="_blank" rel="noopener noreferrer" className="block relative w-16 h-16 rounded-md overflow-hidden border border-slate-200 hover:border-blue-500 transition-colors shadow-sm">
-                                    <img src={`http://localhost:3001${path}`} alt={`附件 ${idx + 1}`} className="w-full h-full object-cover" />
+                                  <a key={idx} href={`${path}`} target="_blank" rel="noopener noreferrer" className="block relative w-16 h-16 rounded-md overflow-hidden border border-slate-200 hover:border-blue-500 transition-colors shadow-sm">
+                                    <img src={`${path}`} alt={`附件 ${idx + 1}`} className="w-full h-full object-cover" />
                                   </a>
                                 ) : (
-                                  <a key={idx} href={`http://localhost:3001${path}`} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline flex items-center gap-1 bg-slate-50 px-2 py-1 rounded border border-slate-200 h-fit">
+                                  <a key={idx} href={`${path}`} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline flex items-center gap-1 bg-slate-50 px-2 py-1 rounded border border-slate-200 h-fit">
                                     附件 {idx + 1}
                                   </a>
                                 );
@@ -909,11 +909,11 @@ const ProjectDetails = () => {
                           
                           const isLegacyImage = selectedLog.attachment.match(/\.(jpeg|jpg|gif|png|webp)$/i);
                           return isLegacyImage ? (
-                            <a href={`http://localhost:3001${selectedLog.attachment}`} target="_blank" rel="noopener noreferrer" className="block relative w-16 h-16 rounded-md overflow-hidden border border-slate-200 hover:border-blue-500 transition-colors shadow-sm">
-                              <img src={`http://localhost:3001${selectedLog.attachment}`} alt="附件" className="w-full h-full object-cover" />
+                            <a href={`${selectedLog.attachment}`} target="_blank" rel="noopener noreferrer" className="block relative w-16 h-16 rounded-md overflow-hidden border border-slate-200 hover:border-blue-500 transition-colors shadow-sm">
+                              <img src={`${selectedLog.attachment}`} alt="附件" className="w-full h-full object-cover" />
                             </a>
                           ) : (
-                            <a href={`http://localhost:3001${selectedLog.attachment}`} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline flex items-center gap-1 bg-slate-50 px-2 py-1 rounded border border-slate-200 h-fit">
+                            <a href={`${selectedLog.attachment}`} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline flex items-center gap-1 bg-slate-50 px-2 py-1 rounded border border-slate-200 h-fit">
                               查看現有附件
                             </a>
                           );

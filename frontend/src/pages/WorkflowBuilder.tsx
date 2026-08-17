@@ -159,7 +159,7 @@ const WorkflowBuilderInner = () => {
     // Fetch users
     const fetchUsers = async () => {
       try {
-        const res = await axios.get('http://localhost:3001/api/users', {
+        const res = await axios.get('/api/users', {
           headers: { Authorization: `Bearer ${token}` }
         });
         setSystemUsers(res.data);

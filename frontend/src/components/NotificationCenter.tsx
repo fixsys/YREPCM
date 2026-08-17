@@ -12,7 +12,7 @@ const NotificationCenter = () => {
 
   const fetchNotifications = async () => {
     try {
-      const res = await axios.get('http://localhost:3001/api/notifications', {
+      const res = await axios.get('/api/notifications', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setNotifications(res.data.notifications);
@@ -42,7 +42,7 @@ const NotificationCenter = () => {
 
   const handleMarkAsRead = async (id: string) => {
     try {
-      await axios.patch(`http://localhost:3001/api/notifications/${id}/read`, {}, {
+      await axios.patch(`/api/notifications/${id}/read`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));

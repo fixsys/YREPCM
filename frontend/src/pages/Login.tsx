@@ -22,7 +22,7 @@ const Login = () => {
     setLoading(true);
 
     try {
-      const res = await axios.post('http://localhost:3001/api/auth/login', { account, password });
+      const res = await axios.post('/api/auth/login', { account, password });
       const { token, user, requirePasswordChange } = res.data;
       
       setAuth(token, user, requirePasswordChange, loginType);

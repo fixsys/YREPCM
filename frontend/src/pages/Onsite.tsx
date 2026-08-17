@@ -234,10 +234,10 @@ const Onsite = () => {
     setLoading(true);
     try {
       const [tbRes, laborRes, uRes, projRes] = await Promise.all([
-        axios.get('http://localhost:3001/api/toolbox-meetings', { headers: { Authorization: `Bearer ${token}` } }),
-        axios.get('http://localhost:3001/api/labor-reports', { headers: { Authorization: `Bearer ${token}` } }),
-        axios.get('http://localhost:3001/api/users', { headers: { Authorization: `Bearer ${token}` } }),
-        axios.get('http://localhost:3001/api/projects', { headers: { Authorization: `Bearer ${token}` } })
+        axios.get('/api/toolbox-meetings', { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get('/api/labor-reports', { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get('/api/users', { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get('/api/projects', { headers: { Authorization: `Bearer ${token}` } })
       ]);
       setToolboxMeetings(tbRes.data);
       setLaborReports(laborRes.data);
@@ -264,7 +264,7 @@ const Onsite = () => {
     toolboxPhotos.forEach(file => formData.append('photos', file));
 
     try {
-      const url = editingToolboxId ? `http://localhost:3001/api/toolbox-meetings/${editingToolboxId}` : 'http://localhost:3001/api/toolbox-meetings';
+      const url = editingToolboxId ? `/api/toolbox-meetings/${editingToolboxId}` : '/api/toolbox-meetings';
       const method = editingToolboxId ? 'put' : 'post';
       await axios[method](url, formData, {
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' }
@@ -331,7 +331,7 @@ const Onsite = () => {
       });
       formData.append('work_items', JSON.stringify(workItemsToSave));
 
-      const url = editingLaborId ? `http://localhost:3001/api/labor-reports/${editingLaborId}` : 'http://localhost:3001/api/labor-reports';
+      const url = editingLaborId ? `/api/labor-reports/${editingLaborId}` : '/api/labor-reports';
       const method = editingLaborId ? 'put' : 'post';
       await axios[method](url, formData, {
         headers: { 
@@ -473,7 +473,7 @@ const Onsite = () => {
                   {t.photos && (
                     <div className="mt-3 flex gap-2 overflow-x-auto">
                       {safeParseJSON(t.photos, []).map((p: string, i: number) => (
-                        <img key={i} src={`http://localhost:3001${p}`} alt="會議紀錄" className="w-12 h-12 rounded object-cover border" />
+                        <img key={i} src={`${p}`} alt="會議紀錄" className="w-12 h-12 rounded object-cover border" />
                       ))}
                     </div>
                   )}
@@ -881,7 +881,7 @@ const Onsite = () => {
                                 }
                               }} className="text-sm w-full" />
                               {typeof item.inspection!.photo === 'string' && (
-                                <img src={`http://localhost:3001${item.inspection!.photo}`} alt="已上傳" className="mt-2 h-16 w-16 object-cover rounded shadow" />
+                                <img src={`${item.inspection!.photo}`} alt="已上傳" className="mt-2 h-16 w-16 object-cover rounded shadow" />
                               )}
                             </div>
                           </div>
@@ -1111,7 +1111,7 @@ const Onsite = () => {
                       <h3 className="text-xl font-bold mb-3 border-l-4 border-indigo-600 pl-3">會議照片</h3>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         {safeParseJSON(viewingRecord.data.photos, []).map((p: string, i: number) => (
-                          <img key={i} src={`http://localhost:3001${p}`} alt="會議照片" className="w-full h-48 object-cover rounded-xl border shadow-sm" />
+                          <img key={i} src={`${p}`} alt="會議照片" className="w-full h-48 object-cover rounded-xl border shadow-sm" />
                         ))}
                       </div>
                     </div>
@@ -1240,7 +1240,7 @@ const Onsite = () => {
                             {typeof w.inspection.photo === 'string' && (
                               <div className="mt-4 pt-4 border-t border-slate-200">
                                 <h5 className="font-bold text-slate-700 text-sm mb-2">{INSPECTION_TEMPLATES[w.name]?.photoLabel || '檢查照片'}</h5>
-                                <img src={`http://localhost:3001${w.inspection.photo}`} alt="檢查照片" className="w-48 h-48 object-cover rounded-xl border shadow-sm" />
+                                <img src={`${w.inspection.photo}`} alt="檢查照片" className="w-48 h-48 object-cover rounded-xl border shadow-sm" />
                               </div>
                             )}
                           </div>
@@ -1291,7 +1291,7 @@ const Onsite = () => {
                           <h4 className="font-bold text-slate-600 mb-2">近照</h4>
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                             {safeParseJSON(viewingRecord.data.photos, {}).close.map((p: string, i: number) => (
-                              <img key={i} src={`http://localhost:3001${p}`} alt="近照" className="w-full h-48 object-cover rounded-xl border shadow-sm" />
+                              <img key={i} src={`${p}`} alt="近照" className="w-full h-48 object-cover rounded-xl border shadow-sm" />
                             ))}
                           </div>
                         </div>
@@ -1301,7 +1301,7 @@ const Onsite = () => {
                           <h4 className="font-bold text-slate-600 mb-2">中距離照</h4>
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                             {safeParseJSON(viewingRecord.data.photos, {}).mid.map((p: string, i: number) => (
-                              <img key={i} src={`http://localhost:3001${p}`} alt="中距離照" className="w-full h-48 object-cover rounded-xl border shadow-sm" />
+                              <img key={i} src={`${p}`} alt="中距離照" className="w-full h-48 object-cover rounded-xl border shadow-sm" />
                             ))}
                           </div>
                         </div>
@@ -1311,7 +1311,7 @@ const Onsite = () => {
                           <h4 className="font-bold text-slate-600 mb-2">遠距照</h4>
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                             {safeParseJSON(viewingRecord.data.photos, {}).far.map((p: string, i: number) => (
-                              <img key={i} src={`http://localhost:3001${p}`} alt="遠距照" className="w-full h-48 object-cover rounded-xl border shadow-sm" />
+                              <img key={i} src={`${p}`} alt="遠距照" className="w-full h-48 object-cover rounded-xl border shadow-sm" />
                             ))}
                           </div>
                         </div>

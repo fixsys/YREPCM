@@ -29,7 +29,7 @@ export default function LeadDetail() {
 
   const fetchLead = async () => {
     try {
-      const res = await axios.get(`http://localhost:3001/api/leads/${id}`, {
+      const res = await axios.get(`/api/leads/${id}`, {
         headers: { Authorization: `Bearer ${JSON.parse(localStorage.getItem('auth-storage') || '{}').state?.token}` }
       });
       setLead(res.data);
@@ -53,7 +53,7 @@ export default function LeadDetail() {
   const handleAddInteraction = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await axios.post(`http://localhost:3001/api/leads/${id}/interactions`, interactionData, {
+      await axios.post(`/api/leads/${id}/interactions`, interactionData, {
         headers: { Authorization: `Bearer ${JSON.parse(localStorage.getItem('auth-storage') || '{}').state?.token}` }
       });
       setShowInteractionAdd(false);
@@ -66,7 +66,7 @@ export default function LeadDetail() {
 
   const handleCreateRequirement = async (data: any) => {
     try {
-      await axios.post(`http://localhost:3001/api/leads/${id}/requirements`, data, {
+      await axios.post(`/api/leads/${id}/requirements`, data, {
         headers: { Authorization: `Bearer ${JSON.parse(localStorage.getItem('auth-storage') || '{}').state?.token}` }
       });
       setShowRequirementAdd(false);
@@ -78,7 +78,7 @@ export default function LeadDetail() {
 
   const handleEditRequirement = async (data: any) => {
     try {
-      await axios.put(`http://localhost:3001/api/leads/${id}/requirements`, data, {
+      await axios.put(`/api/leads/${id}/requirements`, data, {
         headers: { Authorization: `Bearer ${JSON.parse(localStorage.getItem('auth-storage') || '{}').state?.token}` }
       });
       setShowRequirementEdit(false);
@@ -93,7 +93,7 @@ export default function LeadDetail() {
 
     setIsConverting(true);
     try {
-      const res = await axios.post(`http://localhost:3001/api/leads/${id}/convert-to-project`, {}, {
+      const res = await axios.post(`/api/leads/${id}/convert-to-project`, {}, {
         headers: { Authorization: `Bearer ${JSON.parse(localStorage.getItem('auth-storage') || '{}').state?.token}` }
       });
       alert(`已成功拋轉至專案管理！請通知專案人員接取並建立代碼。`);
@@ -110,7 +110,7 @@ export default function LeadDetail() {
   const handleDelete = async () => {
     if (!confirm('確定要刪除此潛在客戶嗎？這會同時刪除所有的互動紀錄與需求單！')) return;
     try {
-      await axios.delete(`http://localhost:3001/api/leads/${id}`, {
+      await axios.delete(`/api/leads/${id}`, {
         headers: { Authorization: `Bearer ${JSON.parse(localStorage.getItem('auth-storage') || '{}').state?.token}` }
       });
       navigate('/crm/leads');
@@ -122,7 +122,7 @@ export default function LeadDetail() {
   const handleEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await axios.put(`http://localhost:3001/api/leads/${id}`, editFormData, {
+      await axios.put(`/api/leads/${id}`, editFormData, {
         headers: { Authorization: `Bearer ${JSON.parse(localStorage.getItem('auth-storage') || '{}').state?.token}` }
       });
       setShowEdit(false);

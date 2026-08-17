@@ -34,7 +34,7 @@ const Tasks = () => {
 
   const fetchTasks = async () => {
     try {
-      const res = await axios.get('http://localhost:3001/api/tasks', {
+      const res = await axios.get('/api/tasks', {
         headers: { Authorization: `Bearer ${token}` }
       });
       // The API returns all tasks. We'll filter them here to only show tasks assigned to me, 
@@ -54,7 +54,7 @@ const Tasks = () => {
 
   const fetchUsers = async () => {
     try {
-      const res = await axios.get('http://localhost:3001/api/users', {
+      const res = await axios.get('/api/users', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setUsers(res.data);
@@ -66,7 +66,7 @@ const Tasks = () => {
   const handleCreateGeneralTask = async () => {
     if (!newTaskName) return;
     try {
-      await axios.post('http://localhost:3001/api/tasks', {
+      await axios.post('/api/tasks', {
         name: newTaskName,
         task_type: 'GENERAL',
         due_date: newDueDate || null,
@@ -85,7 +85,7 @@ const Tasks = () => {
   const handleStatusChange = async (id: string, currentStatus: string) => {
     const nextStatus = currentStatus === '已完成' ? '未開始' : '已完成';
     try {
-      await axios.put(`http://localhost:3001/api/tasks/${id}`, { status: nextStatus }, {
+      await axios.put(`/api/tasks/${id}`, { status: nextStatus }, {
         headers: { Authorization: `Bearer ${token}` }
       });
       fetchTasks();
@@ -97,7 +97,7 @@ const Tasks = () => {
   const handleAcceptTask = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     try {
-      await axios.post(`http://localhost:3001/api/tasks/${id}/accept`, {}, {
+      await axios.post(`/api/tasks/${id}/accept`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
       fetchTasks();
@@ -114,7 +114,7 @@ const Tasks = () => {
     setMarkAsCompleted(task.status === '已完成');
     
     try {
-      const res = await axios.get(`http://localhost:3001/api/tasks/${task.id}/worklogs`, {
+      const res = await axios.get(`/api/tasks/${task.id}/worklogs`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setWorkLogs(res.data);
@@ -135,7 +135,7 @@ const Tasks = () => {
     setIsSubmittingLog(true);
     
     try {
-      await axios.post(`http://localhost:3001/api/tasks/${selectedTask.id}/worklogs`, {
+      await axios.post(`/api/tasks/${selectedTask.id}/worklogs`, {
         description: newLogDesc,
         logged_hours: newLogHours,
         is_completed: markAsCompleted

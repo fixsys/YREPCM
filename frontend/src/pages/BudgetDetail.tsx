@@ -48,7 +48,7 @@ const BudgetDetail = () => {
 
   const fetchTicket = async () => {
     try {
-      const res = await axios.get('http://localhost:3001/api/budget', {
+      const res = await axios.get('/api/budget', {
         headers: { Authorization: `Bearer ${token}` }
       });
       const current = res.data.find((t: any) => t.id === id);
@@ -195,7 +195,7 @@ const BudgetDetail = () => {
   const saveBudget = async () => {
     try {
       const totalAmount = budgetData.reduce((acc, cat) => acc + cat.items.reduce((sum: number, it: any) => sum + (it.quantity * it.unit_price || 0), 0), 0);
-      await axios.post(`http://localhost:3001/api/budget/${id}/budget-book`, {
+      await axios.post(`/api/budget/${id}/budget-book`, {
         items: budgetData,
         total_amount: totalAmount,
         notes: budgetNotes,
@@ -213,7 +213,7 @@ const BudgetDetail = () => {
   const saveQuotation = async () => {
     try {
       const totalPrice = quotationData.reduce((acc, cat) => acc + cat.items.reduce((sum: number, it: any) => sum + (it.quantity * it.unit_price || 0), 0), 0);
-      await axios.post(`http://localhost:3001/api/budget/${id}/quotation`, {
+      await axios.post(`/api/budget/${id}/quotation`, {
         items: quotationData,
         total_price: totalPrice,
         notes: quotationNotes
@@ -238,7 +238,7 @@ const BudgetDetail = () => {
       // Auto save both before completing
       await saveBudget();
       await saveQuotation();
-      await axios.post(`http://localhost:3001/api/budget/${id}/complete`, {}, {
+      await axios.post(`/api/budget/${id}/complete`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
       alert('已成功回拋給業務端');

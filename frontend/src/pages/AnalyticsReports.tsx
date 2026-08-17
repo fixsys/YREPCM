@@ -21,7 +21,7 @@ const AnalyticsReports = () => {
       if (filters.end_date) params.append('end_date', filters.end_date);
       if (filters.department) params.append('department', filters.department);
 
-      const res = await axios.get(`http://localhost:3001/api/reports/work-logs?${params.toString()}`, {
+      const res = await axios.get(`/api/reports/work-logs?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setReports(res.data.summary);

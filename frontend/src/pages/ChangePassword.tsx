@@ -20,7 +20,7 @@ const ChangePassword = () => {
 
     try {
       await axios.post(
-        'http://localhost:3001/api/auth/change-password',
+        '/api/auth/change-password',
         { oldPassword, newPassword },
         { headers: { Authorization: `Bearer ${token}` } }
       );

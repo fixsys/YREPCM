@@ -13,7 +13,7 @@ const Budget = () => {
 
   const fetchData = async () => {
     try {
-      const res = await axios.get('http://localhost:3001/api/budget', { 
+      const res = await axios.get('/api/budget', { 
         headers: { Authorization: `Bearer ${token}` } 
       });
       setTickets(res.data);
@@ -31,7 +31,7 @@ const Budget = () => {
   const handleTakeover = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      await axios.post(`http://localhost:3001/api/budget/${id}/takeover`, {}, {
+      await axios.post(`/api/budget/${id}/takeover`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
       fetchData();
@@ -44,7 +44,7 @@ const Budget = () => {
     e.stopPropagation();
     if (!confirm('確定要退回此需求單嗎？')) return;
     try {
-      await axios.post(`http://localhost:3001/api/budget/${id}/reject`, {}, {
+      await axios.post(`/api/budget/${id}/reject`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
       fetchData();

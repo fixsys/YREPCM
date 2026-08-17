@@ -27,7 +27,7 @@ const Users = () => {
 
   const fetchUsers = async () => {
     try {
-      const res = await axios.get('http://localhost:3001/api/users', {
+      const res = await axios.get('/api/users', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setUsers(res.data);
@@ -41,8 +41,8 @@ const Users = () => {
   const fetchSettings = async () => {
     try {
       const [deptRes, roleRes] = await Promise.all([
-        axios.get('http://localhost:3001/api/settings/departments', { headers: { Authorization: `Bearer ${token}` } }),
-        axios.get('http://localhost:3001/api/settings/roles', { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get('/api/settings/departments', { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get('/api/settings/roles', { headers: { Authorization: `Bearer ${token}` } }),
       ]);
       setDepartments(deptRes.data);
       setRoles(roleRes.data);
@@ -70,12 +70,12 @@ const Users = () => {
     setSubmitError('');
     try {
       if (selectedUser) {
-        await axios.put(`http://localhost:3001/api/users/${selectedUser.id}`, 
+        await axios.put(`/api/users/${selectedUser.id}`, 
           { name: formData.name, email: formData.email, department_id: formData.department_id, role_id: formData.role_id, is_active: true },
           { headers: { Authorization: `Bearer ${token}` } }
         );
       } else {
-        await axios.post('http://localhost:3001/api/users', formData, {
+        await axios.post('/api/users', formData, {
           headers: { Authorization: `Bearer ${token}` }
         });
       }
@@ -90,7 +90,7 @@ const Users = () => {
     e.preventDefault();
     setSubmitError('');
     try {
-      await axios.post(`http://localhost:3001/api/users/${selectedUser.id}/reset-password`, 
+      await axios.post(`/api/users/${selectedUser.id}/reset-password`, 
         { newPassword: resetPassword },
         { headers: { Authorization: `Bearer ${token}` } }
       );

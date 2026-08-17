@@ -49,7 +49,7 @@ export default function RequirementForm({ onSubmit, onCancel, initialData = {}, 
       const fetchUsers = async () => {
         try {
           const token = JSON.parse(localStorage.getItem('auth-storage') || '{}').state?.token;
-          const res = await axios.get('http://localhost:3001/api/users', {
+          const res = await axios.get('/api/users', {
             headers: { Authorization: `Bearer ${token}` }
           });
           setUsers(res.data);
