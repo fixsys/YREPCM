@@ -930,7 +930,7 @@ const Onsite = () => {
               {viewingRecord.type === 'toolbox' && (
                 <>
                   <div className="text-center mb-8 border-b-2 border-slate-800 pb-4">
-                    <h1 className="text-3xl font-black tracking-widest">{viewingRecord.data.project?.project_name || '無專案'}</h1>
+                    <h1 className="text-3xl font-black tracking-widest">{viewingRecord.data.project ? `${viewingRecord.data.project.project_code} ${viewingRecord.data.project.project_name}` : '無專案'}</h1>
                     <h2 className="text-2xl font-bold mt-2 tracking-widest">勞工安全衛生工具箱會議紀錄表</h2>
                   </div>
                   <div className="grid grid-cols-2 gap-4 text-lg border-b border-slate-200 pb-6">
@@ -975,7 +975,7 @@ const Onsite = () => {
               {viewingRecord.type === 'labor' && (
                 <>
                   <div className="text-center mb-8 border-b-2 border-slate-800 pb-4">
-                    <h1 className="text-3xl font-black tracking-widest">{viewingRecord.data.project?.project_name || '無專案'}</h1>
+                    <h1 className="text-3xl font-black tracking-widest">{viewingRecord.data.project ? `${viewingRecord.data.project.project_code} ${viewingRecord.data.project.project_name}` : '無專案'}</h1>
                     <h2 className="text-2xl font-bold mt-2 tracking-widest">施工日誌報表</h2>
                   </div>
                   <div className="grid grid-cols-2 gap-4 text-lg border-b border-slate-200 pb-6">
@@ -1019,6 +1019,52 @@ const Onsite = () => {
                       </table>
                     </div>
                   </div>
+
+                  {safeParseJSON(viewingRecord.data.work_items, []).some((w: any) => w.inspection) && (
+                    <div className="mt-8">
+                      <h3 className="text-xl font-bold mb-3 border-l-4 border-indigo-600 pl-3">自主檢查紀錄</h3>
+                      <div className="space-y-4">
+                        {safeParseJSON(viewingRecord.data.work_items, []).filter((w: any) => w.inspection).map((w: any, i: number) => (
+                          <div key={i} className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                            <h4 className="font-bold text-lg text-slate-800 mb-3 pb-2 border-b border-slate-200">{w.name} - 自主檢查表</h4>
+                            
+                            {Object.keys(w.inspection.fields || {}).length > 0 && (
+                              <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                                {Object.entries(w.inspection.fields).map(([k, v], idx) => (
+                                  <div key={idx}><span className="font-bold text-slate-600">{k}:</span> {v as string}</div>
+                                ))}
+                              </div>
+                            )}
+
+                            {w.inspection.checks && w.inspection.checks.length > 0 && (
+                              <div className="mb-4">
+                                <h5 className="font-bold text-slate-700 text-sm mb-2">檢查項目</h5>
+                                <div className="space-y-2">
+                                  {w.inspection.checks.map((checked: boolean, cIdx: number) => (
+                                    <div key={cIdx} className="flex items-start gap-2 text-sm">
+                                      {checked ? <CheckSquare size={18} className="text-indigo-600 shrink-0"/> : <div className="w-[18px] h-[18px] border-2 border-slate-300 rounded shrink-0"></div>}
+                                      <span>{INSPECTION_TEMPLATES[w.name]?.checks[cIdx] || `項目 ${cIdx + 1}`}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            
+                            <div className="flex gap-4 text-sm mt-4 pt-4 border-t border-slate-200">
+                              <div><span className="font-bold text-slate-600">檢查結果:</span> <span className={`font-bold ${w.inspection.result === '檢查合格' ? 'text-green-600' : 'text-orange-600'}`}>{w.inspection.result}</span></div>
+                              {w.inspection.note && <div><span className="font-bold text-slate-600">備註:</span> {w.inspection.note}</div>}
+                            </div>
+                            {typeof w.inspection.photo === 'string' && (
+                              <div className="mt-4 pt-4 border-t border-slate-200">
+                                <h5 className="font-bold text-slate-700 text-sm mb-2">{INSPECTION_TEMPLATES[w.name]?.photoLabel || '檢查照片'}</h5>
+                                <img src={`http://localhost:3001${w.inspection.photo}`} alt="檢查照片" className="w-48 h-48 object-cover rounded-xl border shadow-sm" />
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div>
