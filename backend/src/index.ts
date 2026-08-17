@@ -55,7 +55,7 @@ const frontendDistPath = path.join(__dirname, '../../frontend/dist');
 app.use(express.static(frontendDistPath));
 
 // Handle React Router fallback (Catch-all for non-API routes)
-app.get('*', (req, res) => {
+app.use((req, res) => {
   if (!req.path.startsWith('/api/') && !req.path.startsWith('/uploads/')) {
     res.sendFile(path.join(frontendDistPath, 'index.html'));
   } else {
