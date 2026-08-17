@@ -1,5 +1,21 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+
+const TimeInput24 = ({ value, onChange, className }: { value: string, onChange: (val: string) => void, className?: string }) => {
+  const [h, m] = value ? value.split(':') : ['08', '00'];
+  return (
+    <div className={`flex items-center justify-center bg-white border rounded ${className}`}>
+      <select value={h} onChange={e => onChange(`${e.target.value}:${m}`)} className="appearance-none bg-transparent outline-none text-center cursor-pointer hover:bg-slate-100 rounded py-1.5 w-12">
+        {Array.from({length: 24}, (_, i) => String(i).padStart(2, '0')).map(hour => <option key={hour} value={hour}>{hour}</option>)}
+      </select>
+      <span className="font-bold text-slate-400 pb-0.5">:</span>
+      <select value={m} onChange={e => onChange(`${h}:${e.target.value}`)} className="appearance-none bg-transparent outline-none text-center cursor-pointer hover:bg-slate-100 rounded py-1.5 w-12">
+        {Array.from({length: 60}, (_, i) => String(i).padStart(2, '0')).map(min => <option key={min} value={min}>{min}</option>)}
+      </select>
+    </div>
+  );
+};
+
 import { useAuthStore } from '../store/authStore';
 import { CheckSquare, Plus, Clock, Search, FolderKanban, Camera, X, Trash2, FileText, Edit2, Printer } from 'lucide-react';
 
@@ -62,6 +78,24 @@ const Onsite = () => {
   const [laborPhotosMid, setLaborPhotosMid] = useState<File[]>([]);
   const [laborPhotosFar, setLaborPhotosFar] = useState<File[]>([]);
   const [engineers, setEngineers] = useState<string[]>(['']);
+  type DispatchWorker = {
+    name: string;
+    start_time: string;
+    end_time: string;
+    work_category: string;
+    work_item: string;
+    work_hours: number;
+  };
+  const [dispatchWorkers, setDispatchWorkers] = useState<DispatchWorker[]>([]);
+
+  const calculateWorkHours = (start: string, end: string) => {
+    if (!start || !end) return 0;
+    const [startH, startM] = start.split(':').map(Number);
+    const [endH, endM] = end.split(':').map(Number);
+    let diffHours = (endH + endM / 60) - (startH + startM / 60);
+    if (startH <= 12 && endH >= 13) diffHours -= 1;
+    return Math.max(0, parseFloat(diffHours.toFixed(1)));
+  };
   const [viewingRecord, setViewingRecord] = useState<{type: 'toolbox' | 'labor', data: any} | null>(null);
   type WorkItem = {
     name: string;
@@ -125,6 +159,66 @@ const Onsite = () => {
       setWorkItems([newItem]);
     }
   }, [isLaborModalOpen, laborForm.work_category]);
+
+  useEffect(() => {
+    if (!isLaborModalOpen) return;
+    
+    const aggregated = dispatchWorkers
+      .filter(w => w.work_category === laborForm.work_category && w.name.trim() !== '')
+      .reduce((acc, w) => {
+        if (!w.work_item) return acc;
+        if (!acc[w.work_item]) {
+          acc[w.work_item] = { count: 0, hours: 0 };
+        }
+        acc[w.work_item].count += 1;
+        acc[w.work_item].hours += Number(w.work_hours) || 0;
+        return acc;
+      }, {} as Record<string, {count: number, hours: number}>);
+
+    const hasCategoryDispatch = dispatchWorkers.some(w => w.work_category === laborForm.work_category && w.name.trim() !== '');
+    if (!hasCategoryDispatch) return;
+
+    setWorkItems(prevItems => {
+      let newItems = [...prevItems];
+      let changed = false;
+
+      newItems = newItems.map(item => {
+        const agg = aggregated[item.name];
+        const newCount = agg ? agg.count.toString() : '';
+        const newHours = agg ? agg.hours.toString() : '';
+        if (item.worker_count !== newCount || item.work_hours !== newHours) {
+          changed = true;
+          return { ...item, worker_count: newCount, work_hours: newHours };
+        }
+        return item;
+      });
+
+      const existingNames = new Set(newItems.map(i => i.name));
+      for (const [itemName, data] of Object.entries(aggregated)) {
+        if (!existingNames.has(itemName)) {
+          changed = true;
+          const newItem: WorkItem = {
+            name: itemName,
+            progress: '',
+            worker_count: data.count.toString(),
+            work_hours: data.hours.toString()
+          };
+          if (laborForm.work_category === '土木' && INSPECTION_TEMPLATES[itemName]) {
+            const tpl = INSPECTION_TEMPLATES[itemName];
+            newItem.inspection = {
+              fields: tpl.fields.reduce((acc, f) => ({...acc, [f]: ''}), {}),
+              checks: new Array(tpl.checks.length).fill(false),
+              result: tpl.results[0],
+              note: ''
+            };
+          }
+          newItems.push(newItem);
+        }
+      }
+
+      return changed ? newItems : prevItems;
+    });
+  }, [dispatchWorkers, laborForm.work_category, isLaborModalOpen]);
 
   useEffect(() => {
     const urls = toolboxPhotos.map(file => URL.createObjectURL(file));
@@ -221,6 +315,7 @@ const Onsite = () => {
         formData.append(key, String(value));
       });
       formData.append('engineers', JSON.stringify(engineers.filter(e => e)));
+      formData.append('dispatch_workers', JSON.stringify(dispatchWorkers.filter(w => w.name && w.start_time && w.end_time)));
       laborPhotosClose.forEach(file => formData.append('photos_close', file));
       laborPhotosMid.forEach(file => formData.append('photos_mid', file));
       laborPhotosFar.forEach(file => formData.append('photos_far', file));
@@ -258,6 +353,7 @@ const Onsite = () => {
     setLaborPhotosMid([]);
     setLaborPhotosFar([]);
     setEngineers(['']);
+    setDispatchWorkers([{ name: '', start_time: '08:00', end_time: '17:00', work_category: '土木', work_item: categoryToItems['土木'][0], work_hours: 8 }]);
     setWorkItems([{name: categoryToItems['土木'][0], progress: '', worker_count: '', work_hours: ''}]);
     setIsLaborModalOpen(true);
   };
@@ -286,6 +382,8 @@ const Onsite = () => {
     setLaborPhotosFar([]);
     if (l.engineers) setEngineers(safeParseJSON(l.engineers, ['']));
     else setEngineers(['']);
+    if (l.dispatch_workers) setDispatchWorkers(safeParseJSON(l.dispatch_workers, []));
+    else setDispatchWorkers([{ name: '', start_time: '08:00', end_time: '17:00', work_category: '土木', work_item: categoryToItems['土木'][0], work_hours: 8 }]);
     if (l.work_items) setWorkItems(safeParseJSON(l.work_items, [{name: categoryToItems[l.work_category][0], progress: '', worker_count: '', work_hours: ''}]));
     else setWorkItems([{name: categoryToItems[l.work_category][0], progress: '', worker_count: '', work_hours: ''}]);
     setIsLaborModalOpen(true);
@@ -622,6 +720,63 @@ const Onsite = () => {
                 </div>
 
                 <div className="border-t border-slate-200 pt-4 mt-4">
+                  <label className="block text-sm font-bold text-slate-700 mb-2">現場派工人員</label>
+                  {dispatchWorkers.map((worker, idx) => (
+                    <div key={idx} className="flex flex-col gap-2 mb-3 p-3 bg-slate-50 border rounded-lg">
+                      <div className="flex flex-wrap gap-2 items-center">
+                        <input type="text" value={worker.name} onChange={e => {
+                          const newWorkers = [...dispatchWorkers];
+                          newWorkers[idx].name = e.target.value;
+                          setDispatchWorkers(newWorkers);
+                        }} placeholder="姓名" className="flex-1 min-w-[80px] px-3 py-1.5 text-sm border rounded outline-none" />
+
+                        <TimeInput24 value={worker.start_time} onChange={val => {
+                          const newWorkers = [...dispatchWorkers];
+                          newWorkers[idx].start_time = val;
+                          newWorkers[idx].work_hours = calculateWorkHours(val, worker.end_time);
+                          setDispatchWorkers(newWorkers);
+                        }} className="text-sm" />
+                        
+                        <span className="text-slate-500">-</span>
+                        
+                        <TimeInput24 value={worker.end_time} onChange={val => {
+                          const newWorkers = [...dispatchWorkers];
+                          newWorkers[idx].end_time = val;
+                          newWorkers[idx].work_hours = calculateWorkHours(worker.start_time, val);
+                          setDispatchWorkers(newWorkers);
+                        }} className="text-sm" />
+
+                        <div className="w-16 text-center text-sm font-bold text-indigo-700 shrink-0">
+                          {worker.work_hours} hr
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2 items-center mt-1">
+                        <select value={worker.work_category} onChange={e => {
+                          const newWorkers = [...dispatchWorkers];
+                          newWorkers[idx].work_category = e.target.value;
+                          newWorkers[idx].work_item = categoryToItems[e.target.value][0] || '';
+                          setDispatchWorkers(newWorkers);
+                        }} className="w-[84px] px-2 py-1.5 text-sm border rounded outline-none bg-white">
+                          {WORK_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                        
+                        <select value={worker.work_item || ''} onChange={e => {
+                          const newWorkers = [...dispatchWorkers];
+                          newWorkers[idx].work_item = e.target.value;
+                          setDispatchWorkers(newWorkers);
+                        }} className="flex-1 min-w-[120px] px-2 py-1.5 text-sm border rounded outline-none bg-white">
+                          {(categoryToItems[worker.work_category] || []).map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                        </select>
+
+                        <button type="button" onClick={() => setDispatchWorkers(dispatchWorkers.filter((_, i) => i !== idx))} className="p-1.5 text-red-500 hover:bg-red-100 rounded shrink-0"><Trash2 size={16}/></button>
+                      </div>
+                    </div>
+                  ))}
+                  <button type="button" onClick={() => setDispatchWorkers([...dispatchWorkers, {name: '', start_time: '08:00', end_time: '17:00', work_category: '土木', work_item: categoryToItems['土木'][0], work_hours: 8}])} className="text-sm text-indigo-600 font-medium hover:underline">+ 新增派工人員</button>
+                </div>
+
+                <div className="border-t border-slate-200 pt-4 mt-4">
                   <label className="block text-sm font-bold text-slate-700 mb-2">工作類別與工項進度</label>
                   <select value={laborForm.work_category} onChange={e => {
                     setLaborForm({...laborForm, work_category: e.target.value});
@@ -652,16 +807,8 @@ const Onsite = () => {
                           }} className="flex-1 px-3 py-2 border rounded-lg outline-none">
                             {categoryToItems[laborForm.work_category].map(opts => <option key={opts} value={opts}>{opts}</option>)}
                           </select>
-                          <input type="number" min="0" value={item.worker_count || ''} onChange={e => {
-                            const newItems = [...workItems];
-                            newItems[idx].worker_count = e.target.value;
-                            setWorkItems(newItems);
-                          }} placeholder="人數" className="w-24 px-3 py-2 border rounded-lg outline-none" />
-                          <input type="number" min="0" step="0.5" value={item.work_hours || ''} onChange={e => {
-                            const newItems = [...workItems];
-                            newItems[idx].work_hours = e.target.value;
-                            setWorkItems(newItems);
-                          }} placeholder="工時" className="w-24 px-3 py-2 border rounded-lg outline-none" />
+                          <input type="text" readOnly value={item.worker_count ? `${item.worker_count} 人` : ''} placeholder="人數" className="w-24 px-3 py-2 border rounded-lg outline-none bg-slate-100 text-slate-500 cursor-not-allowed text-center font-medium" />
+                          <input type="text" readOnly value={item.work_hours ? `${item.work_hours} hr` : ''} placeholder="工時" className="w-24 px-3 py-2 border rounded-lg outline-none bg-slate-100 text-slate-500 cursor-not-allowed text-center font-medium" />
                           <button type="button" onClick={() => setWorkItems(workItems.filter((_, i) => i !== idx))} className="p-2 text-red-500 hover:bg-red-50 rounded-lg shrink-0"><Trash2 size={20}/></button>
                         </div>
                         <div className="mt-2">
@@ -986,6 +1133,42 @@ const Onsite = () => {
                     <div><strong>記錄人員：</strong> {viewingRecord.data.recorder?.name}</div>
                     <div className="col-span-2"><strong>現場工程師：</strong> {viewingRecord.data.engineers ? safeParseJSON(viewingRecord.data.engineers, []).join(', ') : '無'}</div>
                   </div>
+                  
+                  {viewingRecord.data.dispatch_workers && safeParseJSON(viewingRecord.data.dispatch_workers, []).length > 0 && (
+                    <div className="mt-6 mb-8">
+                      <h3 className="text-xl font-bold mb-3 border-l-4 border-indigo-600 pl-3">現場派工人員</h3>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse border border-slate-300">
+                          <thead>
+                            <tr className="bg-slate-100 text-sm">
+                              <th className="border border-slate-300 p-2">姓名</th>
+                              <th className="border border-slate-300 p-2">工作類別與工項</th>
+                              <th className="border border-slate-300 p-2">上班時間</th>
+                              <th className="border border-slate-300 p-2">下班時間</th>
+                              <th className="border border-slate-300 p-2 text-right">工時</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {safeParseJSON(viewingRecord.data.dispatch_workers, []).map((w: any, i: number) => (
+                              <tr key={i} className="text-sm">
+                                <td className="border border-slate-300 p-2">{w.name}</td>
+                                <td className="border border-slate-300 p-2">{w.work_category} - {w.work_item}</td>
+                                <td className="border border-slate-300 p-2">{w.start_time}</td>
+                                <td className="border border-slate-300 p-2">{w.end_time}</td>
+                                <td className="border border-slate-300 p-2 text-right font-medium">{w.work_hours}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot>
+                            <tr className="bg-indigo-50 font-bold text-sm">
+                              <td colSpan={4} className="border border-slate-300 p-2 text-right">總派工時數：</td>
+                              <td className="border border-slate-300 p-2 text-right text-indigo-700">{safeParseJSON(viewingRecord.data.dispatch_workers, []).reduce((acc: number, w: any) => acc + (Number(w.work_hours) || 0), 0)} hr</td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </div>
+                  )}
                   
                   <div>
                     <h3 className="text-xl font-bold mb-3 border-l-4 border-indigo-600 pl-3">施工項目與出工人數</h3>

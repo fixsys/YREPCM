@@ -471,6 +471,7 @@ model DailyLaborReport {
   recorder_id     String
   pm_id           String?
   engineers       Json?    // Array of engineer IDs or names
+  dispatch_workers Json?   // Field dispatch workers
   work_category   String
   work_items              Json?    // Specific work items progress
   drawing_number          String?
