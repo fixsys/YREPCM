@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>每日施工日誌</title>
+  <style>
+    @page { size: A4 portrait; margin: 10mm; }
+    body {
+      font-family: 'Microsoft JhengHei', 'Noto Sans TC', sans-serif;
+      margin: 0;
+      padding: 0;
+      color: #000;
+      font-size: 11px;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      padding-bottom: 5px;
+      border-bottom: 1px solid #000;
+      margin-bottom: 5px;
+    }
+    .logo-placeholder {
+      width: 50px;
+      height: 50px;
+      background: #ccc;
+      border-radius: 50%;
+      margin-right: 15px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      color: #666;
+    }
+    .company-info {
+      flex: 1;
+    }
+    .company-name {
+      font-size: 22px;
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+    .company-name .en {
+      color: #4a8b71; /* approximate green from image */
+      font-size: 18px;
+      margin-left: 10px;
+    }
+    .company-details {
+      font-size: 11px;
+      color: #333;
+    }
+    .title {
+      text-align: center;
+      font-size: 18px;
+      font-weight: bold;
+      margin: 10px 0;
+      letter-spacing: 5px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+    td, th {
+      border: 1px solid #000;
+      padding: 4px 6px;
+      text-align: center;
+      vertical-align: middle;
+      height: 24px;
+    }
+    .left-align { text-align: left; }
+    .no-border-bottom { border-bottom: none; }
+    .no-border-top { border-top: none; }
+    
+    .watermark {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 80px;
+      color: rgba(0,0,0,0.1);
+      z-index: -1;
+      pointer-events: none;
+    }
+    
+    .checkbox {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border: 1px solid #000;
+      margin-right: 2px;
+      vertical-align: middle;
+      text-align: center;
+      line-height: 10px;
+      font-size: 10px;
+    }
+    .checkbox.checked::after {
+      content: '■';
+    }
+    .checkbox.unchecked::after {
+      content: '□';
+      border: none;
+    }
+
+    .safety-section {
+      text-align: left;
+      padding: 10px;
+      line-height: 1.8;
+    }
+    .footer-row td {
+      border: none;
+      text-align: left;
+      padding-top: 15px;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="watermark">第 <%= page %> 頁</div>
+  
+  <div class="header">
+    <div class="logo-placeholder">LOGO</div>
+    <div class="company-info">
+      <div class="company-name">元融科技有限公司 <span class="en">YUANRONG TECHNOLOGY</span></div>
+      <div class="company-details">744 台南市新市區港墘里自由街9號 | 06-5897049 | 統編 24903014</div>
+    </div>
+  </div>
+
+  <div class="title">每日施工日誌</div>
+
+  <table>
+    <colgroup>
+      <col style="width: 12.5%">
+      <col style="width: 12.5%">
+      <col style="width: 12.5%">
+      <col style="width: 12.5%">
+      <col style="width: 12.5%">
+      <col style="width: 12.5%">
+      <col style="width: 12.5%">
+      <col style="width: 12.5%">
+    </colgroup>
+    
+    <!-- Table 1: Info -->
+    <tr>
+      <td>業主</td>
+      <td colspan="3"><%= report.project?.owner || '' %></td>
+      <td>填報日期</td>
+      <td><%= reportDate %></td>
+      <td>星期</td>
+      <td><%= dayOfWeek %></td>
+    </tr>
+    <tr>
+      <td>工程名稱</td>
+      <td colspan="3"><%= report.project?.name || '' %></td>
+      <td>容量</td>
+      <td><%= report.project?.capacity || '' %></td>
+      <td>天氣</td>
+      <td><%= report.weather || '' %></td>
+    </tr>
+    <tr>
+      <td colspan="2">開工日期</td>
+      <td colspan="2"><%= startDate %></td>
+      <td colspan="2">總工期</td>
+      <td><%= totalDuration %></td>
+      <td>天</td>
+    </tr>
+    <tr>
+      <td colspan="2">預計完工日期</td>
+      <td colspan="2"><%= endDate %></td>
+      <td colspan="2">累計工期</td>
+      <td><%= accumulatedDuration %></td>
+      <td>天</td>
+    </tr>
+    <tr>
+      <td colspan="2">延展工期</td>
+      <td colspan="2">0</td>
+      <td colspan="2">剩餘工期</td>
+      <td><%= remainingDuration %></td>
+      <td>天</td>
+    </tr>
+
+    <!-- Table 2: Work Items -->
+    <tr>
+      <td colspan="3">施工項目</td>
+      <td>單位</td>
+      <td>契約數量</td>
+      <td>本日完成數量</td>
+      <td>累計完成數量</td>
+      <td>備註</td>
+    </tr>
+    <% for(let i=0; i<14; i++) { %>
+      <% const item = workItems[i] || {}; %>
+      <tr>
+        <td colspan="3" class="left-align"><%= item.name || '' %></td>
+        <td><%= item.name ? (item.unit || '式') : '' %></td>
+        <td><%= item.contractQty || '' %></td>
+        <td><%= item.progress || '' %></td>
+        <td><%= item.accumulatedQty || '' %></td>
+        <td><%= item.notes || '' %></td>
+      </tr>
+    <% } %>
+
+    <!-- Table 3: Workers & Equipments -->
+    <tr>
+      <td colspan="8" class="left-align" style="background-color: #f9f9f9;">工地人員及機具管理(含約定之出工人數及機具使用情形及數量)</td>
+    </tr>
+    <tr>
+      <td colspan="2">出工工別</td>
+      <td>本日人數</td>
+      <td>累計人數</td>
+      <td colspan="2">機具</td>
+      <td>數量</td>
+      <td>累計時數</td>
+    </tr>
+    <% for(let i=0; i<5; i++) { %>
+      <% const worker = workerStats[i] || {}; %>
+      <% const equip = equipStats[i] || {}; %>
+      <tr>
+        <td colspan="2"><%= worker.category || '' %></td>
+        <td><%= worker.today ? worker.today : '' %></td>
+        <td><%= worker.accumulated ? worker.accumulated : '' %></td>
+        <td colspan="2"><%= equip.name || '' %></td>
+        <td><%= equip.today ? equip.today : '' %></td>
+        <td><%= equip.accumulated ? equip.accumulated : '' %></td>
+      </tr>
+    <% } %>
+    <tr>
+      <td colspan="2">總累計人數</td>
+      <td><%= totalWorkerToday %></td>
+      <td><%= totalWorkerAccumulated %></td>
+      <td colspan="2">總計數量</td>
+      <td><%= totalEquipToday %></td>
+      <td><%= totalEquipAccumulated %></td>
+    </tr>
+
+    <!-- Table 4: Safety & Remarks -->
+    <tr>
+      <td colspan="8" class="safety-section">
+        <div>工地職業安全衛生事項之督導、公共環境與安全之維護及其他工地行政事務：</div>
+        <div style="margin-left: 10px;">(一)施工前檢查事項：</div>
+        <div style="margin-left: 20px;">
+          1. 工具箱會議(含工地預防災變及危害告知)： 
+          <span class="checkbox <%= report.toolbox_meeting ? 'checked' : 'unchecked' %>"></span>有 
+          <span class="checkbox <%= !report.toolbox_meeting ? 'checked' : 'unchecked' %>"></span>無
+        </div>
+        <div style="margin-left: 20px;">
+          2. 確認新進勞工是否提報勞工保險(或其他商業保險)資料及安全衛生教育訓練紀錄：<br>
+          <span class="checkbox <%= report.safety_check_2 === '有' ? 'checked' : 'unchecked' %>"></span>有 
+          <span class="checkbox <%= report.safety_check_2 === '無' ? 'checked' : 'unchecked' %>"></span>無 
+          <span class="checkbox <%= report.safety_check_2 === '無新進勞工' || !report.safety_check_2 ? 'checked' : 'unchecked' %>"></span>無新進勞工
+        </div>
+        <div style="margin-left: 20px;">
+          3. 檢查勞工個人防護具： 
+          <span class="checkbox <%= report.safety_check_1 ? 'checked' : 'unchecked' %>"></span>有 
+          <span class="checkbox <%= !report.safety_check_1 ? 'checked' : 'unchecked' %>"></span>無
+        </div>
+      </td>
+    </tr>
+    <tr>
+      <td colspan="8" class="left-align" style="height: 40px; vertical-align: top;">備註：<br><%= report.additional_notes || '' %></td>
+    </tr>
+    <tr>
+      <td colspan="8" class="left-align" style="height: 40px; vertical-align: top;">明日工作規劃：<br><%= report.tomorrow_plan || '' %></td>
+    </tr>
+  </table>
+
+  <table style="border: none; margin-top: 10px;">
+    <tr class="footer-row">
+      <td style="width: 33%">專管：</td>
+      <td style="width: 33%">經辦：<%= report.recorder?.name || '' %></td>
+      <td style="width: 34%">現場負責人：<%= report.pm?.name || '' %></td>
+    </tr>
+  </table>
+</body>
+</html>

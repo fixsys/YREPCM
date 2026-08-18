@@ -4,6 +4,8 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import ExcelJS from 'exceljs';
+import * as puppeteer from 'puppeteer';
+import * as ejs from 'ejs';
 import { authenticateToken, AuthRequest } from '../middleware/authMiddleware';
 
 const router = Router();
@@ -371,6 +373,150 @@ router.get('/:id/export', authenticateToken, async (req: AuthRequest, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: '匯出報工紀錄失敗' });
+  }
+});
+
+// Helper to diff days
+function getDiffDays(d1: Date, d2: Date) {
+  if (!d1 || !d2) return 0;
+  const t1 = d1.getTime();
+  const t2 = d2.getTime();
+  return Math.max(0, Math.ceil((t2 - t1) / (1000 * 3600 * 24)));
+}
+
+// Export labor report to PDF
+router.get('/:id/export-pdf', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const report: any = await prisma.dailyLaborReport.findUnique({
+      where: { id: String(req.params.id) },
+      include: {
+        project: true,
+        recorder: true,
+        pm: true
+      }
+    });
+
+    if (!report) return res.status(404).json({ error: '找不到報工紀錄' });
+
+    // Accumulated queries
+    const pastReports = await prisma.dailyLaborReport.findMany({
+      where: {
+        project_id: report.project_id,
+        report_date: { lte: report.report_date }
+      }
+    });
+
+    const accumulatedWorkers: Record<string, number> = {};
+    const accumulatedEquip: Record<string, number> = {};
+
+    for (const r of pastReports) {
+      let wList = [];
+      let eList = [];
+      try { wList = JSON.parse((r.dispatch_workers as string) || '[]'); } catch(e){}
+      try { eList = JSON.parse((r.equipments as string) || '[]'); } catch(e){}
+      
+      for (const w of wList) {
+        const cat = w.work_category || '一般工';
+        accumulatedWorkers[cat] = (accumulatedWorkers[cat] || 0) + 1;
+      }
+      for (const eq of eList) {
+        const name = eq.name || '機具';
+        accumulatedEquip[name] = (accumulatedEquip[name] || 0) + (Number(eq.qty) || 1); // using qty instead of hours
+      }
+    }
+
+    const reportDate = new Date(report.report_date);
+    const dateStr = `${reportDate.getFullYear()}/${(reportDate.getMonth()+1).toString().padStart(2,'0')}/${reportDate.getDate().toString().padStart(2,'0')}`;
+    const days = ['日', '一', '二', '三', '四', '五', '六'];
+    
+    const pStart = report.project?.start_date ? new Date(report.project.start_date) : new Date();
+    const pEnd = report.project?.target_date ? new Date(report.project.target_date) : new Date();
+    
+    const totalDuration = getDiffDays(pStart, pEnd);
+    const accumulatedDuration = getDiffDays(pStart, reportDate);
+    const remainingDuration = getDiffDays(reportDate, pEnd);
+
+    let workItems = [];
+    try { workItems = JSON.parse(report.work_items as string || '[]'); } catch(e){}
+    let workers = [];
+    try { workers = JSON.parse(report.dispatch_workers as string || '[]'); } catch(e){}
+    let equips = [];
+    try { equips = JSON.parse(report.equipments as string || '[]'); } catch(e){}
+
+    const todayWorkers: Record<string, number> = {};
+    for (const w of workers) {
+      const cat = w.work_category || '一般工';
+      todayWorkers[cat] = (todayWorkers[cat] || 0) + 1;
+    }
+    const todayEquips: Record<string, number> = {};
+    for (const eq of equips) {
+      const name = eq.name || '機具';
+      todayEquips[name] = (todayEquips[name] || 0) + (Number(eq.qty) || 1);
+    }
+
+    // Merge into arrays for the template (5 rows max)
+    const workerStats: { category: string, today: number, accumulated: number }[] = [];
+    const equipStats: { name: string, today: number, accumulated: number }[] = [];
+    let totalWorkerToday = 0;
+    let totalWorkerAccumulated = 0;
+    let totalEquipToday = 0;
+    let totalEquipAccumulated = 0;
+
+    Object.keys(accumulatedWorkers).forEach(cat => {
+      const t = todayWorkers[cat] || 0;
+      const a = accumulatedWorkers[cat] || 0;
+      workerStats.push({ category: cat, today: t, accumulated: a });
+      totalWorkerToday += t;
+      totalWorkerAccumulated += a;
+    });
+
+    Object.keys(accumulatedEquip).forEach(name => {
+      const t = todayEquips[name] || 0;
+      const a = accumulatedEquip[name] || 0;
+      equipStats.push({ name: name, today: t, accumulated: a });
+      totalEquipToday += t;
+      totalEquipAccumulated += a;
+    });
+
+    const templatePath = path.join(__dirname, '../templates/labor-report-pdf.ejs');
+    const html = await ejs.renderFile(templatePath, {
+      page: 1,
+      report,
+      reportDate: dateStr,
+      dayOfWeek: days[reportDate.getDay()],
+      startDate: pStart.toLocaleDateString(),
+      endDate: pEnd.toLocaleDateString(),
+      totalDuration,
+      accumulatedDuration,
+      remainingDuration,
+      workItems,
+      workerStats,
+      equipStats,
+      totalWorkerToday,
+      totalWorkerAccumulated,
+      totalEquipToday,
+      totalEquipAccumulated
+    });
+
+    const browser = await puppeteer.launch({ headless: true });
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: 'load' });
+    const pdfBuffer = await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      margin: { top: '10mm', right: '10mm', bottom: '10mm', left: '10mm' }
+    });
+    await browser.close();
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="labor-report-${report.id}.pdf"`,
+      'Content-Length': String(pdfBuffer.length)
+    });
+    res.end(pdfBuffer);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: '匯出 PDF 失敗' });
   }
 });
 
