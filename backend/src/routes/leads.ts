@@ -703,6 +703,7 @@ router.post('/:id/convert-to-project', authenticateToken, async (req: AuthReques
         name: existingLead.site_name || existingLead.company || existingLead.name,
         owner: existingLead.company || existingLead.name,
         status: '待接洽',
+        capacity: existingLead.requirementTicket.installation_capacity ? String(existingLead.requirementTicket.installation_capacity) : null,
         sales_rep_id: existingLead.assignee_id,
         content: `轉自業務開發潛在客戶: ${existingLead.name}. \n承攬形式: ${existingLead.requirementTicket.contract_type || '未填'}\n設置容量: ${existingLead.requirementTicket.installation_capacity || '未填'} kW`,
       }

@@ -791,6 +791,10 @@ const ProjectDetails = () => {
                   <label className="block text-sm font-medium text-slate-700 mb-1">預計結束日期</label>
                   <input type="date" value={editProjectData.target_date} onChange={e => setEditProjectData({...editProjectData, target_date: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">設置容量</label>
+                  <input type="text" value={editProjectData.capacity || ''} onChange={e => setEditProjectData({...editProjectData, capacity: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g. 3333 kW" />
+                </div>
                 <div className="col-span-2">
                   <label className="block text-sm font-medium text-slate-700 mb-1">專案內容</label>
                   <textarea value={editProjectData.content} onChange={e => setEditProjectData({...editProjectData, content: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" rows={3}></textarea>

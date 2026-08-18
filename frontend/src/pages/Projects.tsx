@@ -9,7 +9,7 @@ const Projects = () => {
   const [templates, setTemplates] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [newProject, setNewProject] = useState({ project_code: '', name: '', status: '評估中', owner: '', start_date: '', target_date: '', content: '', notes: '', template_id: '' });
+  const [newProject, setNewProject] = useState({ project_code: '', name: '', status: '評估中', owner: '', capacity: '', start_date: '', target_date: '', content: '', notes: '', template_id: '' });
   const [submitError, setSubmitError] = useState('');
   
   const { token, user } = useAuthStore();
@@ -57,7 +57,7 @@ const Projects = () => {
         headers: { Authorization: `Bearer ${token}` }
       });
       setIsModalOpen(false);
-      setNewProject({ project_code: '', name: '', status: '評估中', owner: '', start_date: '', target_date: '', content: '', notes: '', template_id: templates.length > 0 ? templates[0].id : '' });
+      setNewProject({ project_code: '', name: '', status: '評估中', owner: '', capacity: '', start_date: '', target_date: '', content: '', notes: '', template_id: templates.length > 0 ? templates[0].id : '' });
       fetchData();
     } catch (error: any) {
       setSubmitError(error.response?.data?.error || '新增專案失敗');
@@ -290,6 +290,10 @@ const Projects = () => {
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">業主名稱</label>
                   <input type="text" value={newProject.owner} onChange={e => setNewProject({...newProject, owner: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="業主名稱" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">設置容量</label>
+                  <input type="text" value={newProject.capacity} onChange={e => setNewProject({...newProject, capacity: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="e.g. 3333 kW" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">

@@ -78,6 +78,7 @@ model Project {
   target_date        DateTime?   @db.Date
   progress_pct       Int         @default(0)
   owner              String?
+  capacity           String?
   content            String?     @db.Text
   sales_rep_id       String?
   eng_rep_id         String?
