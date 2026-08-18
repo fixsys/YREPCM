@@ -152,7 +152,7 @@
       <td>工程名稱</td>
       <td colspan="3"><%= report.project?.name || '' %></td>
       <td>容量</td>
-      <td><%= report.project?.capacity || '' %></td>
+      <td><%= report.project?.capacity ? (report.project.capacity.toLowerCase().includes('w') ? report.project.capacity : report.project.capacity + ' kW') : '' %></td>
       <td>天氣</td>
       <td><%= report.weather || '' %></td>
     </tr>

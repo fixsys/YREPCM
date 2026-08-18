@@ -16,8 +16,13 @@ call npm run build
 
 echo.
 echo [3/5] Updating Database Schema...
+echo Stopping PM2 temporarily to release files...
+call npx pm2 stop yrpm-system || call pm2 stop yrpm-system
+
+cd backend
 call npx prisma db push
 call npx prisma generate
+cd ..
 
 echo.
 echo [4/5] Updating Frontend...
