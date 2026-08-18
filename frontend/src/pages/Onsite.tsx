@@ -88,6 +88,13 @@ const Onsite = () => {
   };
   const [dispatchWorkers, setDispatchWorkers] = useState<DispatchWorker[]>([]);
 
+  type Equipment = {
+    name: string;
+    quantity: number;
+    hours: number;
+  };
+  const [equipments, setEquipments] = useState<Equipment[]>([]);
+
   const calculateWorkHours = (start: string, end: string) => {
     if (!start || !end) return 0;
     const [startH, startM] = start.split(':').map(Number);
@@ -316,6 +323,7 @@ const Onsite = () => {
       });
       formData.append('engineers', JSON.stringify(engineers.filter(e => e)));
       formData.append('dispatch_workers', JSON.stringify(dispatchWorkers.filter(w => w.name && w.start_time && w.end_time)));
+      formData.append('equipments', JSON.stringify(equipments.filter(e => e.name && e.quantity > 0)));
       laborPhotosClose.forEach(file => formData.append('photos_close', file));
       laborPhotosMid.forEach(file => formData.append('photos_mid', file));
       laborPhotosFar.forEach(file => formData.append('photos_far', file));
@@ -354,6 +362,7 @@ const Onsite = () => {
     setLaborPhotosFar([]);
     setEngineers(['']);
     setDispatchWorkers([{ name: '', start_time: '08:00', end_time: '17:00', work_category: '土木', work_item: categoryToItems['土木'][0], work_hours: 8 }]);
+    setEquipments([]);
     setWorkItems([{name: categoryToItems['土木'][0], progress: '', worker_count: '', work_hours: ''}]);
     setIsLaborModalOpen(true);
   };
@@ -384,6 +393,8 @@ const Onsite = () => {
     else setEngineers(['']);
     if (l.dispatch_workers) setDispatchWorkers(safeParseJSON(l.dispatch_workers, []));
     else setDispatchWorkers([{ name: '', start_time: '08:00', end_time: '17:00', work_category: '土木', work_item: categoryToItems['土木'][0], work_hours: 8 }]);
+    if (l.equipments) setEquipments(safeParseJSON(l.equipments, []));
+    else setEquipments([]);
     if (l.work_items) setWorkItems(safeParseJSON(l.work_items, [{name: categoryToItems[l.work_category][0], progress: '', worker_count: '', work_hours: ''}]));
     else setWorkItems([{name: categoryToItems[l.work_category][0], progress: '', worker_count: '', work_hours: ''}]);
     setIsLaborModalOpen(true);
@@ -514,6 +525,14 @@ const Onsite = () => {
                     <strong className="block mb-1">現場工程師:</strong>
                     {l.engineers ? safeParseJSON(l.engineers, []).join(', ') : '無'}
                   </div>
+                  {l.equipments && safeParseJSON(l.equipments, []).length > 0 && (
+                    <div className="text-sm text-slate-600 mb-2">
+                      <strong className="block mb-1">機具使用:</strong>
+                      {safeParseJSON(l.equipments, []).map((e: any, i: number) => (
+                        <span key={i} className="mr-2 inline-block bg-slate-100 px-2 py-0.5 rounded text-xs">{e.name} {e.quantity}台 {e.hours}hr</span>
+                      ))}
+                    </div>
+                  )}
                   <div className="text-sm text-slate-600 mt-auto border-t border-slate-100 pt-3">
                     <strong className="block mb-1">施工項目進度:</strong>
                     <ul className="list-disc pl-4 space-y-1">
@@ -774,6 +793,36 @@ const Onsite = () => {
                     </div>
                   ))}
                   <button type="button" onClick={() => setDispatchWorkers([...dispatchWorkers, {name: '', start_time: '08:00', end_time: '17:00', work_category: '土木', work_item: categoryToItems['土木'][0], work_hours: 8}])} className="text-sm text-indigo-600 font-medium hover:underline">+ 新增派工人員</button>
+                </div>
+
+                <div className="border-t border-slate-200 pt-4 mt-4">
+                  <label className="block text-sm font-bold text-slate-700 mb-2">機具管理</label>
+                  {equipments.map((eq, idx) => (
+                    <div key={idx} className="flex flex-wrap gap-2 mb-3 p-3 bg-slate-50 border rounded-lg items-center">
+                      <select value={eq.name} onChange={e => {
+                        const newEqs = [...equipments];
+                        newEqs[idx].name = e.target.value;
+                        setEquipments(newEqs);
+                      }} className="flex-1 min-w-[150px] px-3 py-1.5 text-sm border rounded outline-none bg-white">
+                        <option value="">--請選擇機具--</option>
+                        {['怪手/山貓', '切割機/壓路機', '吊車/吊卡', '載運貨車/板車', '水泥車/幫浦車'].map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                      </select>
+                      <input type="number" min="0" value={eq.quantity} onChange={e => {
+                        const newEqs = [...equipments];
+                        newEqs[idx].quantity = Number(e.target.value);
+                        setEquipments(newEqs);
+                      }} placeholder="數量" className="w-[80px] px-3 py-1.5 text-sm border rounded outline-none" />
+                      <span className="text-sm text-slate-500">台</span>
+                      <input type="number" min="0" value={eq.hours} onChange={e => {
+                        const newEqs = [...equipments];
+                        newEqs[idx].hours = Number(e.target.value);
+                        setEquipments(newEqs);
+                      }} placeholder="小時" className="w-[80px] px-3 py-1.5 text-sm border rounded outline-none" />
+                      <span className="text-sm text-slate-500">小時</span>
+                      <button type="button" onClick={() => setEquipments(equipments.filter((_, i) => i !== idx))} className="p-1.5 text-red-500 hover:bg-red-100 rounded shrink-0"><Trash2 size={16}/></button>
+                    </div>
+                  ))}
+                  <button type="button" onClick={() => setEquipments([...equipments, {name: '', quantity: 1, hours: 8}])} className="text-sm text-indigo-600 font-medium hover:underline">+ 新增機具</button>
                 </div>
 
                 <div className="border-t border-slate-200 pt-4 mt-4">
