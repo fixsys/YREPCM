@@ -28,7 +28,11 @@ const upload = multer({ storage: storage });
 // Get toolbox meetings
 router.get('/', authenticateToken, async (req: AuthRequest, res) => {
   try {
+    const { project_id } = req.query;
+    const whereClause = project_id ? { project_id: String(project_id) } : {};
+
     const meetings = await prisma.toolboxMeeting.findMany({
+      where: whereClause,
       include: { recorder: { select: { name: true } }, project: { select: { project_code: true, name: true } } },
       orderBy: { created_at: 'desc' }
     });

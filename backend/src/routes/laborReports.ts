@@ -28,7 +28,11 @@ const upload = multer({ storage: storage });
 // Get daily labor reports
 router.get('/', authenticateToken, async (req: AuthRequest, res) => {
   try {
+    const { project_id } = req.query;
+    const whereClause = project_id ? { project_id: String(project_id) } : {};
+    
     const reports = await prisma.dailyLaborReport.findMany({
+      where: whereClause,
       include: { 
         project: { select: { project_code: true, name: true } },
         recorder: { select: { name: true } },

@@ -116,9 +116,10 @@ const ProjectDetails = () => {
 
   const fetchData = async () => {
     try {
-      const [projectRes, logsRes, tasksRes, contribRes, filesRes, tplRes, wfRes] = await Promise.all([
+      const [projectRes, toolboxRes, laborRes, tasksRes, contribRes, filesRes, tplRes, wfRes] = await Promise.all([
         axios.get(`/api/projects/${id}`, { headers: { Authorization: `Bearer ${token}` } }),
-        axios.get(`/api/logs/project/${id}`, { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get(`/api/toolbox-meetings?project_id=${id}`, { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get(`/api/labor-reports?project_id=${id}`, { headers: { Authorization: `Bearer ${token}` } }),
         axios.get(`/api/tasks?project_id=${id}`, { headers: { Authorization: `Bearer ${token}` } }),
         axios.get(`/api/projects/${id}/contribution`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => ({ data: null })),
         axios.get(`/api/projects/${id}/files`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => ({ data: [] })),
@@ -126,7 +127,13 @@ const ProjectDetails = () => {
         axios.get(`/api/projects/${id}/workflow`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => ({ data: null }))
       ]);
       setProject(projectRes.data);
-      setLogs(logsRes.data);
+      
+      const mergedLogs = [
+        ...(toolboxRes.data || []).map((t: any) => ({ ...t, _logType: 'toolbox', _date: t.record_date })),
+        ...(laborRes.data || []).map((l: any) => ({ ...l, _logType: 'labor', _date: l.report_date }))
+      ].sort((a, b) => new Date(b._date).getTime() - new Date(a._date).getTime());
+      
+      setLogs(mergedLogs);
       setTasks(tasksRes.data);
       setContributionData(contribRes.data);
       setProjectFiles(filesRes.data);
@@ -390,7 +397,7 @@ const ProjectDetails = () => {
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-2 flex gap-2 overflow-x-auto">
             {/* <button onClick={() => setActiveTab('workflow')} className={`px-4 py-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors flex-1 ${activeTab === 'workflow' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}>專案工作流</button> */}
             <button onClick={() => setActiveTab('requirements')} className={`px-4 py-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors flex-1 ${activeTab === 'requirements' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}>客戶需求單</button>
-            <button onClick={() => setActiveTab('logs')} className={`px-4 py-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors flex-1 ${activeTab === 'logs' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}>工作日誌</button>
+            <button onClick={() => setActiveTab('logs')} className={`px-4 py-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors flex-1 ${activeTab === 'logs' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}>施工日誌</button>
             <button onClick={() => setActiveTab('tasks')} className={`px-4 py-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors flex-1 ${activeTab === 'tasks' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}>任務與工時</button>
             <button onClick={() => setActiveTab('performance')} className={`px-4 py-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors flex-1 ${activeTab === 'performance' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}>專案績效與貢獻</button>
             <button onClick={() => setActiveTab('files')} className={`px-4 py-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors flex-1 ${activeTab === 'files' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}>專案檔案</button>
@@ -418,82 +425,50 @@ const ProjectDetails = () => {
 
           {activeTab === 'logs' && (
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="text-lg font-semibold text-slate-800">工作日誌</h3>
-            <button onClick={openCreateLogModal} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors">
-              <Plus size={16} /> 新增日誌
-            </button>
-          </div>
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-lg font-semibold text-slate-800">施工日誌</h3>
+                <button onClick={() => navigate('/onsite')} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors">
+                  <Plus size={16} /> 前往填寫
+                </button>
+              </div>
 
-          <div className="space-y-4">
-            {logs.map((log) => (
-              <div key={log.id} className="border border-slate-200 rounded-lg p-4 hover:border-blue-300 transition-colors">
-                <div className="flex justify-between items-start mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs font-medium">{log.department}</span>
-                    <h4 className="font-medium text-slate-800">{log.task_item}</h4>
+              <div className="space-y-4">
+                {logs.map((log) => (
+                  <div key={`${log._logType}-${log.id}`} className="border border-slate-200 rounded-lg p-4 hover:border-blue-300 transition-colors bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className={`px-2 py-1 text-xs font-bold rounded ${log._logType === 'toolbox' ? 'bg-indigo-100 text-indigo-700' : 'bg-teal-100 text-teal-700'}`}>
+                          {log._logType === 'toolbox' ? '工具箱會議' : '報工日誌'}
+                        </span>
+                        <h4 className="font-bold text-slate-800">{log.work_category}工程</h4>
+                      </div>
+                      <div className="text-sm text-slate-600 space-y-1">
+                        <p><strong className="text-slate-700">日期：</strong> {new Date(log._date).toLocaleDateString()}</p>
+                        {log._logType === 'toolbox' ? (
+                          <p><strong className="text-slate-700">宣導內容：</strong> {log.work_content}</p>
+                        ) : (
+                          <p><strong className="text-slate-700">明日規劃：</strong> {log.tomorrow_plan || '無'}</p>
+                        )}
+                        <p className="text-xs text-slate-400 mt-2">記錄人：{log.recorder?.name || '未知'}</p>
+                      </div>
+                    </div>
+                    
+                    <button 
+                      onClick={() => navigate(`/onsite?viewType=${log._logType}&viewId=${log.id}`)}
+                      className="whitespace-nowrap px-4 py-2 bg-white border border-slate-300 rounded-lg text-slate-700 font-bold hover:bg-slate-50 hover:text-blue-600 hover:border-blue-300 transition-colors shadow-sm flex items-center gap-2 text-sm"
+                    >
+                      <FileText size={16} /> 檢視報表
+                    </button>
                   </div>
-                  <span className="text-xs text-slate-500 flex items-center gap-1">
-                    <Clock size={12} /> {new Date(log.start_time).toLocaleDateString()}
-                  </span>
-                </div>
-                <p className="text-sm text-slate-600 mb-3">{log.sub_task || '無細項說明'}</p>
+                ))}
                 
-                {log.attachment && (
-                  <div className="flex gap-2 flex-wrap mb-3">
-                    {(() => {
-                      try {
-                        const paths = JSON.parse(log.attachment);
-                        if (Array.isArray(paths)) {
-                          return paths.map((path: string, idx: number) => {
-                            const isImage = path.match(/\.(jpeg|jpg|gif|png|webp)$/i);
-                            return isImage ? (
-                              <a key={idx} href={`${path}`} target="_blank" rel="noopener noreferrer" className="block relative w-16 h-16 rounded-md overflow-hidden border border-slate-200 hover:border-blue-500 transition-colors shadow-sm">
-                                <img src={`${path}`} alt={`附件 ${idx + 1}`} loading="lazy" className="w-full h-full object-cover" />
-                              </a>
-                            ) : (
-                              <a key={idx} href={`${path}`} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline flex items-center gap-1 bg-slate-50 px-2 py-1 rounded border border-slate-200 h-fit">
-                                <Paperclip size={12} /> 附件 {idx + 1}
-                              </a>
-                            );
-                          });
-                        }
-                      } catch (e) {}
-                      
-                      const isLegacyImage = log.attachment.match(/\.(jpeg|jpg|gif|png|webp)$/i);
-                      return isLegacyImage ? (
-                        <a href={`${log.attachment}`} target="_blank" rel="noopener noreferrer" className="block relative w-16 h-16 rounded-md overflow-hidden border border-slate-200 hover:border-blue-500 transition-colors shadow-sm">
-                          <img src={`${log.attachment}`} alt="附件" loading="lazy" className="w-full h-full object-cover" />
-                        </a>
-                      ) : (
-                        <a href={`${log.attachment}`} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline flex items-center gap-1 bg-slate-50 px-2 py-1 rounded border border-slate-200 h-fit">
-                          <Paperclip size={12} /> 查看附件
-                        </a>
-                      );
-                    })()}
+                {logs.length === 0 && (
+                  <div className="text-center py-8 text-slate-500 bg-slate-50 rounded-lg border border-dashed border-slate-300">
+                    目前尚無施工日誌記錄
                   </div>
                 )}
-
-                <div className="flex justify-between items-center mt-4 pt-3 border-t border-slate-100">
-                  <span className="text-xs text-slate-500">填寫人：{log.executor?.name}</span>
-                  <div className="flex items-center gap-3">
-                    {(user?.role === 'SystemAdmin' || user?.department === log.department) && (
-                      <>
-                        <button onClick={() => openEditLogModal(log)} className="text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1"><Edit2 size={12}/>編輯</button>
-                        <button onClick={() => handleLogDelete(log.id)} className="text-xs text-red-600 hover:text-red-800 font-medium flex items-center gap-1"><Trash2 size={12}/>刪除</button>
-                      </>
-                    )}
-                  </div>
-                </div>
               </div>
-            ))}
-            {logs.length === 0 && (
-              <div className="text-center py-8 text-slate-500 bg-slate-50 rounded-lg border border-dashed border-slate-300">
-                目前尚無工作日誌
-              </div>
-            )}
-          </div>
-          </div>
+            </div>
           )}
 
           {activeTab === 'tasks' && (

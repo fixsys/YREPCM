@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 const TimeInput24 = ({ value, onChange, className }: { value: string, onChange: (val: string) => void, className?: string }) => {
   const [h, m] = value ? value.split(':') : ['08', '00'];
@@ -257,6 +258,22 @@ const Onsite = () => {
       setLoading(false);
     }
   };
+
+  const location = useLocation();
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const viewType = searchParams.get('viewType');
+    const viewId = searchParams.get('viewId');
+    if (viewType && viewId) {
+      if (viewType === 'toolbox' && toolboxMeetings.length > 0) {
+        const t = toolboxMeetings.find(m => String(m.id) === viewId);
+        if (t) setViewingRecord({ type: 'toolbox', data: t });
+      } else if (viewType === 'labor' && laborReports.length > 0) {
+        const l = laborReports.find(r => String(r.id) === viewId);
+        if (l) setViewingRecord({ type: 'labor', data: l });
+      }
+    }
+  }, [location.search, toolboxMeetings, laborReports]);
 
   const handleToolboxSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
