@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuthStore } from '../store/authStore';
 import RequirementForm from './crm/RequirementForm';
-import { ArrowLeft, Clock, Calendar, User, FileText, Plus, Edit2, Trash2, Paperclip, Building2, AlignLeft, CheckCircle2, UploadCloud, File as FileIcon } from 'lucide-react';
+import { ArrowLeft, Clock, Calendar, User, FileText, Plus, Edit2, Trash2, Paperclip, Building2, AlignLeft, CheckCircle2, UploadCloud, File as FileIcon, Download } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import ProjectWorkflowTab from '../components/ProjectWorkflowTab';
 
@@ -453,12 +453,40 @@ const ProjectDetails = () => {
                       </div>
                     </div>
                     
-                    <button 
-                      onClick={() => navigate(`/onsite?viewType=${log._logType}&viewId=${log.id}`)}
-                      className="whitespace-nowrap px-4 py-2 bg-white border border-slate-300 rounded-lg text-slate-700 font-bold hover:bg-slate-50 hover:text-blue-600 hover:border-blue-300 transition-colors shadow-sm flex items-center gap-2 text-sm"
-                    >
-                      <FileText size={16} /> 檢視報表
-                    </button>
+                    <div className="flex items-center gap-2">
+                      {log._logType === 'labor' && (
+                        <button 
+                          onClick={async () => {
+                            try {
+                              const res = await axios.get(`/api/labor-reports/${log.id}/export`, {
+                                headers: { Authorization: `Bearer ${token}` },
+                                responseType: 'blob'
+                              });
+                              const url = window.URL.createObjectURL(new Blob([res.data]));
+                              const link = document.createElement('a');
+                              link.href = url;
+                              link.setAttribute('download', `施工日誌-${new Date(log._date).toLocaleDateString().replace(/\//g, '')}.xlsx`);
+                              document.body.appendChild(link);
+                              link.click();
+                              link.remove();
+                              window.URL.revokeObjectURL(url);
+                            } catch (e) {
+                              console.error(e);
+                              alert('匯出失敗');
+                            }
+                          }}
+                          className="whitespace-nowrap px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-700 font-bold hover:bg-emerald-100 hover:border-emerald-300 transition-colors shadow-sm flex items-center gap-2 text-sm"
+                        >
+                          <Download size={16} /> 匯出 Excel
+                        </button>
+                      )}
+                      <button 
+                        onClick={() => navigate(`/onsite?viewType=${log._logType}&viewId=${log.id}`)}
+                        className="whitespace-nowrap px-4 py-2 bg-white border border-slate-300 rounded-lg text-slate-700 font-bold hover:bg-slate-50 hover:text-blue-600 hover:border-blue-300 transition-colors shadow-sm flex items-center gap-2 text-sm"
+                      >
+                        <FileText size={16} /> 檢視報表
+                      </button>
+                    </div>
                   </div>
                 ))}
                 

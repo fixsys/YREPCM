@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import ExcelJS from 'exceljs';
 import { authenticateToken, AuthRequest } from '../middleware/authMiddleware';
 
 const router = Router();
@@ -185,6 +186,191 @@ router.put('/:id', authenticateToken, upload.any(), async (req: AuthRequest, res
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: '更新報工紀錄失敗' });
+  }
+});
+
+// Export labor report to Excel
+router.get('/:id/export', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const report = await prisma.dailyLaborReport.findUnique({
+      where: { id: req.params.id },
+      include: {
+        project: true,
+        recorder: true,
+        pm: true
+      }
+    });
+
+    if (!report) {
+      return res.status(404).json({ error: '找不到報工紀錄' });
+    }
+
+    const templatePath = path.join(__dirname, '../../../../施工日誌.xlsx');
+    if (!fs.existsSync(templatePath)) {
+      return res.status(500).json({ error: '找不到 Excel 範本檔案' });
+    }
+
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.readFile(templatePath);
+    const ws = wb.worksheets[0];
+
+    // Project Info
+    ws.getCell('C3').value = `依照合約工程名稱:${report.project?.name || ''}`;
+    
+    // Date & Weather
+    const reportDate = new Date(report.report_date);
+    const dateStr = `${reportDate.getMonth() + 1}/${reportDate.getDate()}`;
+    ws.getCell('N2').value = `今日施工${dateStr}`;
+    const days = ['日', '一', '二', '三', '四', '五', '六'];
+    ws.getCell('R2').value = days[reportDate.getDay()];
+    ws.getCell('R3').value = report.weather || '';
+
+    // Work Items (Rows 9-21)
+    let workItems = [];
+    try { workItems = JSON.parse(report.work_items as string || '[]'); } catch (e) {}
+    let rowIndex = 9;
+    for (const item of workItems) {
+      if (rowIndex <= 21) {
+        ws.getCell(`B${rowIndex}`).value = item.name || '';
+        ws.getCell(`H${rowIndex}`).value = item.unit || '式';
+        ws.getCell(`K${rowIndex}`).value = item.progress || '';
+        rowIndex++;
+      }
+    }
+
+    // Workers (Rows 24-28)
+    let workers = [];
+    try { workers = JSON.parse(report.dispatch_workers as string || '[]'); } catch (e) {}
+    
+    const workerStats: Record<string, number> = {};
+    for (const w of workers) {
+      const category = w.work_category || '一般工';
+      if (!workerStats[category]) workerStats[category] = 0;
+      workerStats[category] += 1;
+    }
+    
+    let wRow = 24;
+    let totalWorkers = 0;
+    for (const [category, count] of Object.entries(workerStats)) {
+      if (wRow <= 28) {
+        ws.getCell(`B${wRow}`).value = category;
+        ws.getCell(`D${wRow}`).value = count;
+        totalWorkers += count;
+        wRow++;
+      }
+    }
+    ws.getCell('D29').value = totalWorkers;
+
+    // Equipments (Rows 24-28)
+    let equipments = [];
+    try { equipments = JSON.parse(report.equipments as string || '[]'); } catch (e) {}
+    let eRow = 24;
+    let totalEquipHours = 0;
+    for (const eq of equipments) {
+      if (eRow <= 28) {
+        ws.getCell(`K${eRow}`).value = eq.name;
+        ws.getCell(`N${eRow}`).value = eq.hours ? parseFloat(eq.hours) : 0;
+        totalEquipHours += eq.hours ? parseFloat(eq.hours) : 0;
+        eRow++;
+      }
+    }
+    ws.getCell('N29').value = totalEquipHours;
+
+    // Safety checks
+    if (report.safety_check_1) {
+      ws.getCell('A32').value = '1.工具箱會議(含工地預防災變及危害告知)：■有 □無';
+    } else {
+      ws.getCell('A32').value = '1.工具箱會議(含工地預防災變及危害告知)：□有 ■無';
+    }
+
+    if (report.safety_check_2) {
+      ws.getCell('A35').value = '3.檢查勞工個人防護具：■有 □無';
+    } else {
+      ws.getCell('A35').value = '3.檢查勞工個人防護具：□有 ■無';
+    }
+
+    // Tomorrow plan
+    const tPlanCell = ws.getCell('A46');
+    if (tPlanCell.value && (tPlanCell.value as ExcelJS.CellRichTextValue).richText) {
+      const rt = tPlanCell.value as ExcelJS.CellRichTextValue;
+      rt.richText[1].text = (report.tomorrow_plan || '無') + '\n';
+      ws.getCell('A46').value = rt;
+    } else {
+      ws.getCell('A46').value = `明日工作規劃：${report.tomorrow_plan || '無'}`;
+    }
+
+    // Recorder
+    const rName = report.recorder?.name || '';
+    const rCell48 = ws.getCell('N48');
+    if (rCell48.value && (rCell48.value as ExcelJS.CellRichTextValue).richText) {
+       const rt = rCell48.value as ExcelJS.CellRichTextValue;
+       rt.richText[1].text = rName;
+       ws.getCell('N48').value = rt;
+    } else {
+       ws.getCell('N48').value = `現場負責人:${rName}`;
+    }
+
+    // Photos
+    let photos: any = {};
+    try { photos = JSON.parse(report.photos as string || '{}'); } catch (e) {}
+    
+    // Collect all photo paths
+    const allPhotoPaths: string[] = [];
+    Object.values(photos).forEach((paths: any) => {
+      if (Array.isArray(paths)) {
+        paths.forEach(p => {
+          // p is like /uploads/labor/xxx.jpg
+          const localPath = path.join(__dirname, '../../', p);
+          if (fs.existsSync(localPath)) {
+            allPhotoPaths.push(localPath);
+          }
+        });
+      }
+    });
+
+    const mainSheetCells = ['U5', 'AA5', 'U10', 'AA10', 'U22', 'AA22'];
+    
+    for (let i = 0; i < allPhotoPaths.length; i++) {
+      const p = allPhotoPaths[i];
+      const imageId = wb.addImage({
+        filename: p,
+        extension: p.toLowerCase().endsWith('.png') ? 'png' : 'jpeg',
+      });
+
+      if (i < 6) {
+        const cell = mainSheetCells[i];
+        ws.addImage(imageId, {
+          tl: { col: ws.getCell(cell).col - 1, row: ws.getCell(cell).row - 1 },
+          ext: { width: 180, height: 120 },
+          editAs: 'oneCell'
+        });
+      } else {
+        // Create new sheet for extra photos if it doesn't exist
+        let extraWs = wb.getWorksheet('附件照片');
+        if (!extraWs) {
+          extraWs = wb.addWorksheet('附件照片');
+        }
+        
+        const extraIdx = i - 6;
+        const row = Math.floor(extraIdx / 2) * 10;
+        const col = (extraIdx % 2) * 5;
+        
+        extraWs.addImage(imageId, {
+          tl: { col: col, row: row },
+          ext: { width: 320, height: 240 },
+          editAs: 'oneCell'
+        });
+      }
+    }
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="labor-report-${report.id}.xlsx"`);
+    
+    await wb.xlsx.write(res);
+    res.end();
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: '匯出報工紀錄失敗' });
   }
 });
 
