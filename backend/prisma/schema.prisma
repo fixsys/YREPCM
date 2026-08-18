@@ -484,6 +484,7 @@ model DailyLaborReport {
   safety_check_1          Boolean  @default(false)
   safety_check_2          Boolean  @default(false)
   safety_check_3          Boolean  @default(false)
+  tomorrow_plan           String?  @db.Text
   additional_notes        String?  @db.Text
   created_at              DateTime @default(now())
   updated_at              DateTime @updatedAt

@@ -72,6 +72,7 @@ const Onsite = () => {
     safety_check_1: false,
     safety_check_2: false,
     safety_check_3: false,
+    tomorrow_plan: '',
     additional_notes: ''
   });
   const [laborPhotosClose, setLaborPhotosClose] = useState<File[]>([]);
@@ -356,7 +357,7 @@ const Onsite = () => {
 
   const handleAddLabor = () => {
     setEditingLaborId(null);
-    setLaborForm({ project_id: '', report_date: new Date().toISOString().slice(0, 10), weather: '晴', recorder_id: user?.id || '', pm_id: '', work_category: '土木', drawing_number: '', drawing_revision: '', construction_location: '', drawing_check_result: '符合圖說', drawing_check_confirmed: false, safety_check_1: false, safety_check_2: false, safety_check_3: false, additional_notes: '' });
+    setLaborForm({ project_id: '', report_date: new Date().toISOString().slice(0, 10), weather: '晴', recorder_id: user?.id || '', pm_id: '', work_category: '土木', drawing_number: '', drawing_revision: '', construction_location: '', drawing_check_result: '符合圖說', drawing_check_confirmed: false, safety_check_1: false, safety_check_2: false, safety_check_3: false, tomorrow_plan: '', additional_notes: '' });
     setLaborPhotosClose([]);
     setLaborPhotosMid([]);
     setLaborPhotosFar([]);
@@ -384,6 +385,7 @@ const Onsite = () => {
       safety_check_1: l.safety_check_1 || false,
       safety_check_2: l.safety_check_2 || false,
       safety_check_3: l.safety_check_3 || false,
+      tomorrow_plan: l.tomorrow_plan || '',
       additional_notes: l.additional_notes || ''
     });
     setLaborPhotosClose([]);
@@ -1075,6 +1077,9 @@ const Onsite = () => {
                 </div>
 
                 <div className="mt-6">
+                  <label className="block text-sm font-bold text-slate-700 mb-2">明日工作規劃 *</label>
+                  <textarea required value={laborForm.tomorrow_plan} onChange={e => setLaborForm({...laborForm, tomorrow_plan: e.target.value})} placeholder="請填寫明日預計進行的工作內容與派工規劃..." className="w-full px-3 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 h-24 resize-none mb-4"></textarea>
+                  
                   <label className="block text-sm font-bold text-slate-700 mb-2">補充說明 (選填)</label>
                   <textarea value={laborForm.additional_notes} onChange={e => setLaborForm({...laborForm, additional_notes: e.target.value})} placeholder="填寫其他需紀錄之事項、異常狀況或協調內容..." className="w-full px-3 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 h-24 resize-none"></textarea>
                 </div>
@@ -1365,6 +1370,13 @@ const Onsite = () => {
                           </div>
                         </div>
                       )}
+                    </div>
+                  )}
+
+                  {viewingRecord.data.tomorrow_plan && (
+                    <div>
+                      <h3 className="text-xl font-bold mb-3 border-l-4 border-indigo-600 pl-3">明日工作規劃</h3>
+                      <p className="whitespace-pre-wrap leading-relaxed text-lg bg-indigo-50/50 p-4 rounded-xl border border-indigo-100">{viewingRecord.data.tomorrow_plan}</p>
                     </div>
                   )}
 
