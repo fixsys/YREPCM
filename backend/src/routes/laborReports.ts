@@ -192,8 +192,8 @@ router.put('/:id', authenticateToken, upload.any(), async (req: AuthRequest, res
 // Export labor report to Excel
 router.get('/:id/export', authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const report = await prisma.dailyLaborReport.findUnique({
-      where: { id: req.params.id },
+    const report: any = await prisma.dailyLaborReport.findUnique({
+      where: { id: String(req.params.id) },
       include: {
         project: true,
         recorder: true,
@@ -205,7 +205,7 @@ router.get('/:id/export', authenticateToken, async (req: AuthRequest, res) => {
       return res.status(404).json({ error: '找不到報工紀錄' });
     }
 
-    const templatePath = path.join(__dirname, '../../../../施工日誌.xlsx');
+    const templatePath = path.join(__dirname, '../../../施工日誌.xlsx');
     if (!fs.existsSync(templatePath)) {
       return res.status(500).json({ error: '找不到 Excel 範本檔案' });
     }
@@ -340,7 +340,7 @@ router.get('/:id/export', authenticateToken, async (req: AuthRequest, res) => {
       if (i < 6) {
         const cell = mainSheetCells[i];
         ws.addImage(imageId, {
-          tl: { col: ws.getCell(cell).col - 1, row: ws.getCell(cell).row - 1 },
+          tl: { col: Number(ws.getCell(cell).col) - 1, row: Number(ws.getCell(cell).row) - 1 },
           ext: { width: 180, height: 120 },
           editAs: 'oneCell'
         });
