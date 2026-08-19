@@ -374,8 +374,8 @@ router.get('/:id/export', authenticateToken, async (req: AuthRequest, res) => {
       const item = workItems[i] || {};
       ws.mergeCells(`A${r}:C${r}`);
       ws.getCell(`A${r}`).value = item.name || ''; applyStyle(ws.getCell(`A${r}`), false, true);
-      ws.getCell(`D${r}`).value = item.name ? (item.unit || '式') : ''; applyStyle(ws.getCell(`D${r}`));
-      ws.getCell(`E${r}`).value = item.contractQty || ''; applyStyle(ws.getCell(`E${r}`));
+      ws.getCell(`D${r}`).value = item.name ? '式' : ''; applyStyle(ws.getCell(`D${r}`));
+      ws.getCell(`E${r}`).value = item.name ? '100%' : ''; applyStyle(ws.getCell(`E${r}`));
       ws.getCell(`F${r}`).value = item.progress || ''; applyStyle(ws.getCell(`F${r}`));
       ws.getCell(`G${r}`).value = item.accumulatedQty || ''; applyStyle(ws.getCell(`G${r}`));
       ws.getCell(`H${r}`).value = item.notes || ''; applyStyle(ws.getCell(`H${r}`));
