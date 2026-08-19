@@ -221,8 +221,8 @@ router.get('/:id/export', authenticateToken, async (req: AuthRequest, res) => {
     for (const r of pastReports) {
       let wList = [];
       let eList = [];
-      try { wList = JSON.parse((r.dispatch_workers as string) || '[]'); } catch(e){}
-      try { eList = JSON.parse((r.equipments as string) || '[]'); } catch(e){}
+      try { wList = typeof r.dispatch_workers === 'string' ? JSON.parse(r.dispatch_workers) : (r.dispatch_workers || []); } catch(e){}
+      try { eList = typeof r.equipments === 'string' ? JSON.parse(r.equipments) : (r.equipments || []); } catch(e){}
       
       for (const w of wList) {
         const cat = w.work_category || '一般工';
@@ -250,11 +250,11 @@ router.get('/:id/export', authenticateToken, async (req: AuthRequest, res) => {
     const remainingDuration = getDiffDays(reportDate, pEnd);
 
     let workItems = [];
-    try { workItems = JSON.parse(report.work_items as string || '[]'); } catch(e){}
+    try { workItems = typeof report.work_items === 'string' ? JSON.parse(report.work_items) : (report.work_items || []); } catch(e){}
     let workers = [];
-    try { workers = JSON.parse(report.dispatch_workers as string || '[]'); } catch(e){}
+    try { workers = typeof report.dispatch_workers === 'string' ? JSON.parse(report.dispatch_workers) : (report.dispatch_workers || []); } catch(e){}
     let equips = [];
-    try { equips = JSON.parse(report.equipments as string || '[]'); } catch(e){}
+    try { equips = typeof report.equipments === 'string' ? JSON.parse(report.equipments) : (report.equipments || []); } catch(e){}
 
     const todayWorkers: Record<string, number> = {};
     for (const w of workers) {
@@ -516,8 +516,8 @@ router.get('/:id/export-pdf', authenticateToken, async (req: AuthRequest, res) =
     for (const r of pastReports) {
       let wList = [];
       let eList = [];
-      try { wList = JSON.parse((r.dispatch_workers as string) || '[]'); } catch(e){}
-      try { eList = JSON.parse((r.equipments as string) || '[]'); } catch(e){}
+      try { wList = typeof r.dispatch_workers === 'string' ? JSON.parse(r.dispatch_workers) : (r.dispatch_workers || []); } catch(e){}
+      try { eList = typeof r.equipments === 'string' ? JSON.parse(r.equipments) : (r.equipments || []); } catch(e){}
       
       for (const w of wList) {
         const cat = w.work_category || '一般工';
@@ -541,11 +541,11 @@ router.get('/:id/export-pdf', authenticateToken, async (req: AuthRequest, res) =
     const remainingDuration = getDiffDays(reportDate, pEnd);
 
     let workItems = [];
-    try { workItems = JSON.parse(report.work_items as string || '[]'); } catch(e){}
+    try { workItems = typeof report.work_items === 'string' ? JSON.parse(report.work_items) : (report.work_items || []); } catch(e){}
     let workers = [];
-    try { workers = JSON.parse(report.dispatch_workers as string || '[]'); } catch(e){}
+    try { workers = typeof report.dispatch_workers === 'string' ? JSON.parse(report.dispatch_workers) : (report.dispatch_workers || []); } catch(e){}
     let equips = [];
-    try { equips = JSON.parse(report.equipments as string || '[]'); } catch(e){}
+    try { equips = typeof report.equipments === 'string' ? JSON.parse(report.equipments) : (report.equipments || []); } catch(e){}
 
     const todayWorkers: Record<string, number> = {};
     for (const w of workers) {
