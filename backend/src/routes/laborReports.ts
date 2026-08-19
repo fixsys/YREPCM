@@ -191,7 +191,7 @@ router.put('/:id', authenticateToken, upload.any(), async (req: AuthRequest, res
   }
 });
 
-// Export labor report to Excel
+// Export labor report to Excel (Matching PDF layout)
 router.get('/:id/export', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const report: any = await prisma.dailyLaborReport.findUnique({
@@ -207,161 +207,266 @@ router.get('/:id/export', authenticateToken, async (req: AuthRequest, res) => {
       return res.status(404).json({ error: '找不到報工紀錄' });
     }
 
-    const templatePath = path.join(__dirname, '../../../施工日誌.xlsx');
-    if (!fs.existsSync(templatePath)) {
-      return res.status(500).json({ error: '找不到 Excel 範本檔案' });
-    }
-
-    const wb = new ExcelJS.Workbook();
-    await wb.xlsx.readFile(templatePath);
-    const ws = wb.worksheets[0];
-
-    // Project Info
-    ws.getCell('C3').value = `依照合約工程名稱:${report.project?.name || ''}`;
-    
-    // Date & Weather
-    const reportDate = new Date(report.report_date);
-    const dateStr = `${reportDate.getMonth() + 1}/${reportDate.getDate()}`;
-    ws.getCell('N2').value = `今日施工${dateStr}`;
-    const days = ['日', '一', '二', '三', '四', '五', '六'];
-    ws.getCell('R2').value = days[reportDate.getDay()];
-    ws.getCell('R3').value = report.weather || '';
-
-    // Work Items (Rows 9-21)
-    let workItems = [];
-    try { workItems = JSON.parse(report.work_items as string || '[]'); } catch (e) {}
-    let rowIndex = 9;
-    for (const item of workItems) {
-      if (rowIndex <= 21) {
-        ws.getCell(`B${rowIndex}`).value = item.name || '';
-        ws.getCell(`H${rowIndex}`).value = item.unit || '式';
-        ws.getCell(`K${rowIndex}`).value = item.progress || '';
-        rowIndex++;
-      }
-    }
-
-    // Workers (Rows 24-28)
-    let workers = [];
-    try { workers = JSON.parse(report.dispatch_workers as string || '[]'); } catch (e) {}
-    
-    const workerStats: Record<string, number> = {};
-    for (const w of workers) {
-      const category = w.work_category || '一般工';
-      if (!workerStats[category]) workerStats[category] = 0;
-      workerStats[category] += 1;
-    }
-    
-    let wRow = 24;
-    let totalWorkers = 0;
-    for (const [category, count] of Object.entries(workerStats)) {
-      if (wRow <= 28) {
-        ws.getCell(`B${wRow}`).value = category;
-        ws.getCell(`D${wRow}`).value = count;
-        totalWorkers += count;
-        wRow++;
-      }
-    }
-    ws.getCell('D29').value = totalWorkers;
-
-    // Equipments (Rows 24-28)
-    let equipments = [];
-    try { equipments = JSON.parse(report.equipments as string || '[]'); } catch (e) {}
-    let eRow = 24;
-    let totalEquipHours = 0;
-    for (const eq of equipments) {
-      if (eRow <= 28) {
-        ws.getCell(`K${eRow}`).value = eq.name;
-        ws.getCell(`N${eRow}`).value = eq.hours ? parseFloat(eq.hours) : 0;
-        totalEquipHours += eq.hours ? parseFloat(eq.hours) : 0;
-        eRow++;
-      }
-    }
-    ws.getCell('N29').value = totalEquipHours;
-
-    // Safety checks
-    if (report.safety_check_1) {
-      ws.getCell('A32').value = '1.工具箱會議(含工地預防災變及危害告知)：■有 □無';
-    } else {
-      ws.getCell('A32').value = '1.工具箱會議(含工地預防災變及危害告知)：□有 ■無';
-    }
-
-    if (report.safety_check_2) {
-      ws.getCell('A35').value = '3.檢查勞工個人防護具：■有 □無';
-    } else {
-      ws.getCell('A35').value = '3.檢查勞工個人防護具：□有 ■無';
-    }
-
-    // Tomorrow plan
-    const tPlanCell = ws.getCell('A46');
-    if (tPlanCell.value && (tPlanCell.value as ExcelJS.CellRichTextValue).richText) {
-      const rt = tPlanCell.value as ExcelJS.CellRichTextValue;
-      rt.richText[1].text = (report.tomorrow_plan || '無') + '\n';
-      ws.getCell('A46').value = rt;
-    } else {
-      ws.getCell('A46').value = `明日工作規劃：${report.tomorrow_plan || '無'}`;
-    }
-
-    // Recorder
-    const rName = report.recorder?.name || '';
-    const rCell48 = ws.getCell('N48');
-    if (rCell48.value && (rCell48.value as ExcelJS.CellRichTextValue).richText) {
-       const rt = rCell48.value as ExcelJS.CellRichTextValue;
-       rt.richText[1].text = rName;
-       ws.getCell('N48').value = rt;
-    } else {
-       ws.getCell('N48').value = `現場負責人:${rName}`;
-    }
-
-    // Photos
-    let photos: any = {};
-    try { photos = JSON.parse(report.photos as string || '{}'); } catch (e) {}
-    
-    // Collect all photo paths
-    const allPhotoPaths: string[] = [];
-    Object.values(photos).forEach((paths: any) => {
-      if (Array.isArray(paths)) {
-        paths.forEach(p => {
-          // p is like /uploads/labor/xxx.jpg
-          const localPath = path.join(__dirname, '../../', p);
-          if (fs.existsSync(localPath)) {
-            allPhotoPaths.push(localPath);
-          }
-        });
+    // --- Data Calculation (Same as PDF) ---
+    const pastReports = await prisma.dailyLaborReport.findMany({
+      where: {
+        project_id: report.project_id,
+        report_date: { lte: report.report_date }
       }
     });
 
-    const mainSheetCells = ['U5', 'AA5', 'U10', 'AA10', 'U22', 'AA22'];
-    
-    for (let i = 0; i < allPhotoPaths.length; i++) {
-      const p = allPhotoPaths[i];
-      const imageId = wb.addImage({
-        filename: p,
-        extension: p.toLowerCase().endsWith('.png') ? 'png' : 'jpeg',
-      });
+    const accumulatedWorkers: Record<string, number> = {};
+    const accumulatedEquip: Record<string, number> = {};
 
-      if (i < 6) {
-        const cell = mainSheetCells[i];
-        ws.addImage(imageId, {
-          tl: { col: Number(ws.getCell(cell).col) - 1, row: Number(ws.getCell(cell).row) - 1 },
-          ext: { width: 180, height: 120 },
-          editAs: 'oneCell'
-        });
-      } else {
-        // Create new sheet for extra photos if it doesn't exist
-        let extraWs = wb.getWorksheet('附件照片');
-        if (!extraWs) {
-          extraWs = wb.addWorksheet('附件照片');
-        }
-        
-        const extraIdx = i - 6;
-        const row = Math.floor(extraIdx / 2) * 10;
-        const col = (extraIdx % 2) * 5;
-        
-        extraWs.addImage(imageId, {
-          tl: { col: col, row: row },
-          ext: { width: 320, height: 240 },
-          editAs: 'oneCell'
-        });
+    for (const r of pastReports) {
+      let wList = [];
+      let eList = [];
+      try { wList = JSON.parse((r.dispatch_workers as string) || '[]'); } catch(e){}
+      try { eList = JSON.parse((r.equipments as string) || '[]'); } catch(e){}
+      
+      for (const w of wList) {
+        const cat = w.work_category || '一般工';
+        accumulatedWorkers[cat] = (accumulatedWorkers[cat] || 0) + 1;
+      }
+      for (const eq of eList) {
+        const name = eq.name || '機具';
+        accumulatedEquip[name] = (accumulatedEquip[name] || 0) + (Number(eq.qty) || 1);
+      }
+    }
+
+    const reportDate = new Date(report.report_date);
+    const dateStr = `${reportDate.getFullYear()}/${(reportDate.getMonth()+1).toString().padStart(2,'0')}/${reportDate.getDate().toString().padStart(2,'0')}`;
+    const days = ['日', '一', '二', '三', '四', '五', '六'];
+    const dayOfWeek = days[reportDate.getDay()];
+    
+    const pStart = report.project?.start_date ? new Date(report.project.start_date) : new Date();
+    const pEnd = report.project?.target_date ? new Date(report.project.target_date) : new Date();
+    
+    const startDateStr = `${pStart.getFullYear()}/${pStart.getMonth()+1}/${pStart.getDate()}`;
+    const endDateStr = `${pEnd.getFullYear()}/${pEnd.getMonth()+1}/${pEnd.getDate()}`;
+
+    const totalDuration = getDiffDays(pStart, pEnd);
+    const accumulatedDuration = getDiffDays(pStart, reportDate);
+    const remainingDuration = getDiffDays(reportDate, pEnd);
+
+    let workItems = [];
+    try { workItems = JSON.parse(report.work_items as string || '[]'); } catch(e){}
+    let workers = [];
+    try { workers = JSON.parse(report.dispatch_workers as string || '[]'); } catch(e){}
+    let equips = [];
+    try { equips = JSON.parse(report.equipments as string || '[]'); } catch(e){}
+
+    const todayWorkers: Record<string, number> = {};
+    for (const w of workers) {
+      const cat = w.work_category || '一般工';
+      todayWorkers[cat] = (todayWorkers[cat] || 0) + 1;
+    }
+    const todayEquips: Record<string, number> = {};
+    for (const eq of equips) {
+      const name = eq.name || '機具';
+      todayEquips[name] = (todayEquips[name] || 0) + (Number(eq.qty) || 1);
+    }
+
+    const workerStats: { category: string, today: number, accumulated: number }[] = [];
+    const equipStats: { name: string, today: number, accumulated: number }[] = [];
+    let totalWorkerToday = 0;
+    let totalWorkerAccumulated = 0;
+    let totalEquipToday = 0;
+    let totalEquipAccumulated = 0;
+
+    Object.keys(accumulatedWorkers).forEach(cat => {
+      const t = todayWorkers[cat] || 0;
+      const a = accumulatedWorkers[cat] || 0;
+      workerStats.push({ category: cat, today: t, accumulated: a });
+      totalWorkerToday += t;
+      totalWorkerAccumulated += a;
+    });
+
+    Object.keys(accumulatedEquip).forEach(name => {
+      const t = todayEquips[name] || 0;
+      const a = accumulatedEquip[name] || 0;
+      equipStats.push({ name: name, today: t, accumulated: a });
+      totalEquipToday += t;
+      totalEquipAccumulated += a;
+    });
+
+    // --- ExcelJS Construction ---
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('每日施工日誌', {
+      pageSetup: { paperSize: 9, orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 1, margins: { left: 0.2, right: 0.2, top: 0.2, bottom: 0.2, header: 0, footer: 0 } }
+    });
+
+    for(let i=1; i<=8; i++) {
+      ws.getColumn(i).width = 12;
+    }
+
+    const applyStyle = (cell: ExcelJS.Cell, bg: boolean = false, alignLeft: boolean = false) => {
+      cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+      cell.alignment = { vertical: 'middle', horizontal: alignLeft ? 'left' : 'center', wrapText: true };
+      if (bg) {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE5E7EB' } };
+      }
+      cell.font = { name: '微軟正黑體', size: 10 };
+    };
+
+    let r = 1;
+
+    ws.mergeCells(`A${r}:H${r}`);
+    ws.getCell(`A${r}`).value = '每 日 施 工 日 誌';
+    ws.getCell(`A${r}`).font = { name: '微軟正黑體', size: 16, bold: true };
+    ws.getCell(`A${r}`).alignment = { vertical: 'middle', horizontal: 'center' };
+    ws.getRow(r).height = 30;
+    r++;
+
+    ws.mergeCells(`B${r}:D${r}`);
+    ws.getCell(`A${r}`).value = '業主'; applyStyle(ws.getCell(`A${r}`), true);
+    ws.getCell(`B${r}`).value = report.project?.owner || ''; applyStyle(ws.getCell(`B${r}`));
+    ws.getCell(`E${r}`).value = '填報日期'; applyStyle(ws.getCell(`E${r}`), true);
+    ws.getCell(`F${r}`).value = dateStr; applyStyle(ws.getCell(`F${r}`));
+    ws.getCell(`G${r}`).value = '星期'; applyStyle(ws.getCell(`G${r}`), true);
+    ws.getCell(`H${r}`).value = dayOfWeek; applyStyle(ws.getCell(`H${r}`));
+    r++;
+
+    ws.mergeCells(`B${r}:D${r}`);
+    ws.getCell(`A${r}`).value = '工程名稱'; applyStyle(ws.getCell(`A${r}`), true);
+    ws.getCell(`B${r}`).value = report.project?.name || ''; applyStyle(ws.getCell(`B${r}`));
+    ws.getCell(`E${r}`).value = '容量'; applyStyle(ws.getCell(`E${r}`), true);
+    const cap = report.project?.capacity || '';
+    ws.getCell(`F${r}`).value = cap ? (cap.toLowerCase().includes('w') ? cap : cap + ' kW') : ''; applyStyle(ws.getCell(`F${r}`));
+    ws.getCell(`G${r}`).value = '天氣'; applyStyle(ws.getCell(`G${r}`), true);
+    ws.getCell(`H${r}`).value = report.weather || ''; applyStyle(ws.getCell(`H${r}`));
+    r++;
+
+    ws.mergeCells(`A${r}:B${r}`); ws.mergeCells(`C${r}:D${r}`); ws.mergeCells(`E${r}:F${r}`);
+    ws.getCell(`A${r}`).value = '開工日期'; applyStyle(ws.getCell(`A${r}`), true);
+    ws.getCell(`C${r}`).value = startDateStr; applyStyle(ws.getCell(`C${r}`));
+    ws.getCell(`E${r}`).value = '總工期'; applyStyle(ws.getCell(`E${r}`), true);
+    ws.getCell(`G${r}`).value = totalDuration; applyStyle(ws.getCell(`G${r}`));
+    ws.getCell(`H${r}`).value = '天'; applyStyle(ws.getCell(`H${r}`));
+    r++;
+
+    ws.mergeCells(`A${r}:B${r}`); ws.mergeCells(`C${r}:D${r}`); ws.mergeCells(`E${r}:F${r}`);
+    ws.getCell(`A${r}`).value = '預計完工日期'; applyStyle(ws.getCell(`A${r}`), true);
+    ws.getCell(`C${r}`).value = endDateStr; applyStyle(ws.getCell(`C${r}`));
+    ws.getCell(`E${r}`).value = '累計工期'; applyStyle(ws.getCell(`E${r}`), true);
+    ws.getCell(`G${r}`).value = accumulatedDuration; applyStyle(ws.getCell(`G${r}`));
+    ws.getCell(`H${r}`).value = '天'; applyStyle(ws.getCell(`H${r}`));
+    r++;
+
+    ws.mergeCells(`A${r}:B${r}`); ws.mergeCells(`C${r}:D${r}`); ws.mergeCells(`E${r}:F${r}`);
+    ws.getCell(`A${r}`).value = '延展工期'; applyStyle(ws.getCell(`A${r}`), true);
+    ws.getCell(`C${r}`).value = 0; applyStyle(ws.getCell(`C${r}`));
+    ws.getCell(`E${r}`).value = '剩餘工期'; applyStyle(ws.getCell(`E${r}`), true);
+    ws.getCell(`G${r}`).value = remainingDuration; applyStyle(ws.getCell(`G${r}`));
+    ws.getCell(`H${r}`).value = '天'; applyStyle(ws.getCell(`H${r}`));
+    r++;
+
+    ws.mergeCells(`A${r}:C${r}`);
+    ws.getCell(`A${r}`).value = '施工項目'; applyStyle(ws.getCell(`A${r}`), true);
+    ws.getCell(`D${r}`).value = '單位'; applyStyle(ws.getCell(`D${r}`), true);
+    ws.getCell(`E${r}`).value = '契約數量'; applyStyle(ws.getCell(`E${r}`), true);
+    ws.getCell(`F${r}`).value = '本日完成數量'; applyStyle(ws.getCell(`F${r}`), true);
+    ws.getCell(`G${r}`).value = '累計完成數量'; applyStyle(ws.getCell(`G${r}`), true);
+    ws.getCell(`H${r}`).value = '備註'; applyStyle(ws.getCell(`H${r}`), true);
+    r++;
+
+    for(let i=0; i<11; i++) {
+      const item = workItems[i] || {};
+      ws.mergeCells(`A${r}:C${r}`);
+      ws.getCell(`A${r}`).value = item.name || ''; applyStyle(ws.getCell(`A${r}`), false, true);
+      ws.getCell(`D${r}`).value = item.name ? (item.unit || '式') : ''; applyStyle(ws.getCell(`D${r}`));
+      ws.getCell(`E${r}`).value = item.contractQty || ''; applyStyle(ws.getCell(`E${r}`));
+      ws.getCell(`F${r}`).value = item.progress || ''; applyStyle(ws.getCell(`F${r}`));
+      ws.getCell(`G${r}`).value = item.accumulatedQty || ''; applyStyle(ws.getCell(`G${r}`));
+      ws.getCell(`H${r}`).value = item.notes || ''; applyStyle(ws.getCell(`H${r}`));
+      ws.getRow(r).height = 20;
+      r++;
+    }
+
+    ws.mergeCells(`A${r}:H${r}`);
+    ws.getCell(`A${r}`).value = '工地人員及機具管理(含約定之出工人數及機具使用情形及數量)'; 
+    applyStyle(ws.getCell(`A${r}`), true, true);
+    ws.getCell(`A${r}`).font = { name: '微軟正黑體', size: 10, bold: true };
+    r++;
+
+    ws.mergeCells(`A${r}:B${r}`); ws.mergeCells(`E${r}:F${r}`);
+    ws.getCell(`A${r}`).value = '出工工別'; applyStyle(ws.getCell(`A${r}`), true);
+    ws.getCell(`C${r}`).value = '本日人數'; applyStyle(ws.getCell(`C${r}`), true);
+    ws.getCell(`D${r}`).value = '累計人數'; applyStyle(ws.getCell(`D${r}`), true);
+    ws.getCell(`E${r}`).value = '機具'; applyStyle(ws.getCell(`E${r}`), true);
+    ws.getCell(`G${r}`).value = '數量'; applyStyle(ws.getCell(`G${r}`), true);
+    ws.getCell(`H${r}`).value = '累計時數'; applyStyle(ws.getCell(`H${r}`), true);
+    r++;
+
+    for(let i=0; i<4; i++) {
+      const w = workerStats[i] || {};
+      const eq = equipStats[i] || {};
+      ws.mergeCells(`A${r}:B${r}`); ws.mergeCells(`E${r}:F${r}`);
+      ws.getCell(`A${r}`).value = w.category || ''; applyStyle(ws.getCell(`A${r}`));
+      ws.getCell(`C${r}`).value = w.today || ''; applyStyle(ws.getCell(`C${r}`));
+      ws.getCell(`D${r}`).value = w.accumulated || ''; applyStyle(ws.getCell(`D${r}`));
+      ws.getCell(`E${r}`).value = eq.name || ''; applyStyle(ws.getCell(`E${r}`));
+      ws.getCell(`G${r}`).value = eq.today || ''; applyStyle(ws.getCell(`G${r}`));
+      ws.getCell(`H${r}`).value = eq.accumulated || ''; applyStyle(ws.getCell(`H${r}`));
+      r++;
+    }
+
+    ws.mergeCells(`A${r}:B${r}`); ws.mergeCells(`E${r}:F${r}`);
+    ws.getCell(`A${r}`).value = '總累計人數'; applyStyle(ws.getCell(`A${r}`), true);
+    ws.getCell(`C${r}`).value = totalWorkerToday; applyStyle(ws.getCell(`C${r}`));
+    ws.getCell(`D${r}`).value = totalWorkerAccumulated; applyStyle(ws.getCell(`D${r}`));
+    ws.getCell(`E${r}`).value = '總計數量'; applyStyle(ws.getCell(`E${r}`), true);
+    ws.getCell(`G${r}`).value = totalEquipToday; applyStyle(ws.getCell(`G${r}`));
+    ws.getCell(`H${r}`).value = totalEquipAccumulated; applyStyle(ws.getCell(`H${r}`));
+    r++;
+
+    ws.mergeCells(`A${r}:H${r}`);
+    const check1 = report.toolbox_meeting ? '■' : '□';
+    const check1N = report.toolbox_meeting ? '□' : '■';
+    let check2 = '□有 □無 □無新進勞工';
+    if(report.safety_check_2 === '有') check2 = '■有 □無 □無新進勞工';
+    if(report.safety_check_2 === '無') check2 = '□有 ■無 □無新進勞工';
+    if(report.safety_check_2 === '無新進勞工' || !report.safety_check_2) check2 = '□有 □無 ■無新進勞工';
+
+    ws.getCell(`A${r}`).value = `工地職業安全衛生事項之督導、公共環境與安全之維護及其他工地行政事務：
+(一)施工前檢查事項：
+  1. 工具箱會議(含工地預防災變及危害告知)： ${check1}有 ${check1N}無
+  2. 確認新進勞工是否提報勞工保險(或其他商業保險)資料及安全衛生教育訓練紀錄：
+     ${check2}`;
+    applyStyle(ws.getCell(`A${r}`), false, true);
+    ws.getRow(r).height = 100;
+    r++;
+
+    ws.mergeCells(`A${r}:H${r}`);
+    ws.getCell(`A${r}`).value = `明日工作規劃：
+${report.tomorrow_plan || '無'}`;
+    applyStyle(ws.getCell(`A${r}`), false, true);
+    ws.getRow(r).height = 50;
+    r++;
+
+    ws.mergeCells(`A${r}:H${r}`);
+    ws.getCell(`A${r}`).value = `重要事項紀錄：
+${report.important_notes || '無'}`;
+    applyStyle(ws.getCell(`A${r}`), false, true);
+    ws.getRow(r).height = 50;
+    r++;
+
+    ws.mergeCells(`A${r}:D${r}`); ws.mergeCells(`E${r}:H${r}`);
+    ws.getCell(`A${r}`).value = `專案經理(PM)：
+${report.pm?.name || ''}`;
+    applyStyle(ws.getCell(`A${r}`), false, true);
+    ws.getCell(`E${r}`).value = `現場負責人：
+${report.recorder?.name || ''}`;
+    applyStyle(ws.getCell(`E${r}`), false, true);
+    ws.getRow(r).height = 60;
+    r++;
+
+    for(let row=2; row<r; row++) {
+      for(let col=1; col<=8; col++) {
+         const cell = ws.getCell(row, col);
+         if (!cell.border) {
+            cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+         }
       }
     }
 
@@ -375,7 +480,6 @@ router.get('/:id/export', authenticateToken, async (req: AuthRequest, res) => {
     res.status(500).json({ error: '匯出報工紀錄失敗' });
   }
 });
-
 // Helper to diff days
 function getDiffDays(d1: Date, d2: Date) {
   if (!d1 || !d2) return 0;
