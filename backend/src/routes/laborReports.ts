@@ -582,7 +582,10 @@ router.get('/:id/export-pdf', authenticateToken, async (req: AuthRequest, res) =
       totalEquipAccumulated += a;
     });
 
-    const templatePath = path.join(__dirname, '../templates/labor-report-pdf.ejs');
+    let templatePath = path.join(__dirname, '../templates/labor-report-pdf.ejs');
+    if (!fs.existsSync(templatePath)) {
+      templatePath = path.join(__dirname, '../../src/templates/labor-report-pdf.ejs');
+    }
     const html = await ejs.renderFile(templatePath, {
       page: 1,
       report,
