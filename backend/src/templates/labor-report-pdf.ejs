@@ -141,51 +141,51 @@
     
     <!-- Table 1: Info -->
     <tr>
-      <td>業主</td>
+      <td class="bg-gray">業主</td>
       <td colspan="3"><%= report.project?.owner || '' %></td>
-      <td>填報日期</td>
+      <td class="bg-gray">填報日期</td>
       <td><%= reportDate %></td>
-      <td>星期</td>
+      <td class="bg-gray">星期</td>
       <td><%= dayOfWeek %></td>
     </tr>
     <tr>
-      <td>工程名稱</td>
+      <td class="bg-gray">工程名稱</td>
       <td colspan="3"><%= report.project?.name || '' %></td>
-      <td>容量</td>
+      <td class="bg-gray">容量</td>
       <td><%= report.project?.capacity ? (report.project.capacity.toLowerCase().includes('w') ? report.project.capacity : report.project.capacity + ' kW') : '' %></td>
-      <td>天氣</td>
+      <td class="bg-gray">天氣</td>
       <td><%= report.weather || '' %></td>
     </tr>
     <tr>
-      <td colspan="2">開工日期</td>
+      <td colspan="2" class="bg-gray">開工日期</td>
       <td colspan="2"><%= startDate %></td>
-      <td colspan="2">總工期</td>
+      <td colspan="2" class="bg-gray">總工期</td>
       <td><%= totalDuration %></td>
       <td>天</td>
     </tr>
     <tr>
-      <td colspan="2">預計完工日期</td>
+      <td colspan="2" class="bg-gray">預計完工日期</td>
       <td colspan="2"><%= endDate %></td>
-      <td colspan="2">累計工期</td>
+      <td colspan="2" class="bg-gray">累計工期</td>
       <td><%= accumulatedDuration %></td>
       <td>天</td>
     </tr>
     <tr>
-      <td colspan="2">延展工期</td>
+      <td colspan="2" class="bg-gray">延展工期</td>
       <td colspan="2">0</td>
-      <td colspan="2">剩餘工期</td>
+      <td colspan="2" class="bg-gray">剩餘工期</td>
       <td><%= remainingDuration %></td>
       <td>天</td>
     </tr>
 
     <!-- Table 2: Work Items -->
     <tr>
-      <td colspan="3">施工項目</td>
-      <td>單位</td>
-      <td>契約數量</td>
-      <td>本日完成數量</td>
-      <td>累計完成數量</td>
-      <td>備註</td>
+      <td colspan="3" class="bg-gray">施工項目</td>
+      <td class="bg-gray">單位</td>
+      <td class="bg-gray">契約數量</td>
+      <td class="bg-gray">本日完成數量</td>
+      <td class="bg-gray">累計完成數量</td>
+      <td class="bg-gray">備註</td>
     </tr>
     <% for(let i=0; i<11; i++) { %>
       <% const item = workItems[i] || {}; %>
@@ -201,15 +201,15 @@
 
     <!-- Table 3: Workers & Equipments -->
     <tr>
-      <td colspan="8" class="left-align" style="background-color: #f9f9f9;">工地人員及機具管理(含約定之出工人數及機具使用情形及數量)</td>
+      <td colspan="8" class="left-align bg-gray" style="font-weight: bold;">工地人員及機具管理(含約定之出工人數及機具使用情形及數量)</td>
     </tr>
     <tr>
-      <td colspan="2">出工工別</td>
-      <td>本日人數</td>
-      <td>累計人數</td>
-      <td colspan="2">機具</td>
-      <td>數量</td>
-      <td>累計時數</td>
+      <td colspan="2" class="bg-gray">出工工別</td>
+      <td class="bg-gray">本日人數</td>
+      <td class="bg-gray">累計人數</td>
+      <td colspan="2" class="bg-gray">機具</td>
+      <td class="bg-gray">數量</td>
+      <td class="bg-gray">累計時數</td>
     </tr>
     <% for(let i=0; i<4; i++) { %>
       <% const worker = workerStats[i] || {}; %>
@@ -224,10 +224,10 @@
       </tr>
     <% } %>
     <tr>
-      <td colspan="2">總累計人數</td>
+      <td colspan="2" class="bg-gray">總累計人數</td>
       <td><%= totalWorkerToday %></td>
       <td><%= totalWorkerAccumulated %></td>
-      <td colspan="2">總計數量</td>
+      <td colspan="2" class="bg-gray">總計數量</td>
       <td><%= totalEquipToday %></td>
       <td><%= totalEquipAccumulated %></td>
     </tr>
