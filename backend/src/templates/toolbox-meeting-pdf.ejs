@@ -205,8 +205,8 @@
       <td colspan="3" style="font-weight: bold;">感電危害</td>
     </tr>
     <tr>
-      <td colspan="11" class="left-align" style="vertical-align: top; line-height: 1.8; font-size: 11px;">
-        <div style="margin-bottom: 4px;">
+      <td colspan="11" class="left-align" style="vertical-align: top; line-height: 1.2; font-size: 11px;">
+        <div>
           <span style="margin-right: 8px; white-space: nowrap;"><%- box(meeting.hazards && meeting.hazards.includes('跌落、墜落')) %> 跌落、墜落</span>
           <span style="margin-right: 8px; white-space: nowrap;"><%- box(meeting.hazards && meeting.hazards.includes('物體飛落')) %> 物體飛落</span>
           <span style="margin-right: 8px; white-space: nowrap;"><%- box(meeting.hazards && meeting.hazards.includes('異物入眼')) %> 異物入眼</span>
@@ -217,15 +217,15 @@
           <span style="white-space: nowrap;"><%- box(meeting.hazards && meeting.hazards.includes('噪音')) %> 噪音</span>
         </div>
       </td>
-      <td colspan="3" class="left-align" style="vertical-align: top; line-height: 1.5;">
+      <td colspan="3" class="left-align" style="vertical-align: top; line-height: 1.2;">
         <%- box(meeting.hazards && meeting.hazards.includes('化學性灼傷')) %> 化學性灼傷<br>
         <%- box(meeting.hazards && meeting.hazards.includes('化學吸入')) %> 化學吸入
       </td>
-      <td colspan="3" class="left-align" style="vertical-align: top; line-height: 1.5;">
+      <td colspan="3" class="left-align" style="vertical-align: top; line-height: 1.2;">
         <%- box(meeting.hazards && meeting.hazards.includes('火災')) %> 火災<br>
         <%- box(meeting.hazards && meeting.hazards.includes('爆炸')) %> 爆炸
       </td>
-      <td colspan="3" class="left-align" style="vertical-align: top; line-height: 1.5;">
+      <td colspan="3" class="left-align" style="vertical-align: top; line-height: 1.2;">
         <%- box(meeting.hazards && meeting.hazards.includes('感電')) %> 感電
       </td>
     </tr>
@@ -262,7 +262,7 @@
 
     <!-- 其他存在風險說明 -->
     <tr>
-      <td colspan="20" class="left-align" style="height: 40px; vertical-align: top;">
+      <td colspan="20" class="left-align" style="height: 25px; vertical-align: top;">
         <span style="font-weight: bold;">其他存在風險說明:</span><br/>
         <%= meeting.other_risks || '' %>
       </td>
