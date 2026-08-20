@@ -1,4 +1,6 @@
 import { Router } from 'express';
+import puppeteer from 'puppeteer';
+import ejs from 'ejs';
 import { PrismaClient } from '@prisma/client';
 import multer from 'multer';
 import path from 'path';
@@ -113,6 +115,70 @@ router.put('/:id', authenticateToken, upload.array('photos', 5), async (req: Aut
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: '更新會議紀錄失敗' });
+  }
+});
+
+
+// Export PDF
+router.get('/:id/export-pdf', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const meeting = await prisma.toolboxMeeting.findUnique({
+      where: { id: id as string },
+      include: {
+        project: true,
+        recorder: true
+      }
+    });
+
+    if (!meeting) {
+      return res.status(404).json({ error: 'Toolbox meeting not found' });
+    }
+
+    const logoPath = path.join(process.cwd(), '../frontend/public/logo.png');
+    let logoBase64 = '';
+    if (fs.existsSync(logoPath)) {
+        logoBase64 = `data:image/png;base64,${fs.readFileSync(logoPath).toString('base64')}`;
+    }
+
+    const allPhotos = meeting.photos && Array.isArray(meeting.photos) ? (meeting.photos as string[]).map((p: string) => {
+      const pPath = path.join(process.cwd(), p);
+      if (fs.existsSync(pPath)) {
+        return `data:image/jpeg;base64,${fs.readFileSync(pPath).toString('base64')}`;
+      }
+      return null;
+    }).filter(Boolean) : [];
+
+    let templatePath = path.join(__dirname, '../templates/toolbox-meeting-pdf.ejs');
+    if (!fs.existsSync(templatePath)) {
+      return res.status(500).json({ error: 'Template not found' });
+    }
+
+    const html = await ejs.renderFile(templatePath, {
+      meeting,
+      allPhotos,
+      logoBase64
+    });
+
+    const browser = await puppeteer.launch({ headless: true });
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: 'load' });
+    
+    const pdfBuffer = await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      margin: { top: '10mm', right: '10mm', bottom: '10mm', left: '10mm' }
+    });
+    
+    await browser.close();
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=toolbox-meeting-${id}.pdf`);
+    res.send(Buffer.from(pdfBuffer));
+
+  } catch (error) {
+    console.error('Error generating PDF:', error);
+    res.status(500).json({ error: 'Failed to generate PDF' });
   }
 });
 

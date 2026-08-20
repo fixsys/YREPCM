@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>每日工具箱會議紀錄表</title>
+  <style>
+    @page { size: A4 portrait; margin: 10mm; }
+    body {
+      font-family: 'Microsoft JhengHei', 'Noto Sans TC', sans-serif;
+      margin: 0;
+      padding: 0;
+      color: #000;
+      font-size: 11px;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      padding-bottom: 5px;
+      margin-bottom: 5px;
+    }
+    .logo-placeholder {
+      width: 50px;
+      height: 50px;
+      margin-right: 15px;
+    }
+    .company-info {
+      flex: 1;
+    }
+    .company-name {
+      font-size: 22px;
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+    .company-name .en {
+      color: #4a8b71;
+      font-size: 18px;
+      margin-left: 10px;
+    }
+    .company-details {
+      font-size: 11px;
+      color: #333;
+    }
+    .title {
+      text-align: center;
+      font-size: 18px;
+      font-weight: bold;
+      margin: 10px 0;
+      letter-spacing: 5px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+    td, th {
+      border: 1px solid #000;
+      padding: 4px;
+      text-align: center;
+      vertical-align: middle;
+      font-size: 11px;
+    }
+    .left-align { text-align: left; }
+    
+    .checkbox {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border: 1px solid #000;
+      margin-right: 2px;
+      vertical-align: middle;
+      text-align: center;
+      line-height: 10px;
+      font-size: 10px;
+    }
+    .checkbox.checked::after { content: '■'; }
+    .checkbox.unchecked::after { content: ' '; }
+    
+    .vertical-text {
+      writing-mode: vertical-lr;
+      text-orientation: upright;
+      letter-spacing: 2px;
+    }
+
+    .page-break {
+      page-break-before: always;
+    }
+
+    /* Photo gallery styles */
+    .photo-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 15px;
+      margin-top: 20px;
+    }
+    .photo-cell {
+      border: 1px solid #ccc;
+      padding: 10px;
+      text-align: center;
+      height: 380px;
+      display: flex;
+      flex-direction: column;
+    }
+    .photo-cell img {
+      width: 100%;
+      height: 330px;
+      object-fit: contain;
+      margin-bottom: 10px;
+    }
+    .photo-title {
+      font-weight: bold;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- PAGE 1: 表單 -->
+  <div class="header">
+    <% if (logoBase64) { %>
+      <img src="<%= logoBase64 %>" class="logo-placeholder" />
+    <% } else { %>
+      <div class="logo-placeholder">Logo</div>
+    <% } %>
+    <div class="company-info">
+      <div class="company-name">元融科技有限公司<span class="en">YUANRONG TECHNOLOGY</span></div>
+      <div class="company-details">
+        744 台南市新市區港墘里自由街9號 | 06-5897049 | 統編 24903014
+      </div>
+    </div>
+  </div>
+
+  <div class="title">每日工具箱會議紀錄表</div>
+
+  <table>
+    <tr>
+      <td style="width: 15%;" class="bg-gray font-bold">工程名稱</td>
+      <td style="width: 35%;" class="left-align"><%= meeting.project ? meeting.project.name : '' %></td>
+      <td style="width: 15%;" class="bg-gray font-bold">會議日期</td>
+      <td style="width: 35%;" class="left-align"><%= new Date(meeting.record_date).toLocaleDateString() %></td>
+    </tr>
+    <tr>
+      <td class="bg-gray font-bold">工程地點</td>
+      <td class="left-align"></td>
+      <td class="bg-gray font-bold">案場負責人</td>
+      <td class="left-align"><%= meeting.recorder ? meeting.recorder.name : '' %></td>
+    </tr>
+    <tr>
+      <td class="bg-gray font-bold">施工區域</td>
+      <td colspan="3" class="left-align">
+        <% 
+          const areas = ['浪板屋頂', '建物屋頂', '地面', '圳溝', '蓄水池'];
+          let otherArea = '';
+          if (meeting.work_area && !areas.includes(meeting.work_area)) {
+            otherArea = meeting.work_area;
+          }
+        %>
+        <% areas.forEach(a => { %>
+          <span class="checkbox <%= meeting.work_area === a ? 'checked' : 'unchecked' %>"></span> <%= a %> &nbsp;&nbsp;
+        <% }) %>
+        <span class="checkbox <%= otherArea ? 'checked' : 'unchecked' %>"></span> 其他: <span style="border-bottom: 1px solid #000; padding: 0 10px;"><%= otherArea || '　　　' %></span>
+      </td>
+    </tr>
+
+    <!-- 工作內容 -->
+    <tr>
+      <td colspan="4" class="font-bold">工作內容:(重要工作項目打勾)</td>
+    </tr>
+    <tr>
+      <td colspan="2" class="font-bold">工作項目</td>
+      <td colspan="2" class="font-bold">備註</td>
+    </tr>
+    <% 
+      const items = ['測量、收方', '灌漿作業', '鋼筋綁紮', '模板作業', '鋼構作業', '吊掛作業', '浪板鋪設更換作業', '太陽能板鋪設作業', '機電設備作業', '機電配管線作業', '材料堆疊、環境整理', '其他(於備註欄說明)'];
+      // Convert single col layout to what is in image, but image has 2 cols of [Item, Note]
+      // Image has 6 rows. Each row has 2 items.
+      const half = Math.ceil(items.length / 2);
+      for (let i = 0; i < half; i++) {
+        const item1 = items[i];
+        const item2 = items[i + half];
+        
+        let checked1 = false;
+        let note1 = '';
+        if (meeting.work_items) {
+          const found = meeting.work_items.find(w => w.name === item1);
+          if (found) { checked1 = true; note1 = found.note || ''; }
+        }
+
+        let checked2 = false;
+        let note2 = '';
+        if (item2 && meeting.work_items) {
+          const found = meeting.work_items.find(w => w.name === item2);
+          if (found) { checked2 = true; note2 = found.note || ''; }
+        }
+    %>
+    <tr>
+      <td class="left-align"><span class="checkbox <%= checked1 ? 'checked' : 'unchecked' %>"></span> <%= item1 %></td>
+      <td class="left-align"><%= note1 %></td>
+      <% if (item2) { %>
+        <td class="left-align"><span class="checkbox <%= checked2 ? 'checked' : 'unchecked' %>"></span> <%= item2 %></td>
+        <td class="left-align"><%= note2 %></td>
+      <% } else { %>
+        <td></td><td></td>
+      <% } %>
+    </tr>
+    <% } %>
+
+    <!-- 安全宣導內容 -->
+    <tr>
+      <td rowspan="8" class="vertical-text font-bold" style="width: 5%;">安全宣導內容(現場監工確實填寫)</td>
+      <td class="font-bold">物理性危害</td>
+      <td class="font-bold">化學性危害</td>
+      <td class="font-bold">火災危害</td>
+      <td class="font-bold">感電危害</td>
+    </tr>
+    <tr>
+      <!-- Physics -->
+      <td class="left-align" style="vertical-align: top;">
+        <% const phys = ['跌落、墜落', '物體飛落', '異物入眼', '高、低溫接觸', '擦傷、刺傷、扭傷、壓傷、夾傷、割傷、碰撞', '噪音']; %>
+        <% phys.forEach((h, idx) => { %>
+          <div style="display:inline-block; width: 48%; margin-bottom: 4px;">
+            <span class="checkbox <%= (meeting.hazards && meeting.hazards.includes(h)) ? 'checked' : 'unchecked' %>"></span> <%= h %>
+          </div>
+        <% }) %>
+      </td>
+      <!-- Chem -->
+      <td class="left-align" style="vertical-align: top;">
+        <% const chems = ['化學性灼傷', '化學吸入']; %>
+        <% chems.forEach((h, idx) => { %>
+          <div style="margin-bottom: 4px;">
+            <span class="checkbox <%= (meeting.hazards && meeting.hazards.includes(h)) ? 'checked' : 'unchecked' %>"></span> <%= h %>
+          </div>
+        <% }) %>
+      </td>
+      <!-- Fire -->
+      <td class="left-align" style="vertical-align: top;">
+        <% const fires = ['火災', '爆炸']; %>
+        <% fires.forEach((h, idx) => { %>
+          <div style="margin-bottom: 4px;">
+            <span class="checkbox <%= (meeting.hazards && meeting.hazards.includes(h)) ? 'checked' : 'unchecked' %>"></span> <%= h %>
+          </div>
+        <% }) %>
+      </td>
+      <!-- Elec -->
+      <td class="left-align" style="vertical-align: top;">
+        <div style="margin-bottom: 4px;">
+          <span class="checkbox <%= (meeting.hazards && meeting.hazards.includes('感電')) ? 'checked' : 'unchecked' %>"></span> 感電
+        </div>
+      </td>
+    </tr>
+
+    <!-- 現場安全衛生措施 -->
+    <tr>
+      <td colspan="4" class="font-bold">現場安全衛生措施</td>
+    </tr>
+    <tr>
+      <td class="font-bold">個人防護具</td>
+      <td class="font-bold">個人防護具</td>
+      <td class="font-bold">安全防護設施</td>
+      <td class="font-bold">安全防護設施</td>
+    </tr>
+    <% 
+      const ppe1 = ['安全帽', '安全鞋', '施工背心', '全身背負式安全帶', '防墜器', '安全眼鏡', '絕緣手套', '安全面罩'];
+      const ppe2 = ['防護衣', '防塵口罩', '防毒面具', '防化圍裙', '防化手套', '防化鞋', '', ''];
+      const fac1 = ['合梯', '爬梯', '施工架', '安全母索', '安全防墜網', '吊籠/護欄', '警示圍籬', '防火毯'];
+      const fac2 = ['搶救設備', '滅火器', '通風設備', '檢電器', '高壓電防護設備', '接地棒', '漏電斷路器', '電焊防電擊裝置'];
+      // The image has '氧乙炔焊防回火裝置', we'll fit it where space permits, or just render lists
+      
+      for(let i=0; i<8; i++) {
+        const check = (val) => val ? `<span class="checkbox ${meeting.safety_measures && meeting.safety_measures.includes(val) ? 'checked' : 'unchecked'}"></span> ${val}` : '';
+    %>
+    <tr>
+      <td class="left-align"><%- check(ppe1[i]) %></td>
+      <td class="left-align"><%- check(ppe2[i]) %></td>
+      <td class="left-align"><%- check(fac1[i]) %></td>
+      <td class="left-align"><%- check(fac2[i]) %></td>
+    </tr>
+    <% } %>
+
+    <!-- 其他存在風險說明 -->
+    <tr>
+      <td colspan="4" class="left-align font-bold" style="height: 50px; vertical-align: top;">
+        其他存在風險說明：<br/>
+        <span style="font-weight: normal;"><%= meeting.other_risks || '' %></span>
+      </td>
+    </tr>
+
+    <!-- 現場施工人員簽名 -->
+    <tr>
+      <td class="vertical-text font-bold">現場施工人員簽名</td>
+      <td colspan="4" class="left-align">
+        <div style="margin-bottom: 5px;" class="font-bold">施工人數： <%= meeting.worker_count %> 人</div>
+        <table style="width: 100%; border: none;">
+          <% for(let r=0; r<4; r++) { %>
+            <tr>
+              <% for(let c=1; c<=5; c++) { 
+                const num = r * 5 + c;
+                const sigImg = (meeting.signatures && meeting.signatures[num - 1]) ? meeting.signatures[num - 1] : null;
+              %>
+                <td style="border: 1px solid #ccc; width: 20%; height: 50px; text-align: left; vertical-align: top; position: relative;">
+                  <%= num %>.
+                  <% if (sigImg) { %>
+                    <img src="<%= sigImg %>" style="position: absolute; top: 15px; left: 5px; max-width: 90%; max-height: 35px;" />
+                  <% } %>
+                </td>
+              <% } %>
+            </tr>
+          <% } %>
+        </table>
+      </td>
+    </tr>
+
+    <!-- 現場使用機具 -->
+    <tr>
+      <td colspan="5" class="font-bold text-center">現場使用機具</td>
+    </tr>
+    <tr>
+      <td class="font-bold">機具名稱</td>
+      <td class="font-bold">單位</td>
+      <td class="font-bold">數量(H/台)</td>
+      <td class="font-bold">機具名稱</td>
+      <td class="font-bold">單位</td>
+    </tr>
+    <% for(let i=0; i<3; i++) { %>
+    <tr>
+      <td></td><td></td><td></td><td></td><td></td>
+    </tr>
+    <% } %>
+  </table>
+
+  <!-- PAGE 2+: 照片 -->
+  <% if (allPhotos && allPhotos.length > 0) { 
+      let totalPages = Math.ceil(allPhotos.length / 6);
+      for(let p=0; p<totalPages; p++) {
+        let chunk = allPhotos.slice(p*6, (p+1)*6);
+  %>
+    <div class="page-break"></div>
+    <div class="header">
+      <% if (logoBase64) { %>
+        <img src="<%= logoBase64 %>" class="logo-placeholder" />
+      <% } else { %>
+        <div class="logo-placeholder">Logo</div>
+      <% } %>
+      <div class="company-info">
+        <div class="company-name">元融科技有限公司<span class="en">YUANRONG TECHNOLOGY</span></div>
+        <div class="company-details">
+          每日工具箱會議照片紀錄
+        </div>
+      </div>
+    </div>
+    
+    <div class="photo-grid">
+      <% chunk.forEach((photo, idx) => { %>
+        <div class="photo-cell">
+          <img src="<%= photo %>" alt="Photo">
+          <div class="photo-title">會議照片 <%= (p*6) + idx + 1 %></div>
+        </div>
+      <% }) %>
+    </div>
+  <% 
+      }
+    } 
+  %>
+
+</body>
+</html>

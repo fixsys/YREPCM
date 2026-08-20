@@ -454,6 +454,32 @@ const ProjectDetails = () => {
                     </div>
                     
                     <div className="flex items-center gap-2">
+                                            {log._logType === 'toolbox' && (
+                        <button 
+                          onClick={async () => {
+                            try {
+                              const res = await axios.get(`/api/toolbox-meetings/${log.id}/export-pdf`, {
+                                headers: { Authorization: `Bearer ${token}` },
+                                responseType: 'blob'
+                              });
+                              const url = window.URL.createObjectURL(new Blob([res.data]));
+                              const link = document.createElement('a');
+                              link.href = url;
+                              link.setAttribute('download', `工具箱會議-${new Date(log._date).toLocaleDateString().replace(/\//g, '')}.pdf`);
+                              document.body.appendChild(link);
+                              link.click();
+                              link.remove();
+                              window.URL.revokeObjectURL(url);
+                            } catch (e) {
+                              console.error(e);
+                              alert('匯出 PDF 失敗');
+                            }
+                          }}
+                          className="whitespace-nowrap px-4 py-2 bg-red-50 border border-red-200 rounded-lg text-red-700 font-bold hover:bg-red-100 hover:border-red-300 transition-colors shadow-sm flex items-center gap-2 text-sm"
+                        >
+                          <Download size={16} /> 匯出 PDF
+                        </button>
+                      )}
                       {log._logType === 'labor' && (
                         <button 
                           onClick={async () => {
