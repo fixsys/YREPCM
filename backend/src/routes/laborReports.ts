@@ -544,7 +544,7 @@ ${report.recorder?.name || ''}`;
              const p2 = chunk[i+1];
              
              const rowPhoto = r;
-             ws.getRow(rowPhoto).height = 200; // Adjusted for 3 rows
+             ws.getRow(rowPhoto).height = 160; // Adjusted for 3 rows
              
              ws.mergeCells(`A${rowPhoto}:D${rowPhoto}`);
              ws.mergeCells(`E${rowPhoto}:H${rowPhoto}`);
