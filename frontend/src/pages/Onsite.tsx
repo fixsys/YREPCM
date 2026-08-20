@@ -695,6 +695,152 @@ const Onsite = () => {
                     <span className="text-sm text-amber-900">3. 所有人員均了解今日工作內容與緊急應變方式</span>
                   </label>
                 </div>
+                <div className="mt-4 pt-4 border-t border-slate-200">
+                  <h3 className="font-bold text-lg text-slate-800 mb-2">詳細作業內容與安全檢核</h3>
+                  
+                  {/* 施工區域 */}
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-slate-700 mb-2">施工區域</label>
+                    <div className="flex flex-wrap gap-4">
+                      {TOOLBOX_WORK_AREAS.map(area => (
+                         <label key={area} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                           <input type="radio" checked={toolboxForm.work_area === area || (area === '其他' && !TOOLBOX_WORK_AREAS.includes(toolboxForm.work_area) && toolboxForm.work_area !== '')} onChange={() => setToolboxForm({...toolboxForm, work_area: area === '其他' ? '其他填寫...' : area})} className="text-indigo-600" />
+                           {area}
+                         </label>
+                      ))}
+                      {(!TOOLBOX_WORK_AREAS.includes(toolboxForm.work_area) || toolboxForm.work_area === '其他填寫...') && toolboxForm.work_area !== '' && (
+                         <input type="text" value={toolboxForm.work_area === '其他填寫...' ? '' : toolboxForm.work_area} onChange={e => setToolboxForm({...toolboxForm, work_area: e.target.value})} placeholder="請註明其他區域" className="border-b border-slate-300 outline-none px-1 text-sm text-slate-700" />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 工作內容 */}
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-slate-700 mb-2">工作內容 (勾選並填寫備註)</label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      {TOOLBOX_WORK_ITEMS.map(item => {
+                         const existingItem = toolboxForm.work_items.find(w => w.name === item);
+                         return (
+                           <div key={item} className="flex items-center gap-2 text-sm text-slate-700">
+                             <input type="checkbox" checked={!!existingItem} onChange={e => {
+                               if (e.target.checked) setToolboxForm({...toolboxForm, work_items: [...toolboxForm.work_items, { name: item, note: '' }]});
+                               else setToolboxForm({...toolboxForm, work_items: toolboxForm.work_items.filter(w => w.name !== item)});
+                             }} className="w-4 h-4 text-indigo-600" />
+                             <span className="shrink-0">{item}</span>
+                             {existingItem && (
+                               <input type="text" placeholder="備註..." value={existingItem.note} onChange={e => {
+                                 setToolboxForm({
+                                   ...toolboxForm,
+                                   work_items: toolboxForm.work_items.map(w => w.name === item ? { ...w, note: e.target.value } : w)
+                                 });
+                               }} className="flex-1 ml-2 border-b border-slate-300 outline-none px-1 text-xs" />
+                             )}
+                           </div>
+                         );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* 物理性危害 */}
+                  <div className="mb-4 bg-slate-50 p-3 rounded">
+                    <label className="block text-sm font-bold text-slate-700 mb-2">物理性危害</label>
+                    <div className="flex flex-wrap gap-x-4 gap-y-2">
+                      {TOOLBOX_PHYSICAL_HAZARDS.map(h => (
+                         <label key={h} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                           <input type="checkbox" checked={toolboxForm.hazards.includes(h)} onChange={e => {
+                             if (e.target.checked) setToolboxForm({...toolboxForm, hazards: [...toolboxForm.hazards, h]});
+                             else setToolboxForm({...toolboxForm, hazards: toolboxForm.hazards.filter(item => item !== h)});
+                           }} className="w-4 h-4 text-orange-600" />
+                           {h}
+                         </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 化學性/火災/感電危害 */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div className="bg-slate-50 p-3 rounded">
+                      <label className="block text-sm font-bold text-slate-700 mb-2">化學性危害</label>
+                      <div className="flex flex-col gap-2">
+                        {TOOLBOX_CHEMICAL_HAZARDS.map(h => (
+                           <label key={h} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                             <input type="checkbox" checked={toolboxForm.hazards.includes(h)} onChange={e => {
+                               if (e.target.checked) setToolboxForm({...toolboxForm, hazards: [...toolboxForm.hazards, h]});
+                               else setToolboxForm({...toolboxForm, hazards: toolboxForm.hazards.filter(item => item !== h)});
+                             }} className="w-4 h-4 text-orange-600" />
+                             {h}
+                           </label>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="bg-slate-50 p-3 rounded">
+                      <label className="block text-sm font-bold text-slate-700 mb-2">火災危害</label>
+                      <div className="flex flex-col gap-2">
+                        {TOOLBOX_FIRE_HAZARDS.map(h => (
+                           <label key={h} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                             <input type="checkbox" checked={toolboxForm.hazards.includes(h)} onChange={e => {
+                               if (e.target.checked) setToolboxForm({...toolboxForm, hazards: [...toolboxForm.hazards, h]});
+                               else setToolboxForm({...toolboxForm, hazards: toolboxForm.hazards.filter(item => item !== h)});
+                             }} className="w-4 h-4 text-red-600" />
+                             {h}
+                           </label>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="bg-slate-50 p-3 rounded">
+                      <label className="block text-sm font-bold text-slate-700 mb-2">感電危害</label>
+                      <div className="flex flex-col gap-2">
+                        {TOOLBOX_ELECTRICAL_HAZARDS.map(h => (
+                           <label key={h} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                             <input type="checkbox" checked={toolboxForm.hazards.includes(h)} onChange={e => {
+                               if (e.target.checked) setToolboxForm({...toolboxForm, hazards: [...toolboxForm.hazards, h]});
+                               else setToolboxForm({...toolboxForm, hazards: toolboxForm.hazards.filter(item => item !== h)});
+                             }} className="w-4 h-4 text-yellow-600" />
+                             {h}
+                           </label>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 個人防護具 */}
+                  <div className="mb-4 bg-teal-50 p-3 rounded">
+                    <label className="block text-sm font-bold text-teal-800 mb-2">個人防護具</label>
+                    <div className="flex flex-wrap gap-x-4 gap-y-2">
+                      {TOOLBOX_PPE.map(h => (
+                         <label key={h} className="flex items-center gap-2 text-sm text-teal-800 cursor-pointer">
+                           <input type="checkbox" checked={toolboxForm.safety_measures.includes(h)} onChange={e => {
+                             if (e.target.checked) setToolboxForm({...toolboxForm, safety_measures: [...toolboxForm.safety_measures, h]});
+                             else setToolboxForm({...toolboxForm, safety_measures: toolboxForm.safety_measures.filter(item => item !== h)});
+                           }} className="w-4 h-4 text-teal-600" />
+                           {h}
+                         </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 安全防護設施 */}
+                  <div className="mb-4 bg-teal-50 p-3 rounded">
+                    <label className="block text-sm font-bold text-teal-800 mb-2">安全防護設施</label>
+                    <div className="flex flex-wrap gap-x-4 gap-y-2">
+                      {TOOLBOX_SAFETY_FACILITIES.map(h => (
+                         <label key={h} className="flex items-center gap-2 text-sm text-teal-800 cursor-pointer">
+                           <input type="checkbox" checked={toolboxForm.safety_measures.includes(h)} onChange={e => {
+                             if (e.target.checked) setToolboxForm({...toolboxForm, safety_measures: [...toolboxForm.safety_measures, h]});
+                             else setToolboxForm({...toolboxForm, safety_measures: toolboxForm.safety_measures.filter(item => item !== h)});
+                           }} className="w-4 h-4 text-teal-600" />
+                           {h}
+                         </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 其他風險 */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">其他存在風險說明</label>
+                    <textarea value={toolboxForm.other_risks} onChange={e => setToolboxForm({...toolboxForm, other_risks: e.target.value})} rows={2} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="若有上述未列出的風險，請於此說明..."></textarea>
+                  </div>
+                </div>
 
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">會議照片上傳 {editingToolboxId ? '(若不更新請留空)' : '(必須上傳 2 張) *'}</label>
