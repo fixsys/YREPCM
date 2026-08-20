@@ -200,10 +200,14 @@
     </tr>
     <tr>
       <td colspan="9" class="left-align" style="vertical-align: top; line-height: 1.5;">
-        <% const phys = ['跌落、墜落', '物體飛落', '異物入眼', '高、低溫接觸', '擦傷、刺傷、扭傷、壓傷、夾傷、割傷、碰撞', '噪音']; %>
-        <% phys.forEach(h => { %>
-          <div style="display:inline-block; width: 48%;"><%- box(meeting.hazards && meeting.hazards.includes(h)) %> <%= h %></div>
-        <% }) %>
+        <div style="display: flex; flex-wrap: wrap;">
+          <div style="width: 63%; margin-bottom: 2px;"><%- box(meeting.hazards && meeting.hazards.includes('跌落、墜落')) %> 跌落、墜落</div>
+          <div style="width: 37%; margin-bottom: 2px;"><%- box(meeting.hazards && meeting.hazards.includes('物體飛落')) %> 物體飛落</div>
+          <div style="width: 63%; margin-bottom: 2px;"><%- box(meeting.hazards && meeting.hazards.includes('異物入眼')) %> 異物入眼</div>
+          <div style="width: 37%; margin-bottom: 2px;"><%- box(meeting.hazards && meeting.hazards.includes('高、低溫接觸')) %> 高、低溫接觸</div>
+          <div style="width: 63%; white-space: nowrap;"><%- box(meeting.hazards && meeting.hazards.includes('擦傷、刺傷、扭傷、壓傷、夾傷、割傷、碰撞')) %> 擦傷、刺傷、扭傷、壓傷、夾傷、割傷、碰撞</div>
+          <div style="width: 37%;"><%- box(meeting.hazards && meeting.hazards.includes('噪音')) %> 噪音</div>
+        </div>
       </td>
       <td colspan="4" class="left-align" style="vertical-align: top; line-height: 1.5;">
         <%- box(meeting.hazards && meeting.hazards.includes('化學性灼傷')) %> 化學性灼傷<br>
@@ -223,8 +227,8 @@
       <td colspan="20" style="font-weight: bold;">現場安全衛生措施</td>
     </tr>
     <tr>
-      <td colspan="4" style="font-weight: bold;">個人防護具</td>
-      <td colspan="4" style="font-weight: bold;">個人防護具</td>
+      <td colspan="5" style="font-weight: bold;">個人防護具</td>
+      <td colspan="3" style="font-weight: bold;">個人防護具</td>
       <td colspan="4" style="font-weight: bold;">安全防護設施</td>
       <td colspan="4" style="font-weight: bold;">安全防護設施</td>
       <td colspan="4" style="font-weight: bold;">安全防護設施</td>
@@ -240,8 +244,8 @@
         const check = (val) => val ? `${box(meeting.safety_measures && meeting.safety_measures.includes(val))} ${val}` : '';
     %>
     <tr>
-      <td colspan="4" class="left-align"><%- check(ppe1[i]) %></td>
-      <td colspan="4" class="left-align"><%- check(ppe2[i]) %></td>
+      <td colspan="5" class="left-align"><%- check(ppe1[i]) %></td>
+      <td colspan="3" class="left-align"><%- check(ppe2[i]) %></td>
       <td colspan="4" class="left-align"><%- check(fac1[i]) %></td>
       <td colspan="4" class="left-align"><%- check(fac2[i]) %></td>
       <td colspan="4" class="left-align"><%- check(fac3[i]) %></td>
