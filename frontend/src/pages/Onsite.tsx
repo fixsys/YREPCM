@@ -1169,9 +1169,7 @@ const Onsite = () => {
                 {viewingRecord.type === 'toolbox' ? '工具箱會議報表' : '施工日誌報表'}
               </h2>
               <div className="flex gap-2">
-                <button onClick={() => window.print()} className="p-2 text-slate-600 hover:bg-slate-100 hover:text-indigo-600 rounded-lg flex items-center gap-2 font-bold transition-colors">
-                  <Printer size={20} /> <span className="hidden sm:inline">列印報表</span>
-                </button>
+
                 <button onClick={() => setViewingRecord(null)} className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors">
                   <X size={24} />
                 </button>
@@ -1182,7 +1180,7 @@ const Onsite = () => {
               {viewingRecord.type === 'toolbox' && (
                 <>
                   <div className="text-center mb-8 border-b-2 border-slate-800 pb-4">
-                    <h1 className="text-3xl font-black tracking-widest">{viewingRecord.data.project ? `${viewingRecord.data.project.project_code} ${viewingRecord.data.project.project_name}` : '無專案'}</h1>
+                    <h1 className="text-3xl font-black tracking-widest">{viewingRecord.data.project ? `${viewingRecord.data.project.project_code || ''} ${viewingRecord.data.project.name || ''}` : '無專案'}</h1>
                     <h2 className="text-2xl font-bold mt-2 tracking-widest">勞工安全衛生工具箱會議紀錄表</h2>
                   </div>
                   <div className="grid grid-cols-2 gap-4 text-lg border-b border-slate-200 pb-6">
@@ -1227,7 +1225,7 @@ const Onsite = () => {
               {viewingRecord.type === 'labor' && (
                 <>
                   <div className="text-center mb-8 border-b-2 border-slate-800 pb-4">
-                    <h1 className="text-3xl font-black tracking-widest">{viewingRecord.data.project ? `${viewingRecord.data.project.project_code} ${viewingRecord.data.project.project_name}` : '無專案'}</h1>
+                    <h1 className="text-3xl font-black tracking-widest">{viewingRecord.data.project ? `${viewingRecord.data.project.project_code || ''} ${viewingRecord.data.project.name || ''}` : '無專案'}</h1>
                     <h2 className="text-2xl font-bold mt-2 tracking-widest">施工日誌報表</h2>
                   </div>
                   <div className="grid grid-cols-2 gap-4 text-lg border-b border-slate-200 pb-6">
