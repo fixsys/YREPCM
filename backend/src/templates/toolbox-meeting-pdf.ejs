@@ -158,10 +158,10 @@
     <!-- 20 rows of 安全宣導內容 span -->
     <tr>
       <td rowspan="20" class="vertical-text" style="font-weight: bold; font-size: 14px;">安全宣導內容(現場監工確實填寫)</td>
-      <td colspan="4" style="font-weight: bold;">工作項目</td>
+      <td colspan="5" style="font-weight: bold;">工作項目</td>
       <td colspan="5" style="font-weight: bold;">備註</td>
       <td colspan="5" style="font-weight: bold;">工作項目</td>
-      <td colspan="6" style="font-weight: bold;">備註</td>
+      <td colspan="5" style="font-weight: bold;">備註</td>
     </tr>
 
     <% 
@@ -184,22 +184,22 @@
         }
     %>
     <tr>
-      <td colspan="4" class="left-align"><%- box(c1) %> <%= i1 %></td>
+      <td colspan="5" class="left-align"><%- box(c1) %> <%= i1 %></td>
       <td colspan="5" class="left-align"><%= n1 %></td>
       <td colspan="5" class="left-align"><%- box(c2) %> <%= i2 %></td>
-      <td colspan="6" class="left-align"><%= n2 %></td>
+      <td colspan="5" class="left-align"><%= n2 %></td>
     </tr>
     <% } %>
 
     <!-- Hazards -->
     <tr>
-      <td colspan="11" style="font-weight: bold;">物理性危害</td>
+      <td colspan="9" style="font-weight: bold;">物理性危害</td>
       <td colspan="4" style="font-weight: bold;">化學性危害</td>
       <td colspan="4" style="font-weight: bold;">火災危害</td>
-      <td colspan="1" style="font-weight: bold;">感電危害</td>
+      <td colspan="3" style="font-weight: bold;">感電危害</td>
     </tr>
     <tr>
-      <td colspan="11" class="left-align" style="vertical-align: top; line-height: 1.5;">
+      <td colspan="9" class="left-align" style="vertical-align: top; line-height: 1.5;">
         <% const phys = ['跌落、墜落', '物體飛落', '異物入眼', '高、低溫接觸', '擦傷、刺傷、扭傷、壓傷、夾傷、割傷、碰撞', '噪音']; %>
         <% phys.forEach(h => { %>
           <div style="display:inline-block; width: 48%;"><%- box(meeting.hazards && meeting.hazards.includes(h)) %> <%= h %></div>
@@ -213,7 +213,7 @@
         <%- box(meeting.hazards && meeting.hazards.includes('火災')) %> 火災<br>
         <%- box(meeting.hazards && meeting.hazards.includes('爆炸')) %> 爆炸
       </td>
-      <td colspan="1" class="left-align" style="vertical-align: top; line-height: 1.5;">
+      <td colspan="3" class="left-align" style="vertical-align: top; line-height: 1.5;">
         <%- box(meeting.hazards && meeting.hazards.includes('感電')) %> 感電
       </td>
     </tr>
@@ -226,8 +226,8 @@
       <td colspan="3" style="font-weight: bold;">個人防護具</td>
       <td colspan="4" style="font-weight: bold;">個人防護具</td>
       <td colspan="4" style="font-weight: bold;">安全防護設施</td>
-      <td colspan="6" style="font-weight: bold;">安全防護設施</td>
-      <td colspan="3" style="font-weight: bold;">安全防護設施</td>
+      <td colspan="4" style="font-weight: bold;">安全防護設施</td>
+      <td colspan="5" style="font-weight: bold;">安全防護設施</td>
     </tr>
     <% 
       const ppe1 = ['安全帽', '安全鞋', '施工背心', '全身背負式安全帶', '防墜器', '安全眼鏡', '絕緣手套', '安全面罩'];
@@ -243,8 +243,8 @@
       <td colspan="3" class="left-align"><%- check(ppe1[i]) %></td>
       <td colspan="4" class="left-align"><%- check(ppe2[i]) %></td>
       <td colspan="4" class="left-align"><%- check(fac1[i]) %></td>
-      <td colspan="6" class="left-align"><%- check(fac2[i]) %></td>
-      <td colspan="3" class="left-align"><%- check(fac3[i]) %></td>
+      <td colspan="4" class="left-align"><%- check(fac2[i]) %></td>
+      <td colspan="5" class="left-align"><%- check(fac3[i]) %></td>
     </tr>
     <% } %>
 
@@ -264,7 +264,7 @@
     <% for(let r=0; r<5; r++) { %>
       <tr>
         <% 
-          const colSpans = [4, 5, 5, 6]; 
+          const colSpans = [5, 5, 5, 5]; 
           for(let c=0; c<4; c++) { 
             const num = r * 4 + c + 1; // 1 to 20
             // But wait, the docx has them in columns: 1..5, 6..10, 11..15, 16..20!
