@@ -62,17 +62,23 @@ router.post('/', authenticateToken, upload.array('photos', 5), async (req: AuthR
   try {
     const meeting = await prisma.toolboxMeeting.create({
       data: {
-        project_id,
-        record_date: new Date(record_date),
-        recorder_id: recorder_id || req.user.id,
-        worker_count: parseInt(worker_count),
-        work_category,
-        work_content,
-        safety_check_1: safety_check_1 === 'true',
-        safety_check_2: safety_check_2 === 'true',
-        safety_check_3: safety_check_3 === 'true',
-        photos: JSON.stringify(photoPaths)
-      }
+          project_id,
+          record_date: new Date(record_date),
+          recorder_id: recorder_id || req.user.id,
+          worker_count: parseInt(worker_count) || 0,
+          work_category,
+          work_content,
+          safety_check_1: safety_check_1 === 'true',
+          safety_check_2: safety_check_2 === 'true',
+          safety_check_3: safety_check_3 === 'true',
+          work_area: work_area || '',
+          other_risks: other_risks || '',
+          work_items: work_items ? JSON.parse(work_items) : [],
+          hazards: hazards ? JSON.parse(hazards) : [],
+          safety_measures: safety_measures ? JSON.parse(safety_measures) : [],
+          signatures: signatures ? JSON.parse(signatures) : [],
+          photos: JSON.stringify(photoPaths)
+        }
     });
     res.json(meeting);
   } catch (error) {
@@ -87,20 +93,26 @@ router.put('/:id', authenticateToken, upload.array('photos', 5), async (req: Aut
   if (!req.user) return res.status(401).json({ error: '未授權' });
 
   const { id } = req.params;
-  const { project_id, record_date, recorder_id, worker_count, work_category, work_content, safety_check_1, safety_check_2, safety_check_3 } = req.body;
+  const { project_id, record_date, recorder_id, worker_count, work_category, work_content, safety_check_1, safety_check_2, safety_check_3, work_area, work_items, hazards, safety_measures, other_risks, signatures } = req.body;
 
   try {
     const dataToUpdate: any = {
-      project_id,
-      record_date: new Date(record_date),
-      recorder_id: recorder_id || req.user.id,
-      worker_count: parseInt(worker_count),
-      work_category,
-      work_content,
-      safety_check_1: safety_check_1 === 'true' || safety_check_1 === true,
-      safety_check_2: safety_check_2 === 'true' || safety_check_2 === true,
-      safety_check_3: safety_check_3 === 'true' || safety_check_3 === true,
-    };
+        project_id,
+        record_date: new Date(record_date),
+        recorder_id: recorder_id || req.user.id,
+        worker_count: parseInt(worker_count) || 0,
+        work_category,
+        work_content,
+        safety_check_1: safety_check_1 === 'true' || safety_check_1 === true,
+        safety_check_2: safety_check_2 === 'true' || safety_check_2 === true,
+        safety_check_3: safety_check_3 === 'true' || safety_check_3 === true,
+        work_area: work_area || '',
+        other_risks: other_risks || '',
+        work_items: work_items ? JSON.parse(work_items) : [],
+        hazards: hazards ? JSON.parse(hazards) : [],
+        safety_measures: safety_measures ? JSON.parse(safety_measures) : [],
+        signatures: signatures ? JSON.parse(signatures) : []
+      };
 
     const files = req.files as Express.Multer.File[];
     if (files && files.length >= 2) {
