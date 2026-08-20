@@ -673,7 +673,7 @@ const Onsite = () => {
                     if (sigCanvas.current.isEmpty()) {
                       return alert('請先簽名！');
                     }
-                    const trimmedCanvas = sigCanvas.current.getTrimmedCanvas();
+                    const trimmedCanvas = sigCanvas.current.getCanvas();
                     const newSignatures = Array.isArray(toolboxForm.signatures) ? [...toolboxForm.signatures] : [];
                     newSignatures[signatureModal.index] = trimmedCanvas.toDataURL('image/png');
                     setToolboxForm({...toolboxForm, signatures: newSignatures});
