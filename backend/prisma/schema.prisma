@@ -462,6 +462,7 @@ model ToolboxMeeting {
   hazards         Json?
   safety_measures Json?
   other_risks     String?  @db.Text
+  signatures      Json?
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt
 

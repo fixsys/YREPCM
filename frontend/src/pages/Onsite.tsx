@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useNavigate, useLocation } from 'react-router-dom';
+import SignatureCanvas from 'react-signature-canvas';
 
 const TimeInput24 = ({ value, onChange, className }: { value: string, onChange: (val: string) => void, className?: string }) => {
   const [h, m] = value ? value.split(':') : ['08', '00'];
@@ -64,10 +65,13 @@ const Onsite = () => {
     work_items: [] as any[],
     hazards: [] as string[],
     safety_measures: [] as string[],
-    other_risks: ''
+    other_risks: '',
+    signatures: [] as string[]
   });
   const [toolboxPhotos, setToolboxPhotos] = useState<File[]>([]);
   const [toolboxPreviewUrls, setToolboxPreviewUrls] = useState<string[]>([]);
+  const [signatureModal, setSignatureModal] = useState<{ isOpen: boolean; index: number }>({ isOpen: false, index: 0 });
+  const sigCanvas = useRef<any>(null);
 
   // 每日報工 State
   const [laborReports, setLaborReports] = useState<any[]>([]);
@@ -319,7 +323,7 @@ const Onsite = () => {
 
   const handleAddToolbox = () => {
     setEditingToolboxId(null);
-    setToolboxForm({ project_id: '', record_date: new Date().toISOString().slice(0, 10), recorder_id: user?.id || '', worker_count: '', work_category: '土木', work_content: '', safety_check_1: false, safety_check_2: false, safety_check_3: false, work_area: '', work_items: [], hazards: [], safety_measures: [], other_risks: '' });
+    setToolboxForm({ project_id: '', record_date: new Date().toISOString().slice(0, 10), recorder_id: user?.id || '', worker_count: '', work_category: '土木', work_content: '', safety_check_1: false, safety_check_2: false, safety_check_3: false, work_area: '', work_items: [], hazards: [], safety_measures: [], other_risks: '', signatures: [] });
     setToolboxPhotos([]);
     setIsToolboxModalOpen(true);
   };
@@ -340,7 +344,8 @@ const Onsite = () => {
       work_items: safeParseJSON(t.work_items, []),
       hazards: safeParseJSON(t.hazards, []),
       safety_measures: safeParseJSON(t.safety_measures, []),
-      other_risks: t.other_risks || ''
+      other_risks: t.other_risks || '',
+      signatures: safeParseJSON(t.signatures, [])
     });
     setToolboxPhotos([]);
     setIsToolboxModalOpen(true);
@@ -636,6 +641,40 @@ const Onsite = () => {
       </div>
 
       {/* Modal: 新增工具箱會議 */}
+      
+      {signatureModal.isOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col">
+            <div className="p-4 border-b flex justify-between items-center bg-indigo-50">
+              <h3 className="font-bold text-slate-800">人員簽名 ({signatureModal.index + 1})</h3>
+              <button type="button" onClick={() => setSignatureModal({ isOpen: false, index: 0 })} className="text-slate-500 hover:text-slate-700"><X size={20} /></button>
+            </div>
+            <div className="p-4 bg-slate-100">
+              <div className="bg-white border-2 border-dashed border-slate-300 rounded-lg cursor-crosshair">
+                <SignatureCanvas 
+                  ref={sigCanvas}
+                  canvasProps={{ className: 'w-full h-48 rounded-lg' }}
+                  backgroundColor="white"
+                />
+              </div>
+            </div>
+            <div className="p-4 border-t bg-gray-50 flex justify-between gap-3">
+              <button type="button" onClick={() => sigCanvas.current?.clear()} className="px-4 py-2 border rounded-lg text-slate-600 hover:bg-slate-100 font-bold">清除重簽</button>
+              <div className="flex gap-3">
+                <button type="button" onClick={() => setSignatureModal({ isOpen: false, index: 0 })} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-bold">取消</button>
+                <button type="button" onClick={() => {
+                  if (sigCanvas.current?.isEmpty()) return alert('請先簽名！');
+                  const newSignatures = [...toolboxForm.signatures];
+                  newSignatures[signatureModal.index] = sigCanvas.current.getTrimmedCanvas().toDataURL('image/png');
+                  setToolboxForm({...toolboxForm, signatures: newSignatures});
+                  setSignatureModal({ isOpen: false, index: 0 });
+                }} className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-bold shadow-md">確認儲存</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isToolboxModalOpen && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-end md:items-center justify-center z-50 md:p-4">
           <div className="bg-white w-full max-w-2xl max-h-[90vh] rounded-t-2xl md:rounded-xl shadow-2xl flex flex-col overflow-hidden">
@@ -839,6 +878,25 @@ const Onsite = () => {
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">其他存在風險說明</label>
                     <textarea value={toolboxForm.other_risks} onChange={e => setToolboxForm({...toolboxForm, other_risks: e.target.value})} rows={2} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="若有上述未列出的風險，請於此說明..."></textarea>
+                  </div>
+
+                  {/* 現場施工人員簽名 */}
+                  <div className="pt-4 border-t border-slate-200">
+                    <label className="block text-sm font-bold text-slate-800 mb-2">現場施工人員簽名 (對應上工人數: {toolboxForm.worker_count || 0} 人)</label>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      {Array.from({ length: parseInt(toolboxForm.worker_count || '0') }).map((_, i) => (
+                        <div key={i} className="border border-slate-300 rounded-lg h-24 flex flex-col items-center justify-center bg-slate-50 relative overflow-hidden group">
+                          {toolboxForm.signatures[i] ? (
+                            <>
+                              <img src={toolboxForm.signatures[i]} alt="簽名" className="w-full h-full object-contain bg-white" />
+                              <button type="button" onClick={() => setSignatureModal({ isOpen: true, index: i })} className="absolute inset-0 bg-black/50 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-sm">重簽</button>
+                            </>
+                          ) : (
+                            <button type="button" onClick={() => setSignatureModal({ isOpen: true, index: i })} className="text-indigo-600 font-bold hover:text-indigo-800 w-full h-full">點擊簽名 {i + 1}</button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
@@ -1409,6 +1467,17 @@ const Onsite = () => {
                       <div>
                         <h4 className="font-bold text-lg mb-2">其他存在風險說明</h4>
                         <div className="bg-slate-50 p-3 rounded border border-slate-200 text-red-600">{viewingRecord.data.other_risks}</div>
+                      </div>
+                    )}
+
+                    {viewingRecord.data.signatures && safeParseJSON(viewingRecord.data.signatures, []).length > 0 && (
+                      <div>
+                        <h4 className="font-bold text-lg mb-2">現場施工人員簽名</h4>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                          {safeParseJSON(viewingRecord.data.signatures, []).map((sig: string, i: number) => (
+                            sig ? <div key={i} className="border border-slate-200 rounded p-2 bg-white flex justify-center items-center h-20 shadow-sm"><img src={sig} alt="簽名" className="max-h-full object-contain" /></div> : null
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>
