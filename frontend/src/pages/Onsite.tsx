@@ -540,7 +540,8 @@ const Onsite = () => {
                     </div>
                   )}
                 </div>
-                <div className="flex border-t border-slate-100 divide-x divide-slate-100 bg-slate-50 rounded-b-xl overflow-hidden shrink-0">
+
+<div className="flex border-t border-slate-100 divide-x divide-slate-100 bg-slate-50 rounded-b-xl overflow-hidden shrink-0">
                   <button onClick={() => setViewingRecord({type: 'toolbox', data: t})} className="flex-1 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-100 hover:text-indigo-700 flex items-center justify-center gap-2 transition-colors"><FileText size={16}/> 檢視報表</button>
                   <button onClick={() => handleEditToolbox(t)} className="flex-1 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-100 hover:text-teal-700 flex items-center justify-center gap-2 transition-colors"><Edit2 size={16}/> 編輯</button>
                 </div>
@@ -732,21 +733,6 @@ const Onsite = () => {
                   <textarea required value={toolboxForm.work_content} onChange={e => setToolboxForm({...toolboxForm, work_content: e.target.value})} className="w-full px-3 py-2 border rounded-lg outline-none focus:ring-2 min-h-[80px]" placeholder="簡述今日派工項目"></textarea>
                 </div>
 
-                <div className="bg-amber-50 p-4 rounded-lg border border-amber-200 space-y-3">
-                  <h4 className="font-bold text-amber-800 text-sm mb-2">工安提醒與確認 (必勾選)</h4>
-                  <label className="flex items-start gap-3 cursor-pointer">
-                    <input type="checkbox" checked={toolboxForm.safety_check_1} onChange={e => setToolboxForm({...toolboxForm, safety_check_1: e.target.checked})} className="mt-1 w-4 h-4 text-indigo-600" />
-                    <span className="text-sm text-amber-900">1. 已完成今日危害告知與安全作業說明 (嚴禁飲酒)</span>
-                  </label>
-                  <label className="flex items-start gap-3 cursor-pointer">
-                    <input type="checkbox" checked={toolboxForm.safety_check_2} onChange={e => setToolboxForm({...toolboxForm, safety_check_2: e.target.checked})} className="mt-1 w-4 h-4 text-indigo-600" />
-                    <span className="text-sm text-amber-900">2. 已逐員確認禁酒、服裝儀容、安全帽及安全鞋 (禁止穿拖鞋)</span>
-                  </label>
-                  <label className="flex items-start gap-3 cursor-pointer">
-                    <input type="checkbox" checked={toolboxForm.safety_check_3} onChange={e => setToolboxForm({...toolboxForm, safety_check_3: e.target.checked})} className="mt-1 w-4 h-4 text-indigo-600" />
-                    <span className="text-sm text-amber-900">3. 所有人員均了解今日工作內容與緊急應變方式</span>
-                  </label>
-                </div>
                 <div className="mt-4 pt-4 border-t border-slate-200">
                   <h3 className="font-bold text-lg text-slate-800 mb-2">詳細作業內容與安全檢核</h3>
                   
@@ -939,6 +925,23 @@ const Onsite = () => {
                     </div>
                   )}
                 </div>
+              
+                <div className="bg-amber-50 p-4 rounded-lg border border-amber-200 space-y-3">
+                  <h4 className="font-bold text-amber-800 text-sm mb-2">工安提醒與確認 (必勾選)</h4>
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input type="checkbox" checked={toolboxForm.safety_check_1} onChange={e => setToolboxForm({...toolboxForm, safety_check_1: e.target.checked})} className="mt-1 w-4 h-4 text-indigo-600" />
+                    <span className="text-sm text-amber-900">1. 已完成今日危害告知與安全作業說明 (嚴禁飲酒)</span>
+                  </label>
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input type="checkbox" checked={toolboxForm.safety_check_2} onChange={e => setToolboxForm({...toolboxForm, safety_check_2: e.target.checked})} className="mt-1 w-4 h-4 text-indigo-600" />
+                    <span className="text-sm text-amber-900">2. 已逐員確認禁酒、服裝儀容、安全帽及安全鞋 (禁止穿拖鞋)</span>
+                  </label>
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input type="checkbox" checked={toolboxForm.safety_check_3} onChange={e => setToolboxForm({...toolboxForm, safety_check_3: e.target.checked})} className="mt-1 w-4 h-4 text-indigo-600" />
+                    <span className="text-sm text-amber-900">3. 所有人員均了解今日工作內容與緊急應變方式</span>
+                  </label>
+                </div>
+                
               </form>
             </div>
             <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3 shrink-0 pb-safe">
