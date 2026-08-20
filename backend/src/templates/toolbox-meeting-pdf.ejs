@@ -121,21 +121,27 @@
   <div class="title">每日工具箱會議紀錄表</div>
 
   <table>
+  <colgroup>
+    <col style="width: 5.5%;">
+    <% for(let i=0; i<20; i++) { %>
+      <col style="width: 4.725%;">
+    <% } %>
+  </colgroup>
     <tr>
-      <td style="width: 5.5%; white-space: nowrap; padding: 0 1px;">工程名稱</td>
-      <td colspan="8" class="left-align"><%= meeting.project ? meeting.project.name : '' %></td>
+      <td colspan="2" style="white-space: nowrap; padding: 0 1px;">工程名稱</td>
+      <td colspan="7" class="left-align"><%= meeting.project ? meeting.project.name : '' %></td>
       <td colspan="4">會議日期</td>
       <td colspan="8" class="left-align"><%= new Date(meeting.record_date).toLocaleDateString() %></td>
     </tr>
     <tr>
-      <td style="white-space: nowrap; padding: 0 1px;">工程地點</td>
-      <td colspan="8" class="left-align"></td>
+      <td colspan="2" style="white-space: nowrap; padding: 0 1px;">工程地點</td>
+      <td colspan="7" class="left-align"></td>
       <td colspan="4">案場負責人</td>
       <td colspan="8" class="left-align"><%= meeting.recorder ? meeting.recorder.name : '' %></td>
     </tr>
     <tr>
-      <td style="white-space: nowrap; padding: 0 1px;">施工區域</td>
-      <td colspan="20" class="left-align">
+      <td colspan="2" style="white-space: nowrap; padding: 0 1px;">施工區域</td>
+      <td colspan="19" class="left-align">
         <% 
           const areas = ['浪板屋頂', '建物屋頂', '地面', '圳溝', '蓄水池'];
           let otherArea = '';
