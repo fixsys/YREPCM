@@ -674,7 +674,10 @@ const Onsite = () => {
                   <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center hover:bg-slate-50 transition-colors relative">
                     <input type="file" multiple accept="image/*" onChange={e => {
                       if (e.target.files) {
-                        setToolboxPhotos(Array.from(e.target.files));
+                        setToolboxPhotos(prev => {
+                           const newFiles = [...prev, ...Array.from(e.target.files!)];
+                           return newFiles;
+                        });
                       }
                     }} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
                     <Camera className="mx-auto text-slate-400 mb-2" size={32} />
@@ -684,7 +687,10 @@ const Onsite = () => {
                   {toolboxPreviewUrls.length > 0 && (
                     <div className="flex gap-2 mt-3 overflow-x-auto">
                       {toolboxPreviewUrls.map((url, i) => (
-                        <img key={i} src={url} alt="preview" className="w-16 h-16 object-cover rounded border border-slate-200" />
+                        <div key={i} className="relative inline-block shrink-0">
+                          <img src={url} alt="preview" className="w-16 h-16 object-cover rounded border border-slate-200" />
+                          <button type="button" onClick={() => setToolboxPhotos(prev => prev.filter((_, idx) => idx !== i))} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] shadow z-10 hover:bg-red-600">×</button>
+                        </div>
                       ))}
                     </div>
                   )}
@@ -1021,15 +1027,22 @@ const Onsite = () => {
                       <p className="text-xs text-slate-400 mb-3">細部、接點、尺寸或施工品質</p>
                       <input type="file" multiple accept="image/*" onChange={e => {
                         if (e.target.files) {
-                          const files = Array.from(e.target.files);
-                          if (files.length > 4) { alert('近照最多只能上傳 4 張'); setLaborPhotosClose(files.slice(0, 4)); }
-                          else setLaborPhotosClose(files);
+                          setLaborPhotosClose(prev => {
+                            const newFiles = [...prev, ...Array.from(e.target.files!)];
+                            if (newFiles.length > 4) { alert('近照最多只能上傳 4 張'); return newFiles.slice(0, 4); }
+                            return newFiles;
+                          });
                         }
                       }} className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-bold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 p-2 border border-slate-200 rounded-lg bg-slate-50" />
                       <div className={`mt-2 font-bold text-sm ${laborPhotosClose.length >= 2 ? 'text-teal-600' : 'text-red-500'}`}>{laborPhotosClose.length} / 2 張</div>
                       {laborPhotosClose.length > 0 && (
                         <div className="mt-2 flex gap-2 flex-wrap">
-                          {laborPhotosClose.map((f, i) => <div key={i} className="text-xs px-2 py-1 bg-slate-100 rounded text-slate-600 truncate max-w-[150px]">{f.name}</div>)}
+                          {laborPhotosClose.map((f, i) => (
+                          <div key={i} className="flex items-center gap-1 text-xs px-2 py-1 bg-slate-100 rounded text-slate-600">
+                            <span className="truncate max-w-[120px]">{f.name}</span>
+                            <button type="button" onClick={() => setLaborPhotosClose(prev => prev.filter((_, idx) => idx !== i))} className="text-red-500 font-bold hover:text-red-700 ml-1">×</button>
+                          </div>
+                        ))}
                         </div>
                       )}
                     </div>
@@ -1040,15 +1053,22 @@ const Onsite = () => {
                       <p className="text-xs text-slate-400 mb-3">施工人員、工作面與工項範圍</p>
                       <input type="file" multiple accept="image/*" onChange={e => {
                         if (e.target.files) {
-                          const files = Array.from(e.target.files);
-                          if (files.length > 4) { alert('中距離照最多只能上傳 4 張'); setLaborPhotosMid(files.slice(0, 4)); }
-                          else setLaborPhotosMid(files);
+                          setLaborPhotosMid(prev => {
+                            const newFiles = [...prev, ...Array.from(e.target.files!)];
+                            if (newFiles.length > 4) { alert('中距離照最多只能上傳 4 張'); return newFiles.slice(0, 4); }
+                            return newFiles;
+                          });
                         }
                       }} className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-bold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 p-2 border border-slate-200 rounded-lg bg-slate-50" />
                       <div className={`mt-2 font-bold text-sm ${laborPhotosMid.length >= 2 ? 'text-teal-600' : 'text-red-500'}`}>{laborPhotosMid.length} / 2 張</div>
                       {laborPhotosMid.length > 0 && (
                         <div className="mt-2 flex gap-2 flex-wrap">
-                          {laborPhotosMid.map((f, i) => <div key={i} className="text-xs px-2 py-1 bg-slate-100 rounded text-slate-600 truncate max-w-[150px]">{f.name}</div>)}
+                          {laborPhotosMid.map((f, i) => (
+                          <div key={i} className="flex items-center gap-1 text-xs px-2 py-1 bg-slate-100 rounded text-slate-600">
+                            <span className="truncate max-w-[120px]">{f.name}</span>
+                            <button type="button" onClick={() => setLaborPhotosMid(prev => prev.filter((_, idx) => idx !== i))} className="text-red-500 font-bold hover:text-red-700 ml-1">×</button>
+                          </div>
+                        ))}
                         </div>
                       )}
                     </div>
@@ -1059,15 +1079,22 @@ const Onsite = () => {
                       <p className="text-xs text-slate-400 mb-3">案場全景、區域位置與整體進度</p>
                       <input type="file" multiple accept="image/*" onChange={e => {
                         if (e.target.files) {
-                          const files = Array.from(e.target.files);
-                          if (files.length > 4) { alert('遠距照最多只能上傳 4 張'); setLaborPhotosFar(files.slice(0, 4)); }
-                          else setLaborPhotosFar(files);
+                          setLaborPhotosFar(prev => {
+                            const newFiles = [...prev, ...Array.from(e.target.files!)];
+                            if (newFiles.length > 4) { alert('遠距照最多只能上傳 4 張'); return newFiles.slice(0, 4); }
+                            return newFiles;
+                          });
                         }
                       }} className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-bold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 p-2 border border-slate-200 rounded-lg bg-slate-50" />
                       <div className={`mt-2 font-bold text-sm ${laborPhotosFar.length >= 2 ? 'text-teal-600' : 'text-red-500'}`}>{laborPhotosFar.length} / 2 張</div>
                       {laborPhotosFar.length > 0 && (
                         <div className="mt-2 flex gap-2 flex-wrap">
-                          {laborPhotosFar.map((f, i) => <div key={i} className="text-xs px-2 py-1 bg-slate-100 rounded text-slate-600 truncate max-w-[150px]">{f.name}</div>)}
+                          {laborPhotosFar.map((f, i) => (
+                          <div key={i} className="flex items-center gap-1 text-xs px-2 py-1 bg-slate-100 rounded text-slate-600">
+                            <span className="truncate max-w-[120px]">{f.name}</span>
+                            <button type="button" onClick={() => setLaborPhotosFar(prev => prev.filter((_, idx) => idx !== i))} className="text-red-500 font-bold hover:text-red-700 ml-1">×</button>
+                          </div>
+                        ))}
                         </div>
                       )}
                     </div>
