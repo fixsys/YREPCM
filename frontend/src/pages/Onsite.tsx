@@ -663,11 +663,24 @@ const Onsite = () => {
               <div className="flex gap-3">
                 <button type="button" onClick={() => setSignatureModal({ isOpen: false, index: 0 })} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-bold">取消</button>
                 <button type="button" onClick={() => {
-                  if (sigCanvas.current?.isEmpty()) return alert('請先簽名！');
-                  const newSignatures = [...toolboxForm.signatures];
-                  newSignatures[signatureModal.index] = sigCanvas.current.getTrimmedCanvas().toDataURL('image/png');
-                  setToolboxForm({...toolboxForm, signatures: newSignatures});
-                  setSignatureModal({ isOpen: false, index: 0 });
+                  try {
+                    if (!sigCanvas.current) {
+                      return alert('簽名板未就緒，請關閉後重試。');
+                    }
+                    if (typeof sigCanvas.current.isEmpty !== 'function') {
+                      return alert('簽名板套件載入異常，請重整網頁。');
+                    }
+                    if (sigCanvas.current.isEmpty()) {
+                      return alert('請先簽名！');
+                    }
+                    const trimmedCanvas = sigCanvas.current.getTrimmedCanvas();
+                    const newSignatures = Array.isArray(toolboxForm.signatures) ? [...toolboxForm.signatures] : [];
+                    newSignatures[signatureModal.index] = trimmedCanvas.toDataURL('image/png');
+                    setToolboxForm({...toolboxForm, signatures: newSignatures});
+                    setSignatureModal({ isOpen: false, index: 0 });
+                  } catch (err: any) {
+                    alert('儲存失敗: ' + err.message);
+                  }
                 }} className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-bold shadow-md">確認儲存</button>
               </div>
             </div>
