@@ -10,7 +10,7 @@
       margin: 0;
       padding: 0;
       color: #000;
-      font-size: 11px;
+      font-size: 12px;
     }
     .header {
       display: flex;
@@ -27,7 +27,7 @@
       flex: 1;
     }
     .company-name {
-      font-size: 22px;
+      font-size: 24px;
       font-weight: bold;
       margin-bottom: 5px;
     }
@@ -37,12 +37,12 @@
       margin-left: 10px;
     }
     .company-details {
-      font-size: 11px;
+      font-size: 12px;
       color: #333;
     }
     .title {
       text-align: center;
-      font-size: 18px;
+      font-size: 20px;
       font-weight: bold;
       margin: 10px 0;
       letter-spacing: 5px;
@@ -54,38 +54,20 @@
     }
     td, th {
       border: 1px solid #000;
-      padding: 4px;
+      padding: 3px;
       text-align: center;
       vertical-align: middle;
       font-size: 11px;
     }
     .left-align { text-align: left; }
-    
-    .checkbox {
-      display: inline-block;
-      width: 12px;
-      height: 12px;
-      border: 1px solid #000;
-      margin-right: 2px;
-      vertical-align: middle;
-      text-align: center;
-      line-height: 10px;
-      font-size: 10px;
-    }
-    .checkbox.checked::after { content: '■'; }
-    .checkbox.unchecked::after { content: ' '; }
-    
     .vertical-text {
       writing-mode: vertical-lr;
       text-orientation: upright;
       letter-spacing: 2px;
     }
-
     .page-break {
       page-break-before: always;
     }
-
-    /* Photo gallery styles */
     .photo-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
@@ -114,7 +96,14 @@
 </head>
 <body>
 
-  <!-- PAGE 1: 表單 -->
+  <%
+    function box(checked) {
+      return checked 
+        ? '<span style="display:inline-block; border:1px solid #000; width:12px; height:12px; text-align:center; line-height:12px; font-size:10px; font-weight:bold;">V</span>'
+        : '<span style="display:inline-block; border:1px solid #000; width:12px; height:12px; text-align:center; line-height:12px;">&nbsp;</span>';
+    }
+  %>
+
   <div class="header">
     <% if (logoBase64) { %>
       <img src="<%= logoBase64 %>" class="logo-placeholder" />
@@ -133,20 +122,20 @@
 
   <table>
     <tr>
-      <td style="width: 15%;" class="bg-gray font-bold">工程名稱</td>
-      <td style="width: 35%;" class="left-align"><%= meeting.project ? meeting.project.name : '' %></td>
-      <td style="width: 15%;" class="bg-gray font-bold">會議日期</td>
-      <td style="width: 35%;" class="left-align"><%= new Date(meeting.record_date).toLocaleDateString() %></td>
+      <td style="width: 5%;">工程名稱</td>
+      <td colspan="8" class="left-align"><%= meeting.project ? meeting.project.name : '' %></td>
+      <td colspan="4">會議日期</td>
+      <td colspan="8" class="left-align"><%= new Date(meeting.record_date).toLocaleDateString() %></td>
     </tr>
     <tr>
-      <td class="bg-gray font-bold">工程地點</td>
-      <td class="left-align"></td>
-      <td class="bg-gray font-bold">案場負責人</td>
-      <td class="left-align"><%= meeting.recorder ? meeting.recorder.name : '' %></td>
+      <td>工程地點</td>
+      <td colspan="8" class="left-align"></td>
+      <td colspan="4">案場負責人</td>
+      <td colspan="8" class="left-align"><%= meeting.recorder ? meeting.recorder.name : '' %></td>
     </tr>
     <tr>
-      <td class="bg-gray font-bold">施工區域</td>
-      <td colspan="3" class="left-align">
+      <td>施工區域</td>
+      <td colspan="20" class="left-align">
         <% 
           const areas = ['浪板屋頂', '建物屋頂', '地面', '圳溝', '蓄水池'];
           let otherArea = '';
@@ -155,174 +144,167 @@
           }
         %>
         <% areas.forEach(a => { %>
-          <span class="checkbox <%= meeting.work_area === a ? 'checked' : 'unchecked' %>"></span> <%= a %> &nbsp;&nbsp;
+          <%- box(meeting.work_area === a) %> <%= a %> &nbsp;&nbsp;
         <% }) %>
-        <span class="checkbox <%= otherArea ? 'checked' : 'unchecked' %>"></span> 其他: <span style="border-bottom: 1px solid #000; padding: 0 10px;"><%= otherArea || '　　　' %></span>
+        <%- box(!!otherArea) %> 其他: <span style="border-bottom: 1px solid #000; padding: 0 20px;"><%= otherArea || '' %></span>
       </td>
     </tr>
 
     <!-- 工作內容 -->
     <tr>
-      <td colspan="4" class="font-bold">工作內容:(重要工作項目打勾)</td>
+      <td colspan="21" style="font-weight: bold;">工作內容:(重要工作項目打勾)</td>
     </tr>
+    
+    <!-- 20 rows of 安全宣導內容 span -->
     <tr>
-      <td colspan="2" class="font-bold">工作項目</td>
-      <td colspan="2" class="font-bold">備註</td>
+      <td rowspan="20" class="vertical-text" style="font-weight: bold; font-size: 14px;">安全宣導內容(現場監工確實填寫)</td>
+      <td colspan="4" style="font-weight: bold;">工作項目</td>
+      <td colspan="5" style="font-weight: bold;">備註</td>
+      <td colspan="5" style="font-weight: bold;">工作項目</td>
+      <td colspan="6" style="font-weight: bold;">備註</td>
     </tr>
+
     <% 
-      const items = ['測量、收方', '灌漿作業', '鋼筋綁紮', '模板作業', '鋼構作業', '吊掛作業', '浪板鋪設更換作業', '太陽能板鋪設作業', '機電設備作業', '機電配管線作業', '材料堆疊、環境整理', '其他(於備註欄說明)'];
-      // Convert single col layout to what is in image, but image has 2 cols of [Item, Note]
-      // Image has 6 rows. Each row has 2 items.
-      const half = Math.ceil(items.length / 2);
-      for (let i = 0; i < half; i++) {
-        const item1 = items[i];
-        const item2 = items[i + half];
+      const wItems1 = ['測量、收方', '灌漿作業', '鋼筋綁紮', '板模作業', '鋼構作業', '吊掛作業'];
+      const wItems2 = ['浪板鋪設更換作業', '太陽能板鋪設作業', '機電設備作業', '機電配管線作業', '材料堆疊、環境整理', '其他(於備註欄說明)'];
+      for (let i = 0; i < 6; i++) {
+        const i1 = wItems1[i];
+        const i2 = wItems2[i];
         
-        let checked1 = false;
-        let note1 = '';
+        let c1 = false, n1 = '';
         if (meeting.work_items) {
-          const found = meeting.work_items.find(w => w.name === item1);
-          if (found) { checked1 = true; note1 = found.note || ''; }
+          const found = meeting.work_items.find(w => w.name === i1);
+          if (found) { c1 = true; n1 = found.note || ''; }
         }
 
-        let checked2 = false;
-        let note2 = '';
-        if (item2 && meeting.work_items) {
-          const found = meeting.work_items.find(w => w.name === item2);
-          if (found) { checked2 = true; note2 = found.note || ''; }
+        let c2 = false, n2 = '';
+        if (meeting.work_items) {
+          const found = meeting.work_items.find(w => w.name === i2);
+          if (found) { c2 = true; n2 = found.note || ''; }
         }
     %>
     <tr>
-      <td class="left-align"><span class="checkbox <%= checked1 ? 'checked' : 'unchecked' %>"></span> <%= item1 %></td>
-      <td class="left-align"><%= note1 %></td>
-      <% if (item2) { %>
-        <td class="left-align"><span class="checkbox <%= checked2 ? 'checked' : 'unchecked' %>"></span> <%= item2 %></td>
-        <td class="left-align"><%= note2 %></td>
-      <% } else { %>
-        <td></td><td></td>
-      <% } %>
+      <td colspan="4" class="left-align"><%- box(c1) %> <%= i1 %></td>
+      <td colspan="5" class="left-align"><%= n1 %></td>
+      <td colspan="5" class="left-align"><%- box(c2) %> <%= i2 %></td>
+      <td colspan="6" class="left-align"><%= n2 %></td>
     </tr>
     <% } %>
 
-    <!-- 安全宣導內容 -->
+    <!-- Hazards -->
     <tr>
-      <td rowspan="8" class="vertical-text font-bold" style="width: 5%;">安全宣導內容(現場監工確實填寫)</td>
-      <td class="font-bold">物理性危害</td>
-      <td class="font-bold">化學性危害</td>
-      <td class="font-bold">火災危害</td>
-      <td class="font-bold">感電危害</td>
+      <td colspan="11" style="font-weight: bold;">物理性危害</td>
+      <td colspan="4" style="font-weight: bold;">化學性危害</td>
+      <td colspan="4" style="font-weight: bold;">火災危害</td>
+      <td colspan="1" style="font-weight: bold;">感電危害</td>
     </tr>
     <tr>
-      <!-- Physics -->
-      <td class="left-align" style="vertical-align: top;">
+      <td colspan="11" class="left-align" style="vertical-align: top; line-height: 1.5;">
         <% const phys = ['跌落、墜落', '物體飛落', '異物入眼', '高、低溫接觸', '擦傷、刺傷、扭傷、壓傷、夾傷、割傷、碰撞', '噪音']; %>
-        <% phys.forEach((h, idx) => { %>
-          <div style="display:inline-block; width: 48%; margin-bottom: 4px;">
-            <span class="checkbox <%= (meeting.hazards && meeting.hazards.includes(h)) ? 'checked' : 'unchecked' %>"></span> <%= h %>
-          </div>
+        <% phys.forEach(h => { %>
+          <div style="display:inline-block; width: 48%;"><%- box(meeting.hazards && meeting.hazards.includes(h)) %> <%= h %></div>
         <% }) %>
       </td>
-      <!-- Chem -->
-      <td class="left-align" style="vertical-align: top;">
-        <% const chems = ['化學性灼傷', '化學吸入']; %>
-        <% chems.forEach((h, idx) => { %>
-          <div style="margin-bottom: 4px;">
-            <span class="checkbox <%= (meeting.hazards && meeting.hazards.includes(h)) ? 'checked' : 'unchecked' %>"></span> <%= h %>
-          </div>
-        <% }) %>
+      <td colspan="4" class="left-align" style="vertical-align: top; line-height: 1.5;">
+        <%- box(meeting.hazards && meeting.hazards.includes('化學性灼傷')) %> 化學性灼傷<br>
+        <%- box(meeting.hazards && meeting.hazards.includes('化學吸入')) %> 化學吸入
       </td>
-      <!-- Fire -->
-      <td class="left-align" style="vertical-align: top;">
-        <% const fires = ['火災', '爆炸']; %>
-        <% fires.forEach((h, idx) => { %>
-          <div style="margin-bottom: 4px;">
-            <span class="checkbox <%= (meeting.hazards && meeting.hazards.includes(h)) ? 'checked' : 'unchecked' %>"></span> <%= h %>
-          </div>
-        <% }) %>
+      <td colspan="4" class="left-align" style="vertical-align: top; line-height: 1.5;">
+        <%- box(meeting.hazards && meeting.hazards.includes('火災')) %> 火災<br>
+        <%- box(meeting.hazards && meeting.hazards.includes('爆炸')) %> 爆炸
       </td>
-      <!-- Elec -->
-      <td class="left-align" style="vertical-align: top;">
-        <div style="margin-bottom: 4px;">
-          <span class="checkbox <%= (meeting.hazards && meeting.hazards.includes('感電')) ? 'checked' : 'unchecked' %>"></span> 感電
-        </div>
+      <td colspan="1" class="left-align" style="vertical-align: top; line-height: 1.5;">
+        <%- box(meeting.hazards && meeting.hazards.includes('感電')) %> 感電
       </td>
     </tr>
 
-    <!-- 現場安全衛生措施 -->
+    <!-- Safety Measures -->
     <tr>
-      <td colspan="4" class="font-bold">現場安全衛生措施</td>
+      <td colspan="20" style="font-weight: bold;">現場安全衛生措施</td>
     </tr>
     <tr>
-      <td class="font-bold">個人防護具</td>
-      <td class="font-bold">個人防護具</td>
-      <td class="font-bold">安全防護設施</td>
-      <td class="font-bold">安全防護設施</td>
+      <td colspan="3" style="font-weight: bold;">個人防護具</td>
+      <td colspan="4" style="font-weight: bold;">個人防護具</td>
+      <td colspan="4" style="font-weight: bold;">安全防護設施</td>
+      <td colspan="6" style="font-weight: bold;">安全防護設施</td>
+      <td colspan="3" style="font-weight: bold;">安全防護設施</td>
     </tr>
     <% 
       const ppe1 = ['安全帽', '安全鞋', '施工背心', '全身背負式安全帶', '防墜器', '安全眼鏡', '絕緣手套', '安全面罩'];
       const ppe2 = ['防護衣', '防塵口罩', '防毒面具', '防化圍裙', '防化手套', '防化鞋', '', ''];
       const fac1 = ['合梯', '爬梯', '施工架', '安全母索', '安全防墜網', '吊籠/護欄', '警示圍籬', '防火毯'];
       const fac2 = ['搶救設備', '滅火器', '通風設備', '檢電器', '高壓電防護設備', '接地棒', '漏電斷路器', '電焊防電擊裝置'];
-      // The image has '氧乙炔焊防回火裝置', we'll fit it where space permits, or just render lists
+      const fac3 = ['照明設備', '通訊設備', '氧乙炔焊防回火裝置', '', '', '', '', ''];
       
       for(let i=0; i<8; i++) {
-        const check = (val) => val ? `<span class="checkbox ${meeting.safety_measures && meeting.safety_measures.includes(val) ? 'checked' : 'unchecked'}"></span> ${val}` : '';
+        const check = (val) => val ? `${box(meeting.safety_measures && meeting.safety_measures.includes(val))} ${val}` : '';
     %>
     <tr>
-      <td class="left-align"><%- check(ppe1[i]) %></td>
-      <td class="left-align"><%- check(ppe2[i]) %></td>
-      <td class="left-align"><%- check(fac1[i]) %></td>
-      <td class="left-align"><%- check(fac2[i]) %></td>
+      <td colspan="3" class="left-align"><%- check(ppe1[i]) %></td>
+      <td colspan="4" class="left-align"><%- check(ppe2[i]) %></td>
+      <td colspan="4" class="left-align"><%- check(fac1[i]) %></td>
+      <td colspan="6" class="left-align"><%- check(fac2[i]) %></td>
+      <td colspan="3" class="left-align"><%- check(fac3[i]) %></td>
     </tr>
     <% } %>
 
     <!-- 其他存在風險說明 -->
     <tr>
-      <td colspan="4" class="left-align font-bold" style="height: 50px; vertical-align: top;">
-        其他存在風險說明：<br/>
-        <span style="font-weight: normal;"><%= meeting.other_risks || '' %></span>
+      <td colspan="20" class="left-align" style="height: 40px; vertical-align: top;">
+        <span style="font-weight: bold;">其他存在風險說明:</span><br/>
+        <%= meeting.other_risks || '' %>
       </td>
     </tr>
 
-    <!-- 現場施工人員簽名 -->
+    <!-- Signatures -->
     <tr>
-      <td class="vertical-text font-bold">現場施工人員簽名</td>
-      <td colspan="4" class="left-align">
-        <div style="margin-bottom: 5px;" class="font-bold">施工人數： <%= meeting.worker_count %> 人</div>
-        <table style="width: 100%; border: none;">
-          <% for(let r=0; r<4; r++) { %>
-            <tr>
-              <% for(let c=1; c<=5; c++) { 
-                const num = r * 5 + c;
-                const sigImg = (meeting.signatures && meeting.signatures[num - 1]) ? meeting.signatures[num - 1] : null;
-              %>
-                <td style="border: 1px solid #ccc; width: 20%; height: 50px; text-align: left; vertical-align: top; position: relative;">
-                  <%= num %>.
-                  <% if (sigImg) { %>
-                    <img src="<%= sigImg %>" style="position: absolute; top: 15px; left: 5px; max-width: 90%; max-height: 35px;" />
-                  <% } %>
-                </td>
-              <% } %>
-            </tr>
-          <% } %>
-        </table>
-      </td>
+      <td rowspan="6" class="vertical-text" style="font-weight: bold; font-size: 14px;">現場施工人員簽名</td>
+      <td colspan="20" class="left-align">施工人數: <%= meeting.worker_count %> 人</td>
     </tr>
+    <% for(let r=0; r<5; r++) { %>
+      <tr>
+        <% 
+          const colSpans = [4, 5, 5, 6]; 
+          for(let c=0; c<4; c++) { 
+            const num = r * 4 + c + 1; // 1 to 20
+            // But wait, the docx has them in columns: 1..5, 6..10, 11..15, 16..20!
+            // Let's adjust num based on row and col
+            // r=0..4, c=0..3
+            const displayNum = c * 5 + r + 1;
+            const sigImg = (meeting.signatures && meeting.signatures[displayNum - 1]) ? meeting.signatures[displayNum - 1] : null;
+        %>
+          <td colspan="<%= colSpans[c] %>" style="height: 45px; text-align: left; vertical-align: top; padding: 2px;">
+            <div style="font-size: 10px;"><%= displayNum %>.</div>
+            <% if (sigImg) { %>
+              <div style="text-align: center; margin-top: -10px;">
+                <img src="<%= sigImg %>" style="max-height: 32px; max-width: 90%; object-fit: contain;" />
+              </div>
+            <% } %>
+          </td>
+        <% } %>
+      </tr>
+    <% } %>
 
-    <!-- 現場使用機具 -->
+    <!-- Equipment (Empty) -->
     <tr>
-      <td colspan="5" class="font-bold text-center">現場使用機具</td>
+      <td colspan="21" style="font-weight: bold;">現場使用機具</td>
     </tr>
     <tr>
-      <td class="font-bold">機具名稱</td>
-      <td class="font-bold">單位</td>
-      <td class="font-bold">數量(H/台)</td>
-      <td class="font-bold">機具名稱</td>
-      <td class="font-bold">單位</td>
+      <td colspan="2" style="font-weight: bold;">機具名稱</td>
+      <td colspan="1" style="font-weight: bold;">單位</td>
+      <td colspan="3" style="font-weight: bold;">數量(H/台)</td>
+      <td colspan="2" style="font-weight: bold;">機具名稱</td>
+      <td colspan="2" style="font-weight: bold;">單位</td>
+      <td colspan="3" style="font-weight: bold;">數量(H/台)</td>
+      <td colspan="4" style="font-weight: bold;">機具名稱</td>
+      <td colspan="2" style="font-weight: bold;">單位</td>
+      <td colspan="2" style="font-weight: bold;">數量(H/台)</td>
     </tr>
     <% for(let i=0; i<3; i++) { %>
     <tr>
-      <td></td><td></td><td></td><td></td><td></td>
+      <td colspan="2"></td><td colspan="1"></td><td colspan="3"></td>
+      <td colspan="2"></td><td colspan="2"></td><td colspan="3"></td>
+      <td colspan="4"></td><td colspan="2"></td><td colspan="2"></td>
     </tr>
     <% } %>
   </table>

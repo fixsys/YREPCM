@@ -151,6 +151,9 @@ router.get('/:id/export-pdf', authenticateToken, async (req: AuthRequest, res) =
 
     let templatePath = path.join(__dirname, '../templates/toolbox-meeting-pdf.ejs');
     if (!fs.existsSync(templatePath)) {
+      templatePath = path.join(__dirname, '../../src/templates/toolbox-meeting-pdf.ejs');
+    }
+    if (!fs.existsSync(templatePath)) {
       return res.status(500).json({ error: 'Template not found' });
     }
 
