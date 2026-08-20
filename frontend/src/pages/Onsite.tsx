@@ -28,6 +28,16 @@ const safeParseJSON = (data: any, fallback: any = []) => {
   return data;
 };
 
+
+const TOOLBOX_WORK_ITEMS = ['測量、收方', '灌漿作業', '鋼筋綁紮', '模板作業', '鋼構作業', '吊掛作業', '浪板鋪設更換作業', '太陽能板鋪設作業', '機電設備作業', '機電配管線作業', '材料堆疊、環境整理', '其他(於備註欄說明)'];
+const TOOLBOX_PHYSICAL_HAZARDS = ['跌落、墜落', '物體飛落', '異物入眼', '高、低溫接觸', '擦傷、刺傷、扭傷、壓傷、夾傷、割傷、碰撞', '噪音'];
+const TOOLBOX_CHEMICAL_HAZARDS = ['化學性灼傷', '化學吸入'];
+const TOOLBOX_FIRE_HAZARDS = ['火災', '爆炸'];
+const TOOLBOX_ELECTRICAL_HAZARDS = ['感電'];
+const TOOLBOX_PPE = ['安全帽', '安全鞋', '施工背心', '全身背負式安全帶', '防墜器', '安全眼鏡', '絕緣手套', '安全面罩', '防護衣', '防塵口罩', '防毒面具', '防化圍裙', '防化手套', '防化鞋'];
+const TOOLBOX_SAFETY_FACILITIES = ['合梯', '爬梯', '施工架', '安全母索', '安全防墜網', '吊籠/護欄', '警示圍籬', '防火毯', '搶救設備', '滅火器', '通風設備', '檢電器', '高壓電防護設備', '接地棒', '漏電斷路器', '照明設備', '通訊設備', '氧乙炔焊防回火裝置', '電焊防電擊裝置'];
+const TOOLBOX_WORK_AREAS = ['浪板屋頂', '建物屋頂', '地面', '圳溝', '蓄水池', '其他'];
+
 const Onsite = () => {
   const { token, user } = useAuthStore();
   const [loading, setLoading] = useState(true);
@@ -49,7 +59,12 @@ const Onsite = () => {
     work_content: '',
     safety_check_1: false,
     safety_check_2: false,
-    safety_check_3: false
+    safety_check_3: false,
+    work_area: '',
+    work_items: [] as any[],
+    hazards: [] as string[],
+    safety_measures: [] as string[],
+    other_risks: ''
   });
   const [toolboxPhotos, setToolboxPhotos] = useState<File[]>([]);
   const [toolboxPreviewUrls, setToolboxPreviewUrls] = useState<string[]>([]);
@@ -285,7 +300,7 @@ const Onsite = () => {
     }
 
     const formData = new FormData();
-    Object.entries(toolboxForm).forEach(([key, val]) => formData.append(key, val.toString()));
+    Object.entries(toolboxForm).forEach(([key, val]) => formData.append(key, typeof val === 'object' ? JSON.stringify(val) : String(val)));
     toolboxPhotos.forEach(file => formData.append('photos', file));
 
     try {
@@ -304,7 +319,7 @@ const Onsite = () => {
 
   const handleAddToolbox = () => {
     setEditingToolboxId(null);
-    setToolboxForm({ project_id: '', record_date: new Date().toISOString().slice(0, 10), recorder_id: user?.id || '', worker_count: '', work_category: '土木', work_content: '', safety_check_1: false, safety_check_2: false, safety_check_3: false });
+    setToolboxForm({ project_id: '', record_date: new Date().toISOString().slice(0, 10), recorder_id: user?.id || '', worker_count: '', work_category: '土木', work_content: '', safety_check_1: false, safety_check_2: false, safety_check_3: false, work_area: '', work_items: [], hazards: [], safety_measures: [], other_risks: '' });
     setToolboxPhotos([]);
     setIsToolboxModalOpen(true);
   };
@@ -320,7 +335,12 @@ const Onsite = () => {
       work_content: t.work_content,
       safety_check_1: t.safety_check_1,
       safety_check_2: t.safety_check_2,
-      safety_check_3: t.safety_check_3
+      safety_check_3: t.safety_check_3,
+      work_area: t.work_area || '',
+      work_items: safeParseJSON(t.work_items, []),
+      hazards: safeParseJSON(t.hazards, []),
+      safety_measures: safeParseJSON(t.safety_measures, []),
+      other_risks: t.other_risks || ''
     });
     setToolboxPhotos([]);
     setIsToolboxModalOpen(true);
@@ -1194,6 +1214,57 @@ const Onsite = () => {
                   <div>
                     <h3 className="text-xl font-bold mb-3 border-l-4 border-indigo-600 pl-3">會議與宣導內容</h3>
                     <p className="whitespace-pre-wrap leading-relaxed text-lg bg-slate-50 p-4 rounded-xl border border-slate-200">{viewingRecord.data.work_content}</p>
+                  </div>
+
+                  {/* 新增的表單區塊 */}
+                  <div className="space-y-6 border-t border-slate-200 pt-6">
+                    <div>
+                      <h4 className="font-bold text-lg mb-2">施工區域</h4>
+                      <div className="bg-slate-50 p-3 rounded border border-slate-200">{viewingRecord.data.work_area || '未填寫'}</div>
+                    </div>
+                    
+                    <div>
+                      <h4 className="font-bold text-lg mb-2">工作內容</h4>
+                      <div className="bg-slate-50 p-3 rounded border border-slate-200 grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {safeParseJSON(viewingRecord.data.work_items, []).length > 0 ? (
+                          safeParseJSON(viewingRecord.data.work_items, []).map((item: any, i: number) => (
+                            <div key={i}>
+                              <span className="font-bold mr-2">☑ {item.name}</span>
+                              <span className="text-sm text-slate-600">{item.note ? `(${item.note})` : ''}</span>
+                            </div>
+                          ))
+                        ) : '未填寫'}
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="font-bold text-lg mb-2 text-orange-800">安全宣導內容 (危害)</h4>
+                      <div className="bg-orange-50 p-3 rounded border border-orange-200 flex flex-wrap gap-2">
+                        {safeParseJSON(viewingRecord.data.hazards, []).length > 0 ? (
+                          safeParseJSON(viewingRecord.data.hazards, []).map((h: string, i: number) => (
+                            <span key={i} className="px-2 py-1 bg-white border border-orange-200 rounded text-sm text-orange-800">{h}</span>
+                          ))
+                        ) : '無'}
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="font-bold text-lg mb-2 text-teal-800">現場安全衛生措施 (防護具與設施)</h4>
+                      <div className="bg-teal-50 p-3 rounded border border-teal-200 flex flex-wrap gap-2">
+                        {safeParseJSON(viewingRecord.data.safety_measures, []).length > 0 ? (
+                          safeParseJSON(viewingRecord.data.safety_measures, []).map((s: string, i: number) => (
+                            <span key={i} className="px-2 py-1 bg-white border border-teal-200 rounded text-sm text-teal-800">{s}</span>
+                          ))
+                        ) : '無'}
+                      </div>
+                    </div>
+
+                    {viewingRecord.data.other_risks && (
+                      <div>
+                        <h4 className="font-bold text-lg mb-2">其他存在風險說明</h4>
+                        <div className="bg-slate-50 p-3 rounded border border-slate-200 text-red-600">{viewingRecord.data.other_risks}</div>
+                      </div>
+                    )}
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="border rounded-xl p-4 flex flex-col justify-between items-center text-center">
