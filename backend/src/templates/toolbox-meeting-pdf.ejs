@@ -122,7 +122,7 @@
 
   <table>
     <tr>
-      <td style="width: 5%;">工程名稱</td>
+      <td style="width: 9%;">工程名稱</td>
       <td colspan="8" class="left-align"><%= meeting.project ? meeting.project.name : '' %></td>
       <td colspan="4">會議日期</td>
       <td colspan="8" class="left-align"><%= new Date(meeting.record_date).toLocaleDateString() %></td>
@@ -223,11 +223,11 @@
       <td colspan="20" style="font-weight: bold;">現場安全衛生措施</td>
     </tr>
     <tr>
-      <td colspan="3" style="font-weight: bold;">個人防護具</td>
+      <td colspan="4" style="font-weight: bold;">個人防護具</td>
       <td colspan="4" style="font-weight: bold;">個人防護具</td>
       <td colspan="4" style="font-weight: bold;">安全防護設施</td>
       <td colspan="4" style="font-weight: bold;">安全防護設施</td>
-      <td colspan="5" style="font-weight: bold;">安全防護設施</td>
+      <td colspan="4" style="font-weight: bold;">安全防護設施</td>
     </tr>
     <% 
       const ppe1 = ['安全帽', '安全鞋', '施工背心', '全身背負式安全帶', '防墜器', '安全眼鏡', '絕緣手套', '安全面罩'];
@@ -240,11 +240,11 @@
         const check = (val) => val ? `${box(meeting.safety_measures && meeting.safety_measures.includes(val))} ${val}` : '';
     %>
     <tr>
-      <td colspan="3" class="left-align"><%- check(ppe1[i]) %></td>
+      <td colspan="4" class="left-align"><%- check(ppe1[i]) %></td>
       <td colspan="4" class="left-align"><%- check(ppe2[i]) %></td>
       <td colspan="4" class="left-align"><%- check(fac1[i]) %></td>
       <td colspan="4" class="left-align"><%- check(fac2[i]) %></td>
-      <td colspan="5" class="left-align"><%- check(fac3[i]) %></td>
+      <td colspan="4" class="left-align"><%- check(fac3[i]) %></td>
     </tr>
     <% } %>
 
