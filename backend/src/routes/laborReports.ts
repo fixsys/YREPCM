@@ -505,102 +505,108 @@ ${report.recorder?.name || ''}`;
     }
 
     
+    
     // --- Page 2: Photos ---
     if (allPhotos.length > 0) {
-      r += 2;
-      ws.mergeCells(`A${r}:H${r}`);
-      ws.getCell(`A${r}`).value = '施 工 照 片 及 說 明';
-      ws.getCell(`A${r}`).font = { name: '微軟正黑體', size: 16, bold: true };
-      ws.getCell(`A${r}`).alignment = { vertical: 'middle', horizontal: 'center' };
-      ws.getRow(r).height = 30;
-      r++;
+      for (let pIndex = 0; pIndex < allPhotos.length; pIndex += 6) {
+          r += 2; // Some margin
+          
+          ws.mergeCells(`A${r}:H${r}`);
+          ws.getCell(`A${r}`).value = '施 工 照 片 及 說 明';
+          ws.getCell(`A${r}`).font = { name: '微軟正黑體', size: 16, bold: true };
+          ws.getCell(`A${r}`).alignment = { vertical: 'middle', horizontal: 'center' };
+          ws.getRow(r).height = 30;
+          r++;
 
-      ws.mergeCells(`B${r}:D${r}`);
-      ws.getCell(`A${r}`).value = '業主'; applyStyle(ws.getCell(`A${r}`), true);
-      ws.getCell(`B${r}`).value = report.project?.owner || ''; applyStyle(ws.getCell(`B${r}`));
-      ws.getCell(`E${r}`).value = '填報日期'; applyStyle(ws.getCell(`E${r}`), true);
-      ws.getCell(`F${r}`).value = dateStr; applyStyle(ws.getCell(`F${r}`));
-      ws.getCell(`G${r}`).value = '星期'; applyStyle(ws.getCell(`G${r}`), true);
-      ws.getCell(`H${r}`).value = dayOfWeek; applyStyle(ws.getCell(`H${r}`));
-      r++;
+          ws.mergeCells(`B${r}:D${r}`);
+          ws.getCell(`A${r}`).value = '業主'; applyStyle(ws.getCell(`A${r}`), true);
+          ws.getCell(`B${r}`).value = report.project?.owner || ''; applyStyle(ws.getCell(`B${r}`));
+          ws.getCell(`E${r}`).value = '填報日期'; applyStyle(ws.getCell(`E${r}`), true);
+          ws.getCell(`F${r}`).value = dateStr; applyStyle(ws.getCell(`F${r}`));
+          ws.getCell(`G${r}`).value = '星期'; applyStyle(ws.getCell(`G${r}`), true);
+          ws.getCell(`H${r}`).value = dayOfWeek; applyStyle(ws.getCell(`H${r}`));
+          r++;
 
-      ws.mergeCells(`B${r}:D${r}`);
-      ws.getCell(`A${r}`).value = '工程名稱'; applyStyle(ws.getCell(`A${r}`), true);
-      ws.getCell(`B${r}`).value = report.project?.name || ''; applyStyle(ws.getCell(`B${r}`));
-      ws.getCell(`E${r}`).value = '容量'; applyStyle(ws.getCell(`E${r}`), true);
-      ws.getCell(`F${r}`).value = cap ? (cap.toLowerCase().includes('w') ? cap : cap + ' kW') : ''; applyStyle(ws.getCell(`F${r}`));
-      ws.getCell(`G${r}`).value = '本日天氣'; applyStyle(ws.getCell(`G${r}`), true);
-      ws.getCell(`H${r}`).value = report.weather || ''; applyStyle(ws.getCell(`H${r}`));
-      r++;
+          ws.mergeCells(`B${r}:D${r}`);
+          ws.getCell(`A${r}`).value = '工程名稱'; applyStyle(ws.getCell(`A${r}`), true);
+          ws.getCell(`B${r}`).value = report.project?.name || ''; applyStyle(ws.getCell(`B${r}`));
+          ws.getCell(`E${r}`).value = '容量'; applyStyle(ws.getCell(`E${r}`), true);
+          const cap = report.project?.capacity || '';
+          ws.getCell(`F${r}`).value = cap ? (cap.toLowerCase().includes('w') ? cap : cap + ' kW') : ''; applyStyle(ws.getCell(`F${r}`));
+          ws.getCell(`G${r}`).value = '本日天氣'; applyStyle(ws.getCell(`G${r}`), true);
+          ws.getCell(`H${r}`).value = report.weather || ''; applyStyle(ws.getCell(`H${r}`));
+          r++;
 
-      // Photos in pairs
-      for (let i = 0; i < allPhotos.length; i += 2) {
-         const p1 = allPhotos[i];
-         const p2 = allPhotos[i+1];
-         
-         const rowPhoto = r;
-         ws.getRow(rowPhoto).height = 200; // Large height for images
-         
-         // Create borders for photo cells
-         ws.mergeCells(`A${rowPhoto}:D${rowPhoto}`);
-         ws.mergeCells(`E${rowPhoto}:H${rowPhoto}`);
-         applyStyle(ws.getCell(`A${rowPhoto}`));
-         applyStyle(ws.getCell(`E${rowPhoto}`));
+          // Up to 3 rows of photos (6 photos max)
+          const chunk = allPhotos.slice(pIndex, pIndex + 6);
+          for (let i = 0; i < chunk.length; i += 2) {
+             const p1 = chunk[i];
+             const p2 = chunk[i+1];
+             
+             const rowPhoto = r;
+             ws.getRow(rowPhoto).height = 200; // Adjusted for 3 rows
+             
+             ws.mergeCells(`A${rowPhoto}:D${rowPhoto}`);
+             ws.mergeCells(`E${rowPhoto}:H${rowPhoto}`);
+             applyStyle(ws.getCell(`A${rowPhoto}`));
+             applyStyle(ws.getCell(`E${rowPhoto}`));
 
-         // Add images
-         if (p1 && p1.base64) {
-            const absPath1 = getAbsPath(p1.url);
-            if (absPath1 && fs.existsSync(absPath1)) {
-              const imageId1 = wb.addImage({ filename: absPath1, extension: path.extname(absPath1).substring(1) as any });
-              ws.addImage(imageId1, {
-                  tl: { col: 0.1, row: rowPhoto - 1 + 0.1 } as any,
-                  br: { col: 3.9, row: rowPhoto - 0.1 } as any,
-                  editAs: 'oneCell'
-              });
-            }
-         }
-         
-         if (p2 && p2.base64) {
-            const absPath2 = getAbsPath(p2.url);
-            if (absPath2 && fs.existsSync(absPath2)) {
-              const imageId2 = wb.addImage({ filename: absPath2, extension: path.extname(absPath2).substring(1) as any });
-              ws.addImage(imageId2, {
-                  tl: { col: 4.1, row: rowPhoto - 1 + 0.1 } as any,
-                  br: { col: 7.9, row: rowPhoto - 0.1 } as any,
-                  editAs: 'oneCell'
-              });
-            }
-         }
-         r++;
+             if (p1 && p1.base64) {
+                const absPath1 = getAbsPath(p1.url);
+                if (absPath1 && fs.existsSync(absPath1)) {
+                  const imageId1 = wb.addImage({ filename: absPath1, extension: path.extname(absPath1).substring(1) as any });
+                  ws.addImage(imageId1, {
+                      tl: { col: 0.1, row: rowPhoto - 1 + 0.1 } as any,
+                      br: { col: 3.9, row: rowPhoto - 0.1 } as any,
+                      editAs: 'oneCell'
+                  });
+                }
+             }
+             
+             if (p2 && p2.base64) {
+                const absPath2 = getAbsPath(p2.url);
+                if (absPath2 && fs.existsSync(absPath2)) {
+                  const imageId2 = wb.addImage({ filename: absPath2, extension: path.extname(absPath2).substring(1) as any });
+                  ws.addImage(imageId2, {
+                      tl: { col: 4.1, row: rowPhoto - 1 + 0.1 } as any,
+                      br: { col: 7.9, row: rowPhoto - 0.1 } as any,
+                      editAs: 'oneCell'
+                  });
+                }
+             }
+             r++;
 
-         const rowTitle = r;
-         ws.getRow(rowTitle).height = 25;
-         ws.mergeCells(`A${rowTitle}:D${rowTitle}`);
-         ws.mergeCells(`E${rowTitle}:H${rowTitle}`);
-         ws.getCell(`A${rowTitle}`).value = p1 ? p1.title : ''; applyStyle(ws.getCell(`A${rowTitle}`));
-         ws.getCell(`E${rowTitle}`).value = p2 ? p2.title : ''; applyStyle(ws.getCell(`E${rowTitle}`));
-         r++;
+             const rowTitle = r;
+             ws.getRow(rowTitle).height = 25;
+             ws.mergeCells(`A${rowTitle}:D${rowTitle}`);
+             ws.mergeCells(`E${rowTitle}:H${rowTitle}`);
+             ws.getCell(`A${rowTitle}`).value = p1 ? p1.title : ''; applyStyle(ws.getCell(`A${rowTitle}`));
+             ws.getCell(`E${rowTitle}`).value = p2 ? p2.title : ''; applyStyle(ws.getCell(`E${rowTitle}`));
+             r++;
+          }
+          
+          ws.mergeCells(`A${r}:H${r}`);
+          ws.getCell(`A${r}`).value = `備註：`;
+          applyStyle(ws.getCell(`A${r}`), false, true);
+          ws.getRow(r).height = 40;
+          r++;
+
+          ws.mergeCells(`A${r}:D${r}`); ws.mergeCells(`E${r}:H${r}`);
+          ws.getCell(`A${r}`).value = `專案經理(PM)：\n${report.pm?.name || ''}`;
+          applyStyle(ws.getCell(`A${r}`), false, true);
+          ws.getCell(`E${r}`).value = `現場負責人：\n${report.recorder?.name || ''}`;
+          applyStyle(ws.getCell(`E${r}`), false, true);
+          ws.getRow(r).height = 60;
+          r++;
+          
+          // Add page break if there are more chunks
+          if (pIndex + 6 < allPhotos.length) {
+              ws.getRow(r - 1).addPageBreak();
+          }
       }
-      
-      ws.mergeCells(`A${r}:H${r}`);
-      ws.getCell(`A${r}`).value = `備註：`;
-      applyStyle(ws.getCell(`A${r}`), false, true);
-      ws.getRow(r).height = 40;
-      r++;
-
-      ws.mergeCells(`A${r}:D${r}`); ws.mergeCells(`E${r}:H${r}`);
-      ws.getCell(`A${r}`).value = `專案經理(PM)：
-${report.pm?.name || ''}`;
-      applyStyle(ws.getCell(`A${r}`), false, true);
-      ws.getCell(`E${r}`).value = `現場負責人：
-${report.recorder?.name || ''}`;
-      applyStyle(ws.getCell(`E${r}`), false, true);
-      ws.getRow(r).height = 60;
-      r++;
     }
 
-
-res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="labor-report-${report.id}.xlsx"`);
     
     await wb.xlsx.write(res);

@@ -272,10 +272,11 @@
     </tr>
   </table>
 
-  <% if (typeof allPhotos !== 'undefined' && allPhotos.length > 0) { %>
+    <% if (typeof allPhotos !== 'undefined' && allPhotos.length > 0) { %>
+    <% for(let pIndex=0; pIndex<allPhotos.length; pIndex+=6) { %>
     <div style="page-break-before: always;"></div>
     
-    <div class="watermark">第 2 頁</div>
+    <div class="watermark">第 <%= 2 + Math.floor(pIndex/6) %> 頁</div>
     
     <div class="header">
       <div class="logo-placeholder">LOGO</div>
@@ -318,22 +319,25 @@
     </table>
 
     <table style="margin-top: 10px; table-layout: fixed; width: 100%;">
-      <% for(let i=0; i<allPhotos.length; i+=2) { %>
+      <% 
+         const chunk = allPhotos.slice(pIndex, pIndex + 6);
+         for(let i=0; i<chunk.length; i+=2) { 
+      %>
         <tr>
-          <td style="height: 320px; padding: 10px; text-align: center; vertical-align: middle; width: 50%; border: 1px solid #000;">
-             <% if (allPhotos[i] && allPhotos[i].base64) { %>
-               <img src="<%= allPhotos[i].base64 %>" style="max-width: 100%; max-height: 300px; object-fit: contain;">
+          <td style="height: 220px; padding: 10px; text-align: center; vertical-align: middle; width: 50%; border: 1px solid #000;">
+             <% if (chunk[i] && chunk[i].base64) { %>
+               <img src="<%= chunk[i].base64 %>" style="max-width: 100%; max-height: 200px; object-fit: contain;">
              <% } %>
           </td>
-          <td style="height: 320px; padding: 10px; text-align: center; vertical-align: middle; width: 50%; border: 1px solid #000;">
-             <% if (allPhotos[i+1] && allPhotos[i+1].base64) { %>
-               <img src="<%= allPhotos[i+1].base64 %>" style="max-width: 100%; max-height: 300px; object-fit: contain;">
+          <td style="height: 220px; padding: 10px; text-align: center; vertical-align: middle; width: 50%; border: 1px solid #000;">
+             <% if (chunk[i+1] && chunk[i+1].base64) { %>
+               <img src="<%= chunk[i+1].base64 %>" style="max-width: 100%; max-height: 200px; object-fit: contain;">
              <% } %>
           </td>
         </tr>
         <tr>
-          <td style="text-align: center; height: 30px; font-weight: bold; border: 1px solid #000;"><%= allPhotos[i].title %></td>
-          <td style="text-align: center; height: 30px; font-weight: bold; border: 1px solid #000;"><%= allPhotos[i+1] ? allPhotos[i+1].title : '' %></td>
+          <td style="text-align: center; height: 30px; font-weight: bold; border: 1px solid #000;"><%= chunk[i].title %></td>
+          <td style="text-align: center; height: 30px; font-weight: bold; border: 1px solid #000;"><%= chunk[i+1] ? chunk[i+1].title : '' %></td>
         </tr>
       <% } %>
       <tr>
@@ -348,7 +352,7 @@
         <td style="width: 34%">現場負責人：<br><%= report.recorder?.name || '' %></td>
       </tr>
     </table>
+    <% } %>
   <% } %>
 </body>
-
 </html>
