@@ -438,23 +438,23 @@ const Onsite = () => {
       <div className="flex flex-col gap-4 mb-6">
         <h1 className="text-2xl font-bold text-slate-800">現場報工中心</h1>
         
-        <div className="flex flex-wrap items-center gap-3 w-full">
-          <div className="relative">
+        <div className="flex flex-col gap-3 w-full">
+          <div className="relative w-full">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
             <input 
               type="text"
               placeholder="搜尋紀錄..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="pl-9 pr-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none w-full md:w-64"
+              className="pl-9 pr-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none w-full md:max-w-md"
             />
           </div>
           <button 
             onClick={() => activeTab === 'TOOLBOX' ? handleAddToolbox() : handleAddLabor()}
-            className="bg-indigo-600 text-white p-2 md:px-4 md:py-2 rounded-lg shadow-md hover:bg-indigo-700 transition flex items-center justify-center shrink-0"
+            className="bg-indigo-600 text-white p-2 md:px-4 md:py-2 rounded-lg shadow-md hover:bg-indigo-700 transition flex items-center justify-center shrink-0 w-full md:w-auto md:self-start"
           >
             <Plus size={20} />
-            <span className="hidden md:inline ml-2">
+            <span className="ml-2">
               {activeTab === 'TOOLBOX' ? '新增工具箱會議' : '新增每日報工'}
             </span>
           </button>
