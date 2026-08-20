@@ -291,7 +291,41 @@ router.get('/:id/export', authenticateToken, async (req: AuthRequest, res) => {
     });
 
     // --- ExcelJS Construction ---
-    const wb = new ExcelJS.Workbook();
+    
+    // --- Extract Photos ---
+    const allPhotos: any[] = [];
+    let parsedPhotos: any = {};
+    try { parsedPhotos = typeof report.photos === 'string' ? JSON.parse(report.photos) : (report.photos || {}); } catch(e){}
+
+    if (parsedPhotos.close) parsedPhotos.close.forEach((url: string, i: number) => allPhotos.push({ url, title: `施工近照 ${i+1}` }));
+    if (parsedPhotos.mid) parsedPhotos.mid.forEach((url: string, i: number) => allPhotos.push({ url, title: `施工中距離照 ${i+1}` }));
+    if (parsedPhotos.far) parsedPhotos.far.forEach((url: string, i: number) => allPhotos.push({ url, title: `施工遠距照 ${i+1}` }));
+
+    workItems.forEach((item: any, idx: number) => {
+      if (item.inspection && item.inspection.photo) {
+         allPhotos.push({ url: item.inspection.photo, title: `${item.name} 自主檢查照片` });
+      }
+    });
+
+    const getAbsPath = (url: string) => {
+        if (!url) return null;
+        return path.join(__dirname, '../../uploads', url.replace('/uploads/', ''));
+    };
+
+    const getBase64 = (url: string) => {
+        const p = getAbsPath(url);
+        if (p && fs.existsSync(p)) {
+            const ext = path.extname(p).substring(1);
+            const b64 = fs.readFileSync(p).toString('base64');
+            return `data:image/${ext};base64,${b64}`;
+        }
+        return null;
+    };
+
+    allPhotos.forEach((p: any) => p.base64 = getBase64(p.url));
+
+
+const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet('每日施工日誌', {
       pageSetup: { paperSize: 9, orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 1, margins: { left: 0.2, right: 0.2, top: 0.2, bottom: 0.2, header: 0, footer: 0 } }
     });
@@ -470,7 +504,103 @@ ${report.recorder?.name || ''}`;
       }
     }
 
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    
+    // --- Page 2: Photos ---
+    if (allPhotos.length > 0) {
+      r += 2;
+      ws.mergeCells(`A${r}:H${r}`);
+      ws.getCell(`A${r}`).value = '施 工 照 片 及 說 明';
+      ws.getCell(`A${r}`).font = { name: '微軟正黑體', size: 16, bold: true };
+      ws.getCell(`A${r}`).alignment = { vertical: 'middle', horizontal: 'center' };
+      ws.getRow(r).height = 30;
+      r++;
+
+      ws.mergeCells(`B${r}:D${r}`);
+      ws.getCell(`A${r}`).value = '業主'; applyStyle(ws.getCell(`A${r}`), true);
+      ws.getCell(`B${r}`).value = report.project?.owner || ''; applyStyle(ws.getCell(`B${r}`));
+      ws.getCell(`E${r}`).value = '填報日期'; applyStyle(ws.getCell(`E${r}`), true);
+      ws.getCell(`F${r}`).value = dateStr; applyStyle(ws.getCell(`F${r}`));
+      ws.getCell(`G${r}`).value = '星期'; applyStyle(ws.getCell(`G${r}`), true);
+      ws.getCell(`H${r}`).value = dayOfWeek; applyStyle(ws.getCell(`H${r}`));
+      r++;
+
+      ws.mergeCells(`B${r}:D${r}`);
+      ws.getCell(`A${r}`).value = '工程名稱'; applyStyle(ws.getCell(`A${r}`), true);
+      ws.getCell(`B${r}`).value = report.project?.name || ''; applyStyle(ws.getCell(`B${r}`));
+      ws.getCell(`E${r}`).value = '容量'; applyStyle(ws.getCell(`E${r}`), true);
+      ws.getCell(`F${r}`).value = cap ? (cap.toLowerCase().includes('w') ? cap : cap + ' kW') : ''; applyStyle(ws.getCell(`F${r}`));
+      ws.getCell(`G${r}`).value = '本日天氣'; applyStyle(ws.getCell(`G${r}`), true);
+      ws.getCell(`H${r}`).value = report.weather || ''; applyStyle(ws.getCell(`H${r}`));
+      r++;
+
+      // Photos in pairs
+      for (let i = 0; i < allPhotos.length; i += 2) {
+         const p1 = allPhotos[i];
+         const p2 = allPhotos[i+1];
+         
+         const rowPhoto = r;
+         ws.getRow(rowPhoto).height = 200; // Large height for images
+         
+         // Create borders for photo cells
+         ws.mergeCells(`A${rowPhoto}:D${rowPhoto}`);
+         ws.mergeCells(`E${rowPhoto}:H${rowPhoto}`);
+         applyStyle(ws.getCell(`A${rowPhoto}`));
+         applyStyle(ws.getCell(`E${rowPhoto}`));
+
+         // Add images
+         if (p1 && p1.base64) {
+            const absPath1 = getAbsPath(p1.url);
+            if (absPath1 && fs.existsSync(absPath1)) {
+              const imageId1 = wb.addImage({ filename: absPath1, extension: path.extname(absPath1).substring(1) as any });
+              ws.addImage(imageId1, {
+                  tl: { col: 0.1, row: rowPhoto - 1 + 0.1 } as any,
+                  br: { col: 3.9, row: rowPhoto - 0.1 } as any,
+                  editAs: 'oneCell'
+              });
+            }
+         }
+         
+         if (p2 && p2.base64) {
+            const absPath2 = getAbsPath(p2.url);
+            if (absPath2 && fs.existsSync(absPath2)) {
+              const imageId2 = wb.addImage({ filename: absPath2, extension: path.extname(absPath2).substring(1) as any });
+              ws.addImage(imageId2, {
+                  tl: { col: 4.1, row: rowPhoto - 1 + 0.1 } as any,
+                  br: { col: 7.9, row: rowPhoto - 0.1 } as any,
+                  editAs: 'oneCell'
+              });
+            }
+         }
+         r++;
+
+         const rowTitle = r;
+         ws.getRow(rowTitle).height = 25;
+         ws.mergeCells(`A${rowTitle}:D${rowTitle}`);
+         ws.mergeCells(`E${rowTitle}:H${rowTitle}`);
+         ws.getCell(`A${rowTitle}`).value = p1 ? p1.title : ''; applyStyle(ws.getCell(`A${rowTitle}`));
+         ws.getCell(`E${rowTitle}`).value = p2 ? p2.title : ''; applyStyle(ws.getCell(`E${rowTitle}`));
+         r++;
+      }
+      
+      ws.mergeCells(`A${r}:H${r}`);
+      ws.getCell(`A${r}`).value = `備註：`;
+      applyStyle(ws.getCell(`A${r}`), false, true);
+      ws.getRow(r).height = 40;
+      r++;
+
+      ws.mergeCells(`A${r}:D${r}`); ws.mergeCells(`E${r}:H${r}`);
+      ws.getCell(`A${r}`).value = `專案經理(PM)：
+${report.pm?.name || ''}`;
+      applyStyle(ws.getCell(`A${r}`), false, true);
+      ws.getCell(`E${r}`).value = `現場負責人：
+${report.recorder?.name || ''}`;
+      applyStyle(ws.getCell(`E${r}`), false, true);
+      ws.getRow(r).height = 60;
+      r++;
+    }
+
+
+res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="labor-report-${report.id}.xlsx"`);
     
     await wb.xlsx.write(res);
@@ -582,7 +712,41 @@ router.get('/:id/export-pdf', authenticateToken, async (req: AuthRequest, res) =
       totalEquipAccumulated += a;
     });
 
-    let templatePath = path.join(__dirname, '../templates/labor-report-pdf.ejs');
+    
+    // --- Extract Photos ---
+    const allPhotos: any[] = [];
+    let parsedPhotos: any = {};
+    try { parsedPhotos = typeof report.photos === 'string' ? JSON.parse(report.photos) : (report.photos || {}); } catch(e){}
+
+    if (parsedPhotos.close) parsedPhotos.close.forEach((url: string, i: number) => allPhotos.push({ url, title: `施工近照 ${i+1}` }));
+    if (parsedPhotos.mid) parsedPhotos.mid.forEach((url: string, i: number) => allPhotos.push({ url, title: `施工中距離照 ${i+1}` }));
+    if (parsedPhotos.far) parsedPhotos.far.forEach((url: string, i: number) => allPhotos.push({ url, title: `施工遠距照 ${i+1}` }));
+
+    workItems.forEach((item: any, idx: number) => {
+      if (item.inspection && item.inspection.photo) {
+         allPhotos.push({ url: item.inspection.photo, title: `${item.name} 自主檢查照片` });
+      }
+    });
+
+    const getAbsPath = (url: string) => {
+        if (!url) return null;
+        return path.join(__dirname, '../../uploads', url.replace('/uploads/', ''));
+    };
+
+    const getBase64 = (url: string) => {
+        const p = getAbsPath(url);
+        if (p && fs.existsSync(p)) {
+            const ext = path.extname(p).substring(1);
+            const b64 = fs.readFileSync(p).toString('base64');
+            return `data:image/${ext};base64,${b64}`;
+        }
+        return null;
+    };
+
+    allPhotos.forEach((p: any) => p.base64 = getBase64(p.url));
+
+
+let templatePath = path.join(__dirname, '../templates/labor-report-pdf.ejs');
     if (!fs.existsSync(templatePath)) {
       templatePath = path.join(__dirname, '../../src/templates/labor-report-pdf.ejs');
     }
@@ -602,7 +766,9 @@ router.get('/:id/export-pdf', authenticateToken, async (req: AuthRequest, res) =
       totalWorkerToday,
       totalWorkerAccumulated,
       totalEquipToday,
-      totalEquipAccumulated
+      totalEquipAccumulated,
+      allPhotos,
+      capacity: report.project?.capacity || ''
     });
 
     const browser = await puppeteer.launch({ headless: true });
