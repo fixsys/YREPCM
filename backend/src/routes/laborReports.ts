@@ -292,6 +292,13 @@ router.get('/:id/export', authenticateToken, async (req: AuthRequest, res) => {
 
     // --- ExcelJS Construction ---
     
+    
+    const logoPath = path.join(process.cwd(), '../frontend/public/logo.png');
+    let logoBase64 = '';
+    if (fs.existsSync(logoPath)) {
+        logoBase64 = `data:image/png;base64,${fs.readFileSync(logoPath).toString('base64')}`;
+    }
+
     // --- Extract Photos ---
     const allPhotos: any[] = [];
     let parsedPhotos: any = {};
@@ -343,7 +350,33 @@ const wb = new ExcelJS.Workbook();
       cell.font = { name: '微軟正黑體', size: 10 };
     };
 
+    
     let r = 1;
+
+    let logoImageId;
+    if (fs.existsSync(logoPath)) {
+       logoImageId = wb.addImage({
+         filename: logoPath,
+         extension: 'png'
+       });
+    }
+
+    // Company Header
+    ws.mergeCells(`B${r}:H${r}`);
+    ws.getCell(`B${r}`).value = '元融科技有限公司 YUANRONG TECHNOLOGY\n744 台南市新市區港墘里自由街9號 | 06-5897049 | 統編 24903014';
+    ws.getCell(`B${r}`).font = { name: '微軟正黑體', size: 12, bold: true };
+    ws.getCell(`B${r}`).alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+    ws.getRow(r).height = 40;
+    
+    if (logoImageId !== undefined) {
+      ws.addImage(logoImageId, {
+        tl: { col: 0.1, row: r - 1 + 0.1 } as any,
+        br: { col: 0.9, row: r - 0.1 } as any,
+        editAs: 'oneCell'
+      });
+    }
+    r++;
+
 
     ws.mergeCells(`A${r}:H${r}`);
     ws.getCell(`A${r}`).value = '每 日 施 工 日 誌';
@@ -750,6 +783,12 @@ router.get('/:id/export-pdf', authenticateToken, async (req: AuthRequest, res) =
     };
 
     allPhotos.forEach((p: any) => p.base64 = getBase64(p.url));
+    
+    const logoPath = path.join(process.cwd(), '../frontend/public/logo.png');
+    let logoBase64 = '';
+    if (fs.existsSync(logoPath)) {
+        logoBase64 = `data:image/png;base64,${fs.readFileSync(logoPath).toString('base64')}`;
+    }
 
 
 let templatePath = path.join(__dirname, '../templates/labor-report-pdf.ejs');
@@ -774,7 +813,8 @@ let templatePath = path.join(__dirname, '../templates/labor-report-pdf.ejs');
       totalEquipToday,
       totalEquipAccumulated,
       allPhotos,
-      capacity: report.project?.capacity || ''
+      capacity: report.project?.capacity || '',
+      logoBase64
     });
 
     const browser = await puppeteer.launch({ headless: true });

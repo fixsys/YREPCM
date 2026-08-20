@@ -119,7 +119,13 @@
   <div class="watermark">第 <%= page %> 頁</div>
   
   <div class="header">
-    <div class="logo-placeholder">LOGO</div>
+    
+    <% if (typeof logoBase64 !== 'undefined' && logoBase64) { %>
+      <img src="<%= logoBase64 %>" style="height: 60px; width: auto; max-width: 100px; margin-right: 15px; object-fit: contain;">
+    <% } else { %>
+      <div class="logo-placeholder">LOGO</div>
+    <% } %>
+
     <div class="company-info">
       <div class="company-name">元融科技有限公司 <span class="en">YUANRONG TECHNOLOGY</span></div>
       <div class="company-details">744 台南市新市區港墘里自由街9號 | 06-5897049 | 統編 24903014</div>
@@ -279,7 +285,13 @@
     <div class="watermark">第 <%= 2 + Math.floor(pIndex/6) %> 頁</div>
     
     <div class="header">
+      
+    <% if (typeof logoBase64 !== 'undefined' && logoBase64) { %>
+      <img src="<%= logoBase64 %>" style="height: 60px; width: auto; max-width: 100px; margin-right: 15px; object-fit: contain;">
+    <% } else { %>
       <div class="logo-placeholder">LOGO</div>
+    <% } %>
+
       <div class="company-info">
         <div class="company-name">元融科技有限公司 <span class="en">YUANRONG TECHNOLOGY</span></div>
         <div class="company-details">744 台南市新市區港墘里自由街9號 | 06-5897049 | 統編 24903014</div>
