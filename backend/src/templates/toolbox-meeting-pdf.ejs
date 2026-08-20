@@ -122,19 +122,19 @@
 
   <table>
     <tr>
-      <td style="width: 9%;">工程名稱</td>
+      <td style="width: 5.5%; white-space: nowrap; padding: 0 1px;">工程名稱</td>
       <td colspan="8" class="left-align"><%= meeting.project ? meeting.project.name : '' %></td>
       <td colspan="4">會議日期</td>
       <td colspan="8" class="left-align"><%= new Date(meeting.record_date).toLocaleDateString() %></td>
     </tr>
     <tr>
-      <td>工程地點</td>
+      <td style="white-space: nowrap; padding: 0 1px;">工程地點</td>
       <td colspan="8" class="left-align"></td>
       <td colspan="4">案場負責人</td>
       <td colspan="8" class="left-align"><%= meeting.recorder ? meeting.recorder.name : '' %></td>
     </tr>
     <tr>
-      <td>施工區域</td>
+      <td style="white-space: nowrap; padding: 0 1px;">施工區域</td>
       <td colspan="20" class="left-align">
         <% 
           const areas = ['浪板屋頂', '建物屋頂', '地面', '圳溝', '蓄水池'];
@@ -201,13 +201,13 @@
     <tr>
       <td colspan="9" class="left-align" style="vertical-align: top; line-height: 1.8; font-size: 11px;">
         <div style="margin-bottom: 4px;">
-          <span style="margin-right: 12px; white-space: nowrap;"><%- box(meeting.hazards && meeting.hazards.includes('跌落、墜落')) %> 跌落、墜落</span>
-          <span style="margin-right: 12px; white-space: nowrap;"><%- box(meeting.hazards && meeting.hazards.includes('物體飛落')) %> 物體飛落</span>
-          <span style="margin-right: 12px; white-space: nowrap;"><%- box(meeting.hazards && meeting.hazards.includes('異物入眼')) %> 異物入眼</span>
+          <span style="margin-right: 8px; white-space: nowrap;"><%- box(meeting.hazards && meeting.hazards.includes('跌落、墜落')) %> 跌落、墜落</span>
+          <span style="margin-right: 8px; white-space: nowrap;"><%- box(meeting.hazards && meeting.hazards.includes('物體飛落')) %> 物體飛落</span>
+          <span style="margin-right: 8px; white-space: nowrap;"><%- box(meeting.hazards && meeting.hazards.includes('異物入眼')) %> 異物入眼</span>
           <span style="white-space: nowrap;"><%- box(meeting.hazards && meeting.hazards.includes('高、低溫接觸')) %> 高、低溫接觸</span>
         </div>
         <div>
-          <span style="margin-right: 12px; white-space: nowrap;"><%- box(meeting.hazards && meeting.hazards.includes('擦傷、刺傷、扭傷、壓傷、夾傷、割傷、碰撞')) %> 擦傷、刺傷、扭傷、壓傷、夾傷、割傷、碰撞</span>
+          <span style="margin-right: 8px; white-space: nowrap;"><%- box(meeting.hazards && meeting.hazards.includes('擦傷、刺傷、扭傷、壓傷、夾傷、割傷、碰撞')) %> 擦傷、刺傷、扭傷、壓傷、夾傷、割傷、碰撞</span>
           <span style="white-space: nowrap;"><%- box(meeting.hazards && meeting.hazards.includes('噪音')) %> 噪音</span>
         </div>
       </td>
