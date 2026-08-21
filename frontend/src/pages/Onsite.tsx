@@ -1381,15 +1381,32 @@ const Onsite = () => {
                     <div className="border border-dashed border-teal-300 bg-white rounded-xl p-4">
                       <h5 className="font-bold text-slate-700">遠距照 <span className="text-slate-500 font-normal text-sm">(至少 2 張)</span></h5>
                       <p className="text-xs text-slate-400 mb-3">案場全景、區域位置與整體進度</p>
-                      <input type="file" accept="image/*" onChange={e => {
-                        if (e.target.files) {
-                          setLaborPhotosFar(prev => {
-                            const newFiles = [...prev, ...Array.from(e.target.files!)];
-                            if (newFiles.length > 4) { alert('遠距照最多只能上傳 4 張'); return newFiles.slice(0, 4); }
-                            return newFiles;
-                          });
-                        }
-                      }} className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-bold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 p-2 border border-slate-200 rounded-lg bg-slate-50" />
+                      <div className="flex gap-2">
+                        <label className="flex-1 cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg border border-slate-200 text-center text-sm flex items-center justify-center gap-1">
+                          <span>📸</span> 拍照
+                          <input type="file" accept="image/*" capture="environment" onChange={e => {
+                            if (e.target.files) {
+                              setLaborPhotosFar(prev => {
+                                const newFiles = [...prev, ...Array.from(e.target.files!)];
+                                if (newFiles.length > 4) { alert('遠距照最多只能上傳 4 張'); return newFiles.slice(0, 4); }
+                                return newFiles;
+                              });
+                            }
+                          }} className="hidden" />
+                        </label>
+                        <label className="flex-1 cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg border border-slate-200 text-center text-sm flex items-center justify-center gap-1">
+                          <span>🖼️</span> 從相簿選擇
+                          <input type="file" multiple accept="image/*" onChange={e => {
+                            if (e.target.files) {
+                              setLaborPhotosFar(prev => {
+                                const newFiles = [...prev, ...Array.from(e.target.files!)];
+                                if (newFiles.length > 4) { alert('遠距照最多只能上傳 4 張'); return newFiles.slice(0, 4); }
+                                return newFiles;
+                              });
+                            }
+                          }} className="hidden" />
+                        </label>
+                      </div>
                       <div className={`mt-2 font-bold text-sm ${laborPhotosFar.length >= 2 ? 'text-teal-600' : 'text-red-500'}`}>{laborPhotosFar.length} / 2 張</div>
                       {laborPhotosFar.length > 0 && (
                         <div className="mt-2 flex gap-2 flex-wrap">
