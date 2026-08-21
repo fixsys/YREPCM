@@ -902,7 +902,7 @@ const Onsite = () => {
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">會議照片上傳 {editingToolboxId ? '(若不更新請留空)' : '(必須上傳 2 張) *'}</label>
                   <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center hover:bg-slate-50 transition-colors relative">
-                    <input type="file" multiple accept="image/*" onChange={e => {
+                    <input type="file" accept="image/*" onChange={e => {
                       if (e.target.files) {
                         setToolboxPhotos(prev => {
                            const newFiles = [...prev, ...Array.from(e.target.files!)];
@@ -1272,7 +1272,7 @@ const Onsite = () => {
                     <div className="border border-dashed border-teal-300 bg-white rounded-xl p-4">
                       <h5 className="font-bold text-slate-700">近照 <span className="text-slate-500 font-normal text-sm">(至少 2 張)</span></h5>
                       <p className="text-xs text-slate-400 mb-3">細部、接點、尺寸或施工品質</p>
-                      <input type="file" multiple accept="image/*" onChange={e => {
+                      <input type="file" accept="image/*" onChange={e => {
                         if (e.target.files) {
                           setLaborPhotosClose(prev => {
                             const newFiles = [...prev, ...Array.from(e.target.files!)];
@@ -1298,7 +1298,7 @@ const Onsite = () => {
                     <div className="border border-dashed border-teal-300 bg-white rounded-xl p-4">
                       <h5 className="font-bold text-slate-700">中距離照 <span className="text-slate-500 font-normal text-sm">(至少 2 張)</span></h5>
                       <p className="text-xs text-slate-400 mb-3">施工人員、工作面與工項範圍</p>
-                      <input type="file" multiple accept="image/*" onChange={e => {
+                      <input type="file" accept="image/*" onChange={e => {
                         if (e.target.files) {
                           setLaborPhotosMid(prev => {
                             const newFiles = [...prev, ...Array.from(e.target.files!)];
@@ -1324,7 +1324,7 @@ const Onsite = () => {
                     <div className="border border-dashed border-teal-300 bg-white rounded-xl p-4">
                       <h5 className="font-bold text-slate-700">遠距照 <span className="text-slate-500 font-normal text-sm">(至少 2 張)</span></h5>
                       <p className="text-xs text-slate-400 mb-3">案場全景、區域位置與整體進度</p>
-                      <input type="file" multiple accept="image/*" onChange={e => {
+                      <input type="file" accept="image/*" onChange={e => {
                         if (e.target.files) {
                           setLaborPhotosFar(prev => {
                             const newFiles = [...prev, ...Array.from(e.target.files!)];
