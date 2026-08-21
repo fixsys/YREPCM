@@ -901,19 +901,27 @@ const Onsite = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">會議照片上傳 {editingToolboxId ? '(若不更新請留空)' : '(必須上傳 2 張) *'}</label>
-                  <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center hover:bg-slate-50 transition-colors relative">
-                    <input type="file" accept="image/*" onChange={e => {
-                      if (e.target.files) {
-                        setToolboxPhotos(prev => {
-                           const newFiles = [...prev, ...Array.from(e.target.files!)];
-                           return newFiles;
-                        });
-                      }
-                    }} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
-                    <Camera className="mx-auto text-slate-400 mb-2" size={32} />
-                    <p className="text-sm text-slate-600">點擊或拖曳上傳照片</p>
-                    <p className="text-xs text-slate-400 mt-1">目前已選 {toolboxPhotos.length} 張</p>
+                  <div className="border-2 border-dashed border-slate-300 rounded-lg text-center overflow-hidden flex">
+                    <label className="flex-1 p-6 hover:bg-slate-100 transition-colors border-r border-dashed border-slate-300 cursor-pointer flex flex-col items-center">
+                      <Camera className="text-slate-400 mb-2" size={32} />
+                      <p className="text-sm text-slate-700 font-bold">拍照</p>
+                      <input type="file" accept="image/*" capture="environment" onChange={e => {
+                        if (e.target.files) {
+                          setToolboxPhotos(prev => [...prev, ...Array.from(e.target.files!)]);
+                        }
+                      }} className="hidden" />
+                    </label>
+                    <label className="flex-1 p-6 hover:bg-slate-100 transition-colors cursor-pointer flex flex-col items-center">
+                      <div className="text-slate-400 mb-2 text-3xl">🖼️</div>
+                      <p className="text-sm text-slate-700 font-bold">從相簿選擇</p>
+                      <input type="file" multiple accept="image/*" onChange={e => {
+                        if (e.target.files) {
+                          setToolboxPhotos(prev => [...prev, ...Array.from(e.target.files!)]);
+                        }
+                      }} className="hidden" />
+                    </label>
                   </div>
+                  <p className="text-xs text-slate-500 mt-2 text-center font-bold">目前已選 {toolboxPhotos.length} 張</p>
                   {toolboxPreviewUrls.length > 0 && (
                     <div className="flex gap-2 mt-3 overflow-x-auto">
                       {toolboxPreviewUrls.map((url, i) => (
@@ -1194,13 +1202,28 @@ const Onsite = () => {
 
                             <div className="bg-teal-50/50 border border-teal-200 border-dashed rounded p-3">
                               <label className="block text-xs font-bold text-teal-700 mb-2">{INSPECTION_TEMPLATES[item.name].photoLabel} (必填)</label>
-                              <input type="file" accept="image/*" onChange={e => {
-                                if (e.target.files && e.target.files[0]) {
-                                  const newItems = [...workItems];
-                                  newItems[idx].inspection!.photo = e.target.files[0];
-                                  setWorkItems(newItems);
-                                }
-                              }} className="text-sm w-full" />
+                              <div className="flex gap-2">
+                                <label className="flex-1 cursor-pointer bg-white hover:bg-teal-50 text-teal-700 font-bold py-1.5 px-2 rounded border border-teal-200 text-center text-xs flex items-center justify-center gap-1">
+                                  <span>📸</span> 拍照
+                                  <input type="file" accept="image/*" capture="environment" onChange={e => {
+                                    if (e.target.files && e.target.files[0]) {
+                                      const newItems = [...workItems];
+                                      newItems[idx].inspection!.photo = e.target.files[0];
+                                      setWorkItems(newItems);
+                                    }
+                                  }} className="hidden" />
+                                </label>
+                                <label className="flex-1 cursor-pointer bg-white hover:bg-teal-50 text-teal-700 font-bold py-1.5 px-2 rounded border border-teal-200 text-center text-xs flex items-center justify-center gap-1">
+                                  <span>🖼️</span> 相簿
+                                  <input type="file" accept="image/*" onChange={e => {
+                                    if (e.target.files && e.target.files[0]) {
+                                      const newItems = [...workItems];
+                                      newItems[idx].inspection!.photo = e.target.files[0];
+                                      setWorkItems(newItems);
+                                    }
+                                  }} className="hidden" />
+                                </label>
+                              </div>
                               {typeof item.inspection!.photo === 'string' && (
                                 <img src={`${item.inspection!.photo}`} alt="已上傳" className="mt-2 h-16 w-16 object-cover rounded shadow" />
                               )}
@@ -1272,15 +1295,32 @@ const Onsite = () => {
                     <div className="border border-dashed border-teal-300 bg-white rounded-xl p-4">
                       <h5 className="font-bold text-slate-700">近照 <span className="text-slate-500 font-normal text-sm">(至少 2 張)</span></h5>
                       <p className="text-xs text-slate-400 mb-3">細部、接點、尺寸或施工品質</p>
-                      <input type="file" accept="image/*" onChange={e => {
-                        if (e.target.files) {
-                          setLaborPhotosClose(prev => {
-                            const newFiles = [...prev, ...Array.from(e.target.files!)];
-                            if (newFiles.length > 4) { alert('近照最多只能上傳 4 張'); return newFiles.slice(0, 4); }
-                            return newFiles;
-                          });
-                        }
-                      }} className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-bold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 p-2 border border-slate-200 rounded-lg bg-slate-50" />
+                      <div className="flex gap-2">
+                        <label className="flex-1 cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg border border-slate-200 text-center text-sm flex items-center justify-center gap-1">
+                          <span>📸</span> 拍照
+                          <input type="file" accept="image/*" capture="environment" onChange={e => {
+                            if (e.target.files) {
+                              setLaborPhotosClose(prev => {
+                                const newFiles = [...prev, ...Array.from(e.target.files!)];
+                                if (newFiles.length > 4) { alert('近照最多只能上傳 4 張'); return newFiles.slice(0, 4); }
+                                return newFiles;
+                              });
+                            }
+                          }} className="hidden" />
+                        </label>
+                        <label className="flex-1 cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg border border-slate-200 text-center text-sm flex items-center justify-center gap-1">
+                          <span>🖼️</span> 從相簿選擇
+                          <input type="file" multiple accept="image/*" onChange={e => {
+                            if (e.target.files) {
+                              setLaborPhotosClose(prev => {
+                                const newFiles = [...prev, ...Array.from(e.target.files!)];
+                                if (newFiles.length > 4) { alert('近照最多只能上傳 4 張'); return newFiles.slice(0, 4); }
+                                return newFiles;
+                              });
+                            }
+                          }} className="hidden" />
+                        </label>
+                      </div>
                       <div className={`mt-2 font-bold text-sm ${laborPhotosClose.length >= 2 ? 'text-teal-600' : 'text-red-500'}`}>{laborPhotosClose.length} / 2 張</div>
                       {laborPhotosClose.length > 0 && (
                         <div className="mt-2 flex gap-2 flex-wrap">
@@ -1298,15 +1338,32 @@ const Onsite = () => {
                     <div className="border border-dashed border-teal-300 bg-white rounded-xl p-4">
                       <h5 className="font-bold text-slate-700">中距離照 <span className="text-slate-500 font-normal text-sm">(至少 2 張)</span></h5>
                       <p className="text-xs text-slate-400 mb-3">施工人員、工作面與工項範圍</p>
-                      <input type="file" accept="image/*" onChange={e => {
-                        if (e.target.files) {
-                          setLaborPhotosMid(prev => {
-                            const newFiles = [...prev, ...Array.from(e.target.files!)];
-                            if (newFiles.length > 4) { alert('中距離照最多只能上傳 4 張'); return newFiles.slice(0, 4); }
-                            return newFiles;
-                          });
-                        }
-                      }} className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-bold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 p-2 border border-slate-200 rounded-lg bg-slate-50" />
+                      <div className="flex gap-2">
+                        <label className="flex-1 cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg border border-slate-200 text-center text-sm flex items-center justify-center gap-1">
+                          <span>📸</span> 拍照
+                          <input type="file" accept="image/*" capture="environment" onChange={e => {
+                            if (e.target.files) {
+                              setLaborPhotosMid(prev => {
+                                const newFiles = [...prev, ...Array.from(e.target.files!)];
+                                if (newFiles.length > 4) { alert('中距離照最多只能上傳 4 張'); return newFiles.slice(0, 4); }
+                                return newFiles;
+                              });
+                            }
+                          }} className="hidden" />
+                        </label>
+                        <label className="flex-1 cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg border border-slate-200 text-center text-sm flex items-center justify-center gap-1">
+                          <span>🖼️</span> 從相簿選擇
+                          <input type="file" multiple accept="image/*" onChange={e => {
+                            if (e.target.files) {
+                              setLaborPhotosMid(prev => {
+                                const newFiles = [...prev, ...Array.from(e.target.files!)];
+                                if (newFiles.length > 4) { alert('中距離照最多只能上傳 4 張'); return newFiles.slice(0, 4); }
+                                return newFiles;
+                              });
+                            }
+                          }} className="hidden" />
+                        </label>
+                      </div>
                       <div className={`mt-2 font-bold text-sm ${laborPhotosMid.length >= 2 ? 'text-teal-600' : 'text-red-500'}`}>{laborPhotosMid.length} / 2 張</div>
                       {laborPhotosMid.length > 0 && (
                         <div className="mt-2 flex gap-2 flex-wrap">
