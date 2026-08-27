@@ -239,12 +239,23 @@ const SystemSettings = () => {
                   {departments.map(dept => (
                     <tr key={dept.id} className="hover:bg-slate-50">
                       <td className="p-3 font-medium text-slate-800">{dept.name}</td>
-                      <td className="p-3 text-slate-500 text-sm max-w-[200px]">
-                        <div className="flex flex-wrap gap-1">
+                      <td className="p-3 text-slate-500 text-sm w-3/4">
+                        <div className="flex flex-wrap gap-1.5">
                           {(dept.permissions || []).map((modId: string) => {
                             const modName = AVAILABLE_MODULES.find(m => m.id === modId)?.name || modId;
+                            let colorClass = 'bg-slate-50 border-slate-200 text-slate-700';
+                            switch(modId) {
+                              case 'dashboard': colorClass = 'bg-blue-50 border-blue-200 text-blue-700'; break;
+                              case 'crm': colorClass = 'bg-purple-50 border-purple-200 text-purple-700'; break;
+                              case 'onsite': colorClass = 'bg-orange-50 border-orange-200 text-orange-700'; break;
+                              case 'budget': colorClass = 'bg-emerald-50 border-emerald-200 text-emerald-700'; break;
+                              case 'tasks': colorClass = 'bg-rose-50 border-rose-200 text-rose-700'; break;
+                              case 'projects': colorClass = 'bg-amber-50 border-amber-200 text-amber-700'; break;
+                              case 'simulators': colorClass = 'bg-cyan-50 border-cyan-200 text-cyan-700'; break;
+                              case 'analytics': colorClass = 'bg-fuchsia-50 border-fuchsia-200 text-fuchsia-700'; break;
+                            }
                             return (
-                              <span key={modId} className="bg-indigo-50 border border-indigo-200 text-indigo-700 px-1.5 py-0.5 rounded text-xs font-medium whitespace-nowrap">
+                              <span key={modId} className={`border px-2 py-0.5 rounded text-xs font-bold whitespace-nowrap ${colorClass}`}>
                                 {modName}
                               </span>
                             );
