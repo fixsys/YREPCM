@@ -480,24 +480,24 @@ router.get('/utils/daily-log-auto', authenticateToken, async (req: AuthRequest, 
       }
     });
 
-    let autoText = '【今日業務開發紀錄自動彙整】\n';
+    let autoText = '【今日業務開發紀錄自動彙整】\r\n';
     
     if (newLeads.length > 0) {
-      autoText += `\n[新增潛在名單] (共 ${newLeads.length} 筆)\n`;
+      autoText += `\r\n[新增潛在名單] (共 ${newLeads.length} 筆)\r\n`;
       newLeads.forEach(l => {
-        autoText += `- ${l.name} (${l.company || '無公司'}) | 案源: ${l.source}\n`;
+        autoText += `- ${l.name} (${l.company || '無公司'}) | 案源: ${l.source}\r\n`;
       });
     }
 
     if (interactions.length > 0) {
-      autoText += `\n[今日互動與追蹤] (共 ${interactions.length} 筆)\n`;
+      autoText += `\r\n[今日互動與追蹤] (共 ${interactions.length} 筆)\r\n`;
       interactions.forEach(i => {
-        autoText += `- 客戶 ${i.lead.name}: 進行 ${i.action_type}，摘要: ${i.summary}。下次預計聯繫: ${new Date(i.next_contact_date).toLocaleDateString()}\n`;
+        autoText += `- 客戶 ${i.lead.name}: 進行 ${i.action_type}，摘要: ${i.summary}。下次預計聯繫: ${new Date(i.next_contact_date).toLocaleDateString()}\r\n`;
       });
     }
 
     if (newLeads.length === 0 && interactions.length === 0) {
-      autoText += '\n今日尚無新增名單或互動紀錄。';
+      autoText += '\r\n今日尚無新增名單或互動紀錄。';
     }
 
     res.json({ autoText });
@@ -688,6 +688,7 @@ router.put('/:id/requirements', authenticateToken, async (req: AuthRequest, res)
 router.post('/:id/convert-to-project', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const id = req.params.id as string;
+    const { capacity } = req.body;
     
     const existingLead = await prisma.lead.findUnique({ where: { id }, include: { requirementTicket: true } });
     if (!existingLead) return res.status(404).json({ error: 'Lead not found' });
@@ -703,9 +704,9 @@ router.post('/:id/convert-to-project', authenticateToken, async (req: AuthReques
         name: existingLead.site_name || existingLead.company || existingLead.name,
         owner: existingLead.company || existingLead.name,
         status: '待接洽',
-        capacity: existingLead.requirementTicket.installation_capacity ? String(existingLead.requirementTicket.installation_capacity) : null,
+        capacity: capacity || null,
         sales_rep_id: existingLead.assignee_id,
-        content: `轉自業務開發潛在客戶: ${existingLead.name}. \n承攬形式: ${existingLead.requirementTicket.contract_type || '未填'}\n設置容量: ${existingLead.requirementTicket.installation_capacity || '未填'} kW`,
+        content: `轉自業務開發潛在客戶: ${existingLead.name}. \r\n承攬形式: ${existingLead.requirementTicket.contract_type || '未填'}\r\n設置容量: ${capacity || '未填'} kW`,
       }
     });
 

@@ -189,6 +189,7 @@ const ProjectDetails = () => {
       name: project.name || '',
       status: project.status || '評估中',
       owner: project.owner || '',
+      capacity: project.capacity || '',
       content: project.content || '',
       start_date: project.start_date ? new Date(project.start_date).toISOString().slice(0, 10) : '',
       target_date: project.target_date ? new Date(project.target_date).toISOString().slice(0, 10) : '',
