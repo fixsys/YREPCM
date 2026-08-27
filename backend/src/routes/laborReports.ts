@@ -260,14 +260,14 @@ router.get('/:id/export', authenticateToken, async (req: AuthRequest, res) => {
           ? JSON.parse(report.project.work_items_config) 
           : report.project.work_items_config;
         
-        const allConfigItems = [];
+        const allConfigItems: any[] = [];
         Object.values(config).forEach((arr) => {
           if (Array.isArray(arr)) {
             allConfigItems.push(...arr);
           }
         });
         
-        workItems.forEach(wi => {
+        workItems.forEach((wi: any) => {
           const cfg = allConfigItems.find(c => c.name === wi.name);
           if (cfg) {
             wi.contractQuantity = cfg.contractQuantity;
