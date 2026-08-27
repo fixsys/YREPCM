@@ -231,7 +231,7 @@ const SystemSettings = () => {
                 <thead className="bg-slate-50 border-b">
                   <tr>
                     <th className="p-3 text-slate-600 font-medium">部門名稱</th>
-                    <th className="p-3 text-slate-600 font-medium">權限模組數量</th>
+                    <th className="p-3 text-slate-600 font-medium w-1/2">目前已授權模組</th>
                     <th className="p-3 text-right text-slate-600 font-medium">操作</th>
                   </tr>
                 </thead>
@@ -239,10 +239,20 @@ const SystemSettings = () => {
                   {departments.map(dept => (
                     <tr key={dept.id} className="hover:bg-slate-50">
                       <td className="p-3 font-medium text-slate-800">{dept.name}</td>
-                      <td className="p-3 text-slate-500 text-sm">
-                        <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-bold">
-                          {(dept.permissions || []).length} 個模組
-                        </span>
+                      <td className="p-3 text-slate-500 text-sm max-w-[200px]">
+                        <div className="flex flex-wrap gap-1">
+                          {(dept.permissions || []).map((modId: string) => {
+                            const modName = AVAILABLE_MODULES.find(m => m.id === modId)?.name || modId;
+                            return (
+                              <span key={modId} className="bg-indigo-50 border border-indigo-200 text-indigo-700 px-1.5 py-0.5 rounded text-xs font-medium whitespace-nowrap">
+                                {modName}
+                              </span>
+                            );
+                          })}
+                          {(!dept.permissions || dept.permissions.length === 0) && (
+                            <span className="text-slate-400 text-xs italic">尚未配置權限</span>
+                          )}
+                        </div>
                       </td>
                       <td className="p-3 text-right flex justify-end gap-2">
                         <button onClick={() => openPermissionModal(dept)} className="text-indigo-600 hover:text-indigo-800 p-1 rounded hover:bg-indigo-50 border border-transparent hover:border-indigo-200 text-sm flex items-center gap-1 font-bold">
