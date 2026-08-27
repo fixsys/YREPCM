@@ -198,8 +198,8 @@
       <% const item = workItems[i] || {}; %>
       <tr>
         <td colspan="3" class="left-align"><%= item.name || '' %></td>
-        <td><%= item.name ? '式' : '' %></td>
-        <td><%= item.name ? '100%' : '' %></td>
+        <td><%= item.name ? (item.unit || '式') : '' %></td>
+        <td><%= item.name ? (item.contractQuantity !== undefined ? item.contractQuantity : '100%') : '' %></td>
         <td><%= item.progress || '' %></td>
         <td><%= item.accumulatedQty || '' %></td>
         <td><%= item.notes || '' %></td>

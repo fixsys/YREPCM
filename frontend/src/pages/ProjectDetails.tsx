@@ -69,8 +69,35 @@ const ProjectDetails = () => {
   const { token, user } = useAuthStore();
   const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState<'requirements' | 'logs' | 'tasks' | 'performance' | 'files' | 'workflow'>('tasks');
+  const [activeTab, setActiveTab] = useState<'requirements' | 'logs' | 'tasks' | 'performance' | 'files' | 'work_items' | 'workflow'>('tasks');
   const [tasks, setTasks] = useState<any[]>([]);
+  const [workItemsConfig, setWorkItemsConfig] = useState<any>({});
+  
+  // Initialize config when project loads
+  useEffect(() => {
+    if (project && project.work_items_config) {
+      setWorkItemsConfig(project.work_items_config);
+    } else if (project) {
+      // Default to the original Onsite.tsx categories
+      const defaults: any = {
+        '土木': ['整地', '放樣', '開挖', 'PC', '鋼筋綁紮', '大底澆置', '板模', '灌漿', '基礎螺栓', '拆模', '回填', '其他'].map(name => ({ name, contractQuantity: 0, unit: '式' })),
+        '機電': ['DC－模組串列接線', 'DC－直流電纜佈設', 'DC－絕緣阻抗測試', 'DC－逆變器接線', 'AC－交流電纜佈設', 'AC－配電盤安裝', 'AC－接地及防雷施工', 'AC－功能測試', '台電申報／竣工資料', '台電會勘／預計掛表', '其他機電工程'].map(name => ({ name, contractQuantity: 0, unit: '式' })),
+        '模組': ['模組進場點收', '模組搬運上架', '模組定位排列', '中壓塊安裝', '側壓塊安裝', '模組鎖固扭力確認', '模組外觀及破損檢查', '其他模組工程'].map(name => ({ name, contractQuantity: 0, unit: '式' })),
+        '鋼構': ['錨栓及柱腳放樣', '鋼柱吊裝', '鋼柱及主梁吊裝', '次梁及斜撐安裝', '梁柱接頭螺栓安裝', '高強度螺栓終鎖', '現場焊接作業', '柱腳無收縮灌漿', '鍍鋅層修補', '其他鋼構工程'].map(name => ({ name, contractQuantity: 0, unit: '式' })),
+      };
+      setWorkItemsConfig(defaults);
+    }
+  }, [project]);
+
+  const handleSaveWorkItems = async () => {
+    try {
+      await axios.put(`/api/projects/${id}/work-items`, { work_items_config: workItemsConfig }, { headers: { Authorization: `Bearer ${token}` } });
+      alert('施工細項設定已儲存！報工表單將自動套用此設定。');
+    } catch (err) {
+      alert('儲存失敗');
+    }
+  };
+
   const [contributionData, setContributionData] = useState<any>(null);
   const [projectFiles, setProjectFiles] = useState<any[]>([]);
   const [templates, setTemplates] = useState<any[]>([]);
@@ -401,6 +428,7 @@ const ProjectDetails = () => {
             <button onClick={() => setActiveTab('tasks')} className={`px-4 py-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors flex-1 ${activeTab === 'tasks' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}>任務與工時</button>
             <button onClick={() => setActiveTab('performance')} className={`px-4 py-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors flex-1 ${activeTab === 'performance' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}>專案績效與貢獻</button>
             <button onClick={() => setActiveTab('files')} className={`px-4 py-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors flex-1 ${activeTab === 'files' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}>專案檔案</button>
+            <button onClick={() => setActiveTab('work_items')} className={`px-4 py-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors flex-1 ${activeTab === 'work_items' ? 'bg-teal-50 text-teal-700' : 'text-slate-600 hover:bg-slate-50'}`}>施工細項設定</button>
           </div>
 
           {/* activeTab === 'workflow' && (

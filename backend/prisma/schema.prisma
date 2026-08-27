@@ -87,6 +87,7 @@ model Project {
   procurement_rep_id String?
   steel_rep_id       String?
   notes              String?     @db.Text
+  work_items_config  Json?
   created_at         DateTime    @default(now())
   updated_at         DateTime    @updatedAt
 

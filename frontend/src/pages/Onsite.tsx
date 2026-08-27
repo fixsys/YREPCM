@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useNavigate, useLocation } from 'react-router-dom';
 import SignatureCanvas from 'react-signature-canvas';
@@ -164,12 +164,27 @@ const Onsite = () => {
   const WORK_CATEGORIES = ['土木', '機電', '模組', '鋼構'];
   const WEATHER_OPTIONS = ['晴', '陰', '雨', '大雨', '颱風', '其他'];
 
-  const categoryToItems: Record<string, string[]> = {
-    '土木': ['整地', '放樣', '開挖', 'PC', '鋼筋綁紮', '大底澆置', '板模', '灌漿', '基礎螺栓', '拆模', '回填', '其他'],
-    '機電': ['DC－模組串列接線', 'DC－直流電纜佈設', 'DC－絕緣阻抗測試', 'DC－逆變器接線', 'AC－交流電纜佈設', 'AC－配電盤安裝', 'AC－接地及防雷施工', 'AC－功能測試', '台電申報／竣工資料', '台電會勘／預計掛表', '其他機電工程'],
-    '模組': ['模組進場點收', '模組搬運上架', '模組定位排列', '中壓塊安裝', '側壓塊安裝', '模組鎖固扭力確認', '模組外觀及破損檢查', '其他模組工程'],
-    '鋼構': ['錨栓及柱腳放樣', '鋼柱吊裝', '鋼柱及主梁吊裝', '次梁及斜撐安裝', '梁柱接頭螺栓安裝', '高強度螺栓終鎖', '現場焊接作業', '柱腳無收縮灌漿', '鍍鋅層修補', '其他鋼構工程'],
-  };
+  const categoryToItems: Record<string, string[]> = useMemo(() => {
+    const defaultCategories: Record<string, string[]> = {
+      '土木': ['整地', '放樣', '開挖', 'PC', '鋼筋綁紮', '大底澆置', '板模', '灌漿', '基礎螺栓', '拆模', '回填', '其他'],
+      '機電': ['DC－模組串列接線', 'DC－直流電纜佈設', 'DC－絕緣阻抗測試', 'DC－逆變器接線', 'AC－交流電纜佈設', 'AC－配電盤安裝', 'AC－接地及防雷施工', 'AC－功能測試', '台電申報／竣工資料', '台電會勘／預計掛表', '其他機電工程'],
+      '模組': ['模組進場點收', '模組搬運上架', '模組定位排列', '中壓塊安裝', '側壓塊安裝', '模組鎖固扭力確認', '模組外觀及破損檢查', '其他模組工程'],
+      '鋼構': ['錨栓及柱腳放樣', '鋼柱吊裝', '鋼柱及主梁吊裝', '次梁及斜撐安裝', '梁柱接頭螺栓安裝', '高強度螺栓終鎖', '現場焊接作業', '柱腳無收縮灌漿', '鍍鋅層修補', '其他鋼構工程'],
+    };
+    
+    if (laborForm.project_id) {
+      const project = projects.find(p => p.id === laborForm.project_id);
+      if (project && project.work_items_config) {
+        const config = project.work_items_config as Record<string, any[]>;
+        const mapped: Record<string, string[]> = {};
+        for (const cat in config) {
+          mapped[cat] = config[cat].filter(item => item.name).map((item: any) => item.name);
+        }
+        return { ...defaultCategories, ...mapped };
+      }
+    }
+    return defaultCategories;
+  }, [laborForm.project_id, projects]);
 
   useEffect(() => {
     if (isLaborModalOpen && workItems.length === 0) {

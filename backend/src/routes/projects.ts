@@ -207,6 +207,24 @@ router.post('/', authenticateToken, async (req: AuthRequest, res) => {
   }
 });
 
+
+// Update project work items config
+router.put('/:id/work-items', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const projectId = req.params.id as string;
+    const { work_items_config } = req.body;
+    const project = await prisma.project.update({
+      where: { id: projectId },
+      data: { work_items_config }
+    });
+    res.json(project);
+  } catch (error) {
+    console.error('Update work items error:', error);
+    res.status(500).json({ error: 'Failed to update work items' });
+  }
+});
+
+
 // Update project
 router.put('/:id', authenticateToken, async (req: AuthRequest, res) => {
   try {
