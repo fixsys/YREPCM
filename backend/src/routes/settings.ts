@@ -59,6 +59,23 @@ router.post('/departments', authenticateToken, async (req, res) => {
   }
 });
 
+
+router.put('/departments/:id/permissions', authenticateToken, async (req, res) => {
+  // @ts-ignore
+  if (req.user?.level < 100) return res.status(403).json({ error: '權限不足' });
+  try {
+    const { permissions } = req.body;
+    const dept = await prisma.department.update({
+      where: { id: req.params.id as string },
+      data: { permissions }
+    });
+    res.json(dept);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update permissions' });
+  }
+});
+
+
 router.delete('/departments/:id', authenticateToken, async (req, res) => {
   // @ts-ignore
   if (req.user?.level < 100) return res.status(403).json({ error: '權限不足' });

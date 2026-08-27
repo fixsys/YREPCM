@@ -7,6 +7,7 @@ interface User {
   department: string;
   role: string;
   level?: number;
+  permissions?: string[];
 }
 
 interface AuthState {

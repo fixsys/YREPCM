@@ -18,15 +18,20 @@ const Layout = ({ children }: { children: ReactNode }) => {
   };
 
   let navItems = [
-    { name: '總覽看板', path: '/', icon: LayoutDashboard },
-    { name: '業務開發', path: '/crm/leads', icon: Briefcase },
-    { name: '現場報工', path: '/onsite', icon: ClipboardList },
-    { name: '預算分析', path: '/budget', icon: Calculator },
-    { name: '個人任務', path: '/tasks', icon: CheckSquare },
-    { name: '專案管理', path: '/projects', icon: FolderKanban },
-    { name: '設計模擬器', path: '/simulators', icon: Lightbulb },
-    { name: '報表與分析', path: '/analytics', icon: BarChart2 },
+    { id: 'dashboard', name: '總覽看板', path: '/', icon: LayoutDashboard },
+    { id: 'crm', name: '業務開發', path: '/crm/leads', icon: Briefcase },
+    { id: 'onsite', name: '現場報工', path: '/onsite', icon: ClipboardList },
+    { id: 'budget', name: '預算分析', path: '/budget', icon: Calculator },
+    { id: 'tasks', name: '個人任務', path: '/tasks', icon: CheckSquare },
+    { id: 'projects', name: '專案管理', path: '/projects', icon: FolderKanban },
+    { id: 'simulators', name: '設計模擬器', path: '/simulators', icon: Lightbulb },
+    { id: 'analytics', name: '報表與分析', path: '/analytics', icon: BarChart2 },
   ];
+
+  if (user?.level && user.level < 100) {
+    const allowed = user.permissions || [];
+    navItems = navItems.filter(item => allowed.includes(item.id));
+  }
 
   if (user?.level && user.level >= 100) {
     navItems.push({ name: '帳號管理', path: '/users', icon: Shield });

@@ -51,7 +51,8 @@ router.post('/login', async (req, res) => {
         name: user.name, 
         department: user.department?.name || '', 
         role: user.role?.name || '',
-        level: user.role?.level || 0
+        level: user.role?.level || 0,
+        permissions: (user.department?.permissions as string[]) || []
       }, 
       requirePasswordChange 
     });
