@@ -190,6 +190,7 @@ const ProjectDetails = () => {
       status: project.status || '評估中',
       owner: project.owner || '',
       capacity: project.capacity || '',
+      address: project.address || '',
       content: project.content || '',
       start_date: project.start_date ? new Date(project.start_date).toISOString().slice(0, 10) : '',
       target_date: project.target_date ? new Date(project.target_date).toISOString().slice(0, 10) : '',
@@ -920,6 +921,10 @@ const ProjectDetails = () => {
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">設置容量</label>
                   <input type="text" value={editProjectData.capacity || ''} onChange={e => setEditProjectData({...editProjectData, capacity: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g. 3333 kW" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">工程地點</label>
+                  <input type="text" value={editProjectData.address || ''} onChange={e => setEditProjectData({...editProjectData, address: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" placeholder="例如: 台中市西屯區..." />
                 </div>
                 <div className="col-span-2">
                   <label className="block text-sm font-medium text-slate-700 mb-1">專案內容</label>

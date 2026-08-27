@@ -80,6 +80,7 @@ model Project {
   progress_pct       Int         @default(0)
   owner              String?
   capacity           String?
+  address            String?
   content            String?     @db.Text
   sales_rep_id       String?
   eng_rep_id         String?

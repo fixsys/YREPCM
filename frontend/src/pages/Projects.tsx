@@ -9,7 +9,7 @@ const Projects = () => {
   const [templates, setTemplates] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [newProject, setNewProject] = useState({ project_code: '', name: '', status: '評估中', owner: '', capacity: '', start_date: '', target_date: '', content: '', notes: '', template_id: '' });
+  const [newProject, setNewProject] = useState({ project_code: '', name: '', status: '評估中', owner: '', capacity: '', address: '', start_date: '', target_date: '', content: '', notes: '', template_id: '' });
   const [submitError, setSubmitError] = useState('');
   
   const { token, user } = useAuthStore();
@@ -65,7 +65,7 @@ const Projects = () => {
   };
 
   const handleTakeover = async (id: string) => {
-    const code = window.prompt('請輸入官方專案代碼 (例如: PRJ-20231012-001)：\n若留空將取消接取。');
+    const code = window.prompt('請輸入官方專案代碼 (例如: PRJ-20231012-001)：\r\n若留空將取消接取。');
     if (!code) return;
     
     try {
@@ -80,7 +80,7 @@ const Projects = () => {
   };
 
   const handleReject = async (id: string) => {
-    const reason = window.prompt('發現異常？請輸入退回原因，以通知業務人員進行修正：\n(若留空則取消退回)');
+    const reason = window.prompt('發現異常？請輸入退回原因，以通知業務人員進行修正：\r\n(若留空則取消退回)');
     if (!reason) return;
     
     try {
@@ -294,6 +294,10 @@ const Projects = () => {
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">設置容量</label>
                   <input type="text" value={newProject.capacity} onChange={e => setNewProject({...newProject, capacity: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="e.g. 3333 kW" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">工程地點</label>
+                  <input type="text" value={newProject.address || ''} onChange={e => setNewProject({...newProject, address: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="例如: 台中市西屯區..." />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
