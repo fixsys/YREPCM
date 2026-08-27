@@ -178,7 +178,9 @@ const Onsite = () => {
         const config = project.work_items_config as Record<string, any[]>;
         const mapped: Record<string, string[]> = {};
         for (const cat in config) {
-          mapped[cat] = config[cat].filter(item => item.name).map((item: any) => item.name);
+          if (Array.isArray(config[cat])) {
+            mapped[cat] = config[cat].filter(item => item && item.name).map((item: any) => item.name);
+          }
         }
         return { ...defaultCategories, ...mapped };
       }
@@ -1080,7 +1082,7 @@ const Onsite = () => {
                           newWorkers[idx].work_item = e.target.value;
                           setDispatchWorkers(newWorkers);
                         }} className="flex-1 min-w-[120px] px-2 py-1.5 text-sm border rounded outline-none bg-white">
-                          {(categoryToItems[worker.work_category] || []).map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                          {Array.from(new Set([worker.work_item, ...(categoryToItems[worker.work_category] || [])])).filter(Boolean).map(opt => <option key={opt} value={opt}>{opt}</option>)}
                         </select>
 
                         <button type="button" onClick={() => setDispatchWorkers(dispatchWorkers.filter((_, i) => i !== idx))} className="p-1.5 text-red-500 hover:bg-red-100 rounded shrink-0"><Trash2 size={16}/></button>
@@ -1149,7 +1151,7 @@ const Onsite = () => {
                             }
                             setWorkItems(newItems);
                           }} className="flex-1 px-3 py-2 border rounded-lg outline-none">
-                            {categoryToItems[laborForm.work_category].map(opts => <option key={opts} value={opts}>{opts}</option>)}
+                            {Array.from(new Set([item.name, ...(categoryToItems[laborForm.work_category] || [])])).filter(Boolean).map(opts => <option key={opts} value={opts}>{opts}</option>)}
                           </select>
                           <input type="text" readOnly value={item.worker_count ? `${item.worker_count} 人` : ''} placeholder="人數" className="w-24 px-3 py-2 border rounded-lg outline-none bg-slate-100 text-slate-500 cursor-not-allowed text-center font-medium" />
                           <input type="text" readOnly value={item.work_hours ? `${item.work_hours} hr` : ''} placeholder="工時" className="w-24 px-3 py-2 border rounded-lg outline-none bg-slate-100 text-slate-500 cursor-not-allowed text-center font-medium" />

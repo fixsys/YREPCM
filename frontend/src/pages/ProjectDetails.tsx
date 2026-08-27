@@ -75,7 +75,7 @@ const ProjectDetails = () => {
   
   // Initialize config when project loads
   useEffect(() => {
-    if (project && project.work_items_config) {
+    if (project && project.work_items_config && !Array.isArray(project.work_items_config) && Object.keys(project.work_items_config).length > 0) {
       setWorkItemsConfig(project.work_items_config);
     } else if (project) {
       // Default to the original Onsite.tsx categories
