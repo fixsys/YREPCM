@@ -742,7 +742,78 @@ const ProjectDetails = () => {
             </div>
           )}
 
-          {activeTab === 'files' && (
+          {activeTab === 'work_items' && (
+  <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-6">
+    <div className="flex justify-between items-center mb-4 border-b pb-4">
+      <div>
+        <h3 className="text-lg font-semibold text-slate-800">施工細項設定</h3>
+        <p className="text-sm text-slate-500">預先設定本專案各類別需要進行報工的工項、契約數量與單位。報工時，將自動帶入對應數值。</p>
+      </div>
+      <button onClick={handleSaveWorkItems} className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg font-bold">
+        儲存設定
+      </button>
+    </div>
+    
+    {Object.keys(workItemsConfig).map(category => (
+      <div key={category} className="border border-slate-200 rounded-lg overflow-hidden">
+        <div className="bg-slate-100 p-3 font-bold text-slate-700 flex justify-between items-center">
+          {category} 類別
+          <button onClick={() => {
+            const newConfig = { ...workItemsConfig };
+            newConfig[category] = [...(newConfig[category] || []), { name: '', contractQuantity: 0, unit: '式' }];
+            setWorkItemsConfig(newConfig);
+          }} className="text-teal-600 font-bold hover:underline text-sm">+ 新增 {category} 工項</button>
+        </div>
+        <table className="w-full text-left">
+          <thead className="bg-slate-50 border-b">
+            <tr>
+              <th className="p-3 text-slate-600">工項名稱</th>
+              <th className="p-3 text-slate-600 w-32">契約數量</th>
+              <th className="p-3 text-slate-600 w-24">單位</th>
+              <th className="p-3 text-slate-600 text-right w-20">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(workItemsConfig[category] || []).map((item: any, idx: number) => (
+              <tr key={idx} className="border-b">
+                <td className="p-2">
+                  <input type="text" value={item.name} onChange={e => {
+                    const newConfig = { ...workItemsConfig };
+                    newConfig[category][idx].name = e.target.value;
+                    setWorkItemsConfig(newConfig);
+                  }} className="w-full border rounded px-2 py-1" />
+                </td>
+                <td className="p-2">
+                  <input type="number" value={item.contractQuantity} onChange={e => {
+                    const newConfig = { ...workItemsConfig };
+                    newConfig[category][idx].contractQuantity = Number(e.target.value);
+                    setWorkItemsConfig(newConfig);
+                  }} className="w-full border rounded px-2 py-1" />
+                </td>
+                <td className="p-2">
+                  <input type="text" value={item.unit} onChange={e => {
+                    const newConfig = { ...workItemsConfig };
+                    newConfig[category][idx].unit = e.target.value;
+                    setWorkItemsConfig(newConfig);
+                  }} className="w-full border rounded px-2 py-1" />
+                </td>
+                <td className="p-2 text-right">
+                  <button onClick={() => {
+                    const newConfig = { ...workItemsConfig };
+                    newConfig[category] = newConfig[category].filter((_: any, i: number) => i !== idx);
+                    setWorkItemsConfig(newConfig);
+                  }} className="text-red-500 hover:text-red-700 font-bold p-1">刪除</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    ))}
+  </div>
+)}
+
+{activeTab === 'files' && (
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-lg font-semibold text-slate-800">專案相關檔案</h3>
