@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuthStore } from '../store/authStore';
-import { CheckSquare, Plus, Clock, Search, FolderKanban } from 'lucide-react';
+import { CheckSquare, Plus, Clock, Search, FolderKanban, Trash2 } from 'lucide-react';
 
 const Tasks = () => {
   const { token, user } = useAuthStore();
@@ -104,6 +104,20 @@ const Tasks = () => {
     } catch (error) {
       console.error('Failed to accept task', error);
       alert('接取任務失敗');
+    }
+  };
+
+  
+  const handleDeleteTask = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    if (!window.confirm('確定要刪除此任務嗎？此動作無法復原！')) return;
+    try {
+      await axios.delete(`/api/tasks/${id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      fetchData();
+    } catch (error: any) {
+      alert(error.response?.data?.error || '刪除失敗');
     }
   };
 

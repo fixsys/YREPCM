@@ -162,10 +162,8 @@ router.delete('/:id', authenticateToken, async (req: AuthRequest, res) => {
     const existingLead = await prisma.lead.findUnique({ where: { id } });
     if (!existingLead) return res.status(404).json({ error: 'Lead not found' });
 
-    if (!['SystemAdmin', 'Chairman', 'TopManagement'].includes(userRole)) {
-      if (existingLead.assignee_id !== userId && existingLead.created_by !== userId) {
-        return res.status(403).json({ error: '您沒有權限刪除此名單' });
-      }
+    if (userRole !== 'SystemAdmin') {
+      return res.status(403).json({ error: '權限不足，僅系統管理員可刪除' });
     }
 
     // Prisma might throw constraint errors if there are interactions/requirements

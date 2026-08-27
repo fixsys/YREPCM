@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuthStore } from '../store/authStore';
-import { Plus, Search, Calendar, ChevronRight, Briefcase, FileText } from 'lucide-react';
+import { Plus, Search, Calendar, ChevronRight, Briefcase, FileText, Trash2 } from 'lucide-react';
 
 const Projects = () => {
   const [projects, setProjects] = useState<any[]>([]);
@@ -103,6 +103,20 @@ const Projects = () => {
       case '退回修正': return 'bg-red-100 text-red-800 border border-red-200';
       case '停工': return 'bg-red-100 text-red-800';
       default: return 'bg-slate-100 text-slate-800';
+    }
+  };
+
+  
+  const handleDeleteProject = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    if (!window.confirm('確定要刪除此專案嗎？此動作無法復原！')) return;
+    try {
+      await axios.delete(`/api/projects/${id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      fetchData();
+    } catch (error: any) {
+      alert(error.response?.data?.error || '刪除失敗');
     }
   };
 

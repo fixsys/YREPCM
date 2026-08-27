@@ -69,6 +69,20 @@ const ProjectDetails = () => {
   const { token, user } = useAuthStore();
   const navigate = useNavigate();
 
+  const handleDeleteLog = async (log: any) => {
+    if (!window.confirm('確定要刪除此紀錄嗎？此動作無法復原！')) return;
+    try {
+      const endpoint = log._logType === 'toolbox' ? `/api/toolbox-meetings/${log.id}` : `/api/labor-reports/${log.id}`;
+      await axios.delete(endpoint, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      fetchProject(); // refresh data
+    } catch (error: any) {
+      alert(error.response?.data?.error || '刪除失敗');
+    }
+  };
+
+
   const [activeTab, setActiveTab] = useState<'requirements' | 'logs' | 'tasks' | 'performance' | 'files' | 'work_items' | 'workflow'>('tasks');
   const [tasks, setTasks] = useState<any[]>([]);
   const [workItemsConfig, setWorkItemsConfig] = useState<any>({});

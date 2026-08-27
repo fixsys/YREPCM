@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { Plus, Search, Phone, Building2, User, ChevronRight, FileText, Briefcase } from 'lucide-react';
+import { Plus, Search, Phone, Building2, User, ChevronRight, FileText, Briefcase, Trash2 } from 'lucide-react';
 import clsx from 'clsx';
 import DailyLogs from './DailyLogs';
 

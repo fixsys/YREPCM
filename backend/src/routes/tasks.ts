@@ -89,6 +89,9 @@ router.put('/:id', authenticateToken, async (req: AuthRequest, res) => {
 
 // Delete task
 router.delete('/:id', authenticateToken, async (req: AuthRequest, res) => {
+  if (req.user?.role !== 'SystemAdmin') {
+    return res.status(403).json({ error: '權限不足，僅系統管理員可刪除' });
+  }
   try {
     const taskId = req.params.id as string;
     await prisma.workLog.deleteMany({ where: { task_id: taskId } });
