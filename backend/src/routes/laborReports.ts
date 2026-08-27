@@ -253,7 +253,6 @@ router.get('/:id/export', authenticateToken, async (req: AuthRequest, res) => {
 
     let workItems = [];
     try { workItems = typeof report.work_items === 'string' ? JSON.parse(report.work_items) : (report.work_items || []); } catch(e){}
-    
     // Inject contract quantity and unit if project has work_items_config
     if (report.project && report.project.work_items_config) {
       try {
@@ -269,7 +268,7 @@ router.get('/:id/export', authenticateToken, async (req: AuthRequest, res) => {
         });
         
         workItems.forEach((wi: any) => {
-          const cfg = allConfigItems.find(c => c.name === wi.name);
+          const cfg = allConfigItems.find((c: any) => c.name === wi.name);
           if (cfg) {
             wi.contractQuantity = cfg.contractQuantity;
             wi.unit = cfg.unit;
@@ -277,31 +276,11 @@ router.get('/:id/export', authenticateToken, async (req: AuthRequest, res) => {
         });
       } catch (e) {}
     }
+    
+    
 
     
-    // Inject contract quantity and unit if project has work_items_config
-    if (report.project && report.project.work_items_config) {
-      try {
-        const config = typeof report.project.work_items_config === 'string' 
-          ? JSON.parse(report.project.work_items_config) 
-          : report.project.work_items_config;
-        
-        const allConfigItems: any[] = [];
-        Object.values(config).forEach((arr) => {
-          if (Array.isArray(arr)) {
-            allConfigItems.push(...arr);
-          }
-        });
-        
-        workItems.forEach((wi: any) => {
-          const cfg = allConfigItems.find(c => c.name === wi.name);
-          if (cfg) {
-            wi.contractQuantity = cfg.contractQuantity;
-            wi.unit = cfg.unit;
-          }
-        });
-      } catch (e) {}
-    }
+    
 
     let workers = [];
     try { workers = typeof report.dispatch_workers === 'string' ? JSON.parse(report.dispatch_workers) : (report.dispatch_workers || []); } catch(e){}
@@ -415,7 +394,7 @@ const wb = new ExcelJS.Workbook();
 
     // Company Header
     ws.mergeCells(`B${r}:H${r}`);
-    ws.getCell(`B${r}`).value = '元融科技有限公司 YUANRONG TECHNOLOGY\n744 台南市新市區港墘里自由街9號 | 06-5897049 | 統編 24903014';
+    ws.getCell(`B${r}`).value = '元融科技有限公司 YUANRONG TECHNOLOGY\r\n744 台南市新市區港墘里自由街9號 | 06-5897049 | 統編 24903014';
     ws.getCell(`B${r}`).font = { name: '微軟正黑體', size: 12, bold: true };
     ws.getCell(`B${r}`).alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
     ws.getRow(r).height = 40;
@@ -493,8 +472,8 @@ const wb = new ExcelJS.Workbook();
       const item = workItems[i] || {};
       ws.mergeCells(`A${r}:C${r}`);
       ws.getCell(`A${r}`).value = item.name || ''; applyStyle(ws.getCell(`A${r}`), false, true);
-      ws.getCell(`D${r}`).value = item.name ? '式' : ''; applyStyle(ws.getCell(`D${r}`));
-      ws.getCell(`E${r}`).value = item.name ? '100%' : ''; applyStyle(ws.getCell(`E${r}`));
+      ws.getCell(`D${r}`).value = item.name ? (item.unit || '式') : ''; applyStyle(ws.getCell(`D${r}`));
+      ws.getCell(`E${r}`).value = item.name ? (item.contractQuantity !== undefined ? item.contractQuantity : '100%') : ''; applyStyle(ws.getCell(`E${r}`));
       ws.getCell(`F${r}`).value = item.progress || ''; applyStyle(ws.getCell(`F${r}`));
       ws.getCell(`G${r}`).value = item.accumulatedQty || ''; applyStyle(ws.getCell(`G${r}`));
       ws.getCell(`H${r}`).value = item.notes || ''; applyStyle(ws.getCell(`H${r}`));
@@ -677,9 +656,9 @@ ${report.recorder?.name || ''}`;
           r++;
 
           ws.mergeCells(`A${r}:D${r}`); ws.mergeCells(`E${r}:H${r}`);
-          ws.getCell(`A${r}`).value = `專案經理(PM)：\n${report.pm?.name || ''}`;
+          ws.getCell(`A${r}`).value = `專案經理(PM)：\r\n${report.pm?.name || ''}`;
           applyStyle(ws.getCell(`A${r}`), false, true);
-          ws.getCell(`E${r}`).value = `現場負責人：\n${report.recorder?.name || ''}`;
+          ws.getCell(`E${r}`).value = `現場負責人：\r\n${report.recorder?.name || ''}`;
           applyStyle(ws.getCell(`E${r}`), false, true);
           ws.getRow(r).height = 60;
           r++;
@@ -763,6 +742,29 @@ router.get('/:id/export-pdf', authenticateToken, async (req: AuthRequest, res) =
 
     let workItems = [];
     try { workItems = typeof report.work_items === 'string' ? JSON.parse(report.work_items) : (report.work_items || []); } catch(e){}
+    // Inject contract quantity and unit if project has work_items_config
+    if (report.project && report.project.work_items_config) {
+      try {
+        const config = typeof report.project.work_items_config === 'string' 
+          ? JSON.parse(report.project.work_items_config) 
+          : report.project.work_items_config;
+        
+        const allConfigItems: any[] = [];
+        Object.values(config).forEach((arr) => {
+          if (Array.isArray(arr)) {
+            allConfigItems.push(...arr);
+          }
+        });
+        
+        workItems.forEach((wi: any) => {
+          const cfg = allConfigItems.find((c: any) => c.name === wi.name);
+          if (cfg) {
+            wi.contractQuantity = cfg.contractQuantity;
+            wi.unit = cfg.unit;
+          }
+        });
+      } catch (e) {}
+    }
     let workers = [];
     try { workers = typeof report.dispatch_workers === 'string' ? JSON.parse(report.dispatch_workers) : (report.dispatch_workers || []); } catch(e){}
     let equips = [];
