@@ -30,7 +30,7 @@ router.get('/', authenticateToken, async (req: AuthRequest, res) => {
 
 // Create user (Admin only)
 router.post('/', authenticateToken, async (req: AuthRequest, res) => {
-  if (req.user?.role !== 'SystemAdmin') return res.status(403).json({ error: '權限不足' });
+  if ((!req.user?.level || req.user.level < 100)) return res.status(403).json({ error: '權限不足' });
 
   const { account, password, name, email, department_id, role_id } = req.body;
   try {
@@ -55,7 +55,7 @@ router.post('/', authenticateToken, async (req: AuthRequest, res) => {
 
 // Update user
 router.put('/:id', authenticateToken, async (req: AuthRequest, res) => {
-  if (req.user?.role !== 'SystemAdmin') return res.status(403).json({ error: '權限不足' });
+  if ((!req.user?.level || req.user.level < 100)) return res.status(403).json({ error: '權限不足' });
 
   const { name, email, department_id, role_id, is_active } = req.body;
   try {
@@ -74,7 +74,7 @@ router.put('/:id', authenticateToken, async (req: AuthRequest, res) => {
 
 // Reset password (Admin only)
 router.post('/:id/reset-password', authenticateToken, async (req: AuthRequest, res) => {
-  if (req.user?.role !== 'SystemAdmin') return res.status(403).json({ error: '權限不足' });
+  if ((!req.user?.level || req.user.level < 100)) return res.status(403).json({ error: '權限不足' });
   
   const { newPassword } = req.body;
   try {

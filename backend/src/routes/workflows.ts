@@ -24,7 +24,7 @@ router.get('/templates', authenticateToken, async (req: AuthRequest, res) => {
 
 // Save or Update a template (Visual Builder uses this)
 router.post('/templates', authenticateToken, async (req: AuthRequest, res) => {
-  if (req.user?.role !== 'SystemAdmin') return res.status(403).json({ error: '權限不足' });
+  if ((!req.user?.level || req.user.level < 100)) return res.status(403).json({ error: '權限不足' });
 
   const { id, name, description, nodes, edges } = req.body;
   try {
@@ -85,7 +85,7 @@ router.post('/templates', authenticateToken, async (req: AuthRequest, res) => {
 
 // Delete a template
 router.delete('/templates/:id', authenticateToken, async (req: AuthRequest, res) => {
-  if (req.user?.role !== 'SystemAdmin') return res.status(403).json({ error: '權限不足' });
+  if ((!req.user?.level || req.user.level < 100)) return res.status(403).json({ error: '權限不足' });
   try {
     const id = req.params.id as string;
     // ensure no project is using it

@@ -55,7 +55,7 @@ function App() {
                 <Route path="/onsite" element={<Onsite />} />
                 <Route path="/simulators" element={<SimulatorsDashboard />} />
                 <Route path="/simulators/solar" element={<SolarModuleSim />} />
-                <Route path="/workflow-builder" element={user?.role === 'SystemAdmin' ? <WorkflowBuilder /> : <Navigate to="/" />} />
+                <Route path="/workflow-builder" element={(user?.level && user.level >= 100) ? <WorkflowBuilder /> : <Navigate to="/" />} />
                 <Route path="*" element={<Navigate to="/" />} />
               </Routes>
             </Layout>

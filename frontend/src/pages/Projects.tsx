@@ -139,7 +139,7 @@ const Projects = () => {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {user?.role === 'SystemAdmin' && (
+          {(user?.level && user.level >= 100) && (
             <button 
               onClick={(e) => handleDeleteProject(e, project.id)}
               className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"

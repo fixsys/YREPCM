@@ -253,7 +253,7 @@ router.put('/:id', authenticateToken, async (req: AuthRequest, res) => {
 
 // Delete project
 router.delete('/:id', authenticateToken, async (req: AuthRequest, res) => {
-  if (req.user?.role !== 'SystemAdmin') return res.status(403).json({ error: '權限不足' });
+  if ((!req.user?.level || req.user.level < 100)) return res.status(403).json({ error: '權限不足' });
   try {
     const projectId = req.params.id as string;
     await prisma.dailyLog.deleteMany({ where: { project_id: projectId } });

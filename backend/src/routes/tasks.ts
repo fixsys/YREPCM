@@ -89,7 +89,7 @@ router.put('/:id', authenticateToken, async (req: AuthRequest, res) => {
 
 // Delete task
 router.delete('/:id', authenticateToken, async (req: AuthRequest, res) => {
-  if (req.user?.role !== 'SystemAdmin') {
+  if ((!req.user?.level || req.user.level < 100)) {
     return res.status(403).json({ error: '權限不足，僅系統管理員可刪除' });
   }
   try {

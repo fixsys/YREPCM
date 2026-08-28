@@ -856,7 +856,7 @@ const ProjectDetails = () => {
                                 <p className="text-xs text-slate-500 mt-0.5">{new Date(file.uploaded_at).toLocaleDateString()} · 上傳者: {file.uploader?.name}</p>
                               </div>
                             </div>
-                            {(user?.role === 'SystemAdmin' || user?.id === file.uploaded_by) && (
+                            {((user?.level && user.level >= 100) || user?.id === file.uploaded_by) && (
                               <button onClick={() => handleDeleteFile(file.id)} className="p-1.5 text-slate-400 hover:text-red-600 rounded transition-colors ml-2 flex-shrink-0">
                                 <Trash2 size={16} />
                               </button>
