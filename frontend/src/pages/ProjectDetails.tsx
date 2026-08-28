@@ -582,6 +582,15 @@ const ProjectDetails = () => {
                       >
                         <FileText size={16} /> 檢視報表
                       </button>
+                      {(user?.level && user.level >= 100) && (
+                        <button 
+                          onClick={() => handleDeleteLog(log)}
+                          className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-200"
+                          title="刪除"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}

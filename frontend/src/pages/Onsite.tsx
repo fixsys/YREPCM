@@ -461,6 +461,19 @@ const Onsite = () => {
     setIsLaborModalOpen(true);
   };
 
+  const handleDeleteLog = async (log: any, type: 'toolbox' | 'labor') => {
+    if (!window.confirm('確定要刪除這筆紀錄嗎？此動作無法復原！')) return;
+    try {
+      const endpoint = type === 'toolbox' ? `/api/toolbox-meetings/${log.id}` : `/api/labor-reports/${log.id}`;
+      await axios.delete(endpoint, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      fetchData(); // refresh data
+    } catch (error: any) {
+      alert(error.response?.data?.error || '刪除失敗');
+    }
+  };
+
   const filteredToolbox = toolboxMeetings.filter(t => 
     t.work_content.includes(searchQuery) || 
     (t.recorder?.name || '').includes(searchQuery) ||
@@ -561,6 +574,9 @@ const Onsite = () => {
 <div className="flex border-t border-slate-100 divide-x divide-slate-100 bg-slate-50 rounded-b-xl overflow-hidden shrink-0">
                   <button onClick={() => setViewingRecord({type: 'toolbox', data: t})} className="flex-1 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-100 hover:text-indigo-700 flex items-center justify-center gap-2 transition-colors"><FileText size={16}/> 檢視報表</button>
                   <button onClick={() => handleEditToolbox(t)} className="flex-1 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-100 hover:text-teal-700 flex items-center justify-center gap-2 transition-colors"><Edit2 size={16}/> 編輯</button>
+                  {(user?.level && user.level >= 100) && (
+                    <button onClick={() => handleDeleteLog(t, 'toolbox')} className="flex-1 py-2.5 text-sm font-bold text-slate-600 hover:bg-red-50 hover:text-red-700 flex items-center justify-center gap-2 transition-colors"><Trash2 size={16}/> 刪除</button>
+                  )}
                 </div>
               </div>
             ))}
@@ -636,6 +652,9 @@ const Onsite = () => {
                 <div className="flex border-t border-slate-100 divide-x divide-slate-100 bg-slate-50 rounded-b-xl overflow-hidden shrink-0">
                   <button onClick={() => setViewingRecord({type: 'labor', data: l})} className="flex-1 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-100 hover:text-indigo-700 flex items-center justify-center gap-2 transition-colors"><FileText size={16}/> 檢視報表</button>
                   <button onClick={() => handleEditLabor(l)} className="flex-1 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-100 hover:text-teal-700 flex items-center justify-center gap-2 transition-colors"><Edit2 size={16}/> 編輯</button>
+                  {(user?.level && user.level >= 100) && (
+                    <button onClick={() => handleDeleteLog(l, 'labor')} className="flex-1 py-2.5 text-sm font-bold text-slate-600 hover:bg-red-50 hover:text-red-700 flex items-center justify-center gap-2 transition-colors"><Trash2 size={16}/> 刪除</button>
+                  )}
                 </div>
               </div>
             ))}
