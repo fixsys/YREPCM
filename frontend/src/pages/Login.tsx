@@ -37,7 +37,9 @@ const Login = () => {
         }
       }
     } catch (err: any) {
-      setError(err.response?.data?.error || '登入失敗，請檢查帳號密碼');
+      const errorMsg = err.response?.data?.error || '登入失敗，請檢查帳號密碼';
+      setError(errorMsg);
+      alert(errorMsg);
     } finally {
       setLoading(false);
     }
