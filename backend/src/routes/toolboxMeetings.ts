@@ -202,7 +202,7 @@ router.get('/:id/export-pdf', authenticateToken, async (req: AuthRequest, res) =
 router.delete('/:id', authenticateToken, async (req: AuthRequest, res) => {
   if (req.user?.role !== 'SystemAdmin') return res.status(403).json({ error: '權限不足，僅系統管理員可刪除' });
   try {
-    await prisma.toolboxMeeting.delete({ where: { id: req.params.id } });
+    await prisma.toolboxMeeting.delete({ where: { id: req.params.id as string } });
     res.json({ success: true });
   } catch (error) {
     console.error(error);

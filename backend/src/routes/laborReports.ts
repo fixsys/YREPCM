@@ -898,7 +898,7 @@ let templatePath = path.join(__dirname, '../templates/labor-report-pdf.ejs');
 router.delete('/:id', authenticateToken, async (req: AuthRequest, res) => {
   if (req.user?.role !== 'SystemAdmin') return res.status(403).json({ error: '權限不足，僅系統管理員可刪除' });
   try {
-    await prisma.dailyLaborReport.delete({ where: { id: req.params.id } });
+    await prisma.dailyLaborReport.delete({ where: { id: req.params.id as string } });
     res.json({ success: true });
   } catch (error) {
     console.error(error);

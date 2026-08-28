@@ -52,11 +52,18 @@ app.get('/api/health', (req, res) => {
 
 // Serve frontend static files
 const frontendDistPath = path.join(__dirname, '../../frontend/dist');
-app.use(express.static(frontendDistPath));
+app.use(express.static(frontendDistPath, {
+  setHeaders: (res, path) => {
+    if (path.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    }
+  }
+}));
 
 // Handle React Router fallback (Catch-all for non-API routes)
 app.use((req, res) => {
   if (!req.path.startsWith('/api/') && !req.path.startsWith('/uploads/')) {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.sendFile(path.join(frontendDistPath, 'index.html'));
   } else {
     res.status(404).json({ error: 'Not Found' });
