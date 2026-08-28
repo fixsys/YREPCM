@@ -138,9 +138,20 @@ const Projects = () => {
             </span>
           </div>
         </div>
-        <span className={`text-xs px-2.5 py-1 rounded-full font-medium whitespace-nowrap ${getStatusColor(project.status)}`}>
-          {project.status}
-        </span>
+        <div className="flex items-center gap-2">
+          {user?.role === 'SystemAdmin' && (
+            <button 
+              onClick={(e) => handleDeleteProject(e, project.id)}
+              className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+              title="刪除專案"
+            >
+              <Trash2 size={16} />
+            </button>
+          )}
+          <span className={`text-xs px-2.5 py-1 rounded-full font-medium whitespace-nowrap ${getStatusColor(project.status)}`}>
+            {project.status}
+          </span>
+        </div>
       </div>
       
       <div className="space-y-3 mt-auto pt-4 border-t border-slate-100">

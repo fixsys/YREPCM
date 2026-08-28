@@ -16,6 +16,19 @@ export default function Leads() {
   const unconvertedLeads = leads.filter(l => l.status !== 'CONVERTED');
   const convertedLeads = leads.filter(l => l.status === 'CONVERTED');
 
+  const handleDeleteLead = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    if (!window.confirm('確定要刪除此業務項目嗎？此動作無法復原！')) return;
+    try {
+      await axios.delete(`/api/leads/${id}`, {
+        headers: { Authorization: `Bearer ${JSON.parse(localStorage.getItem('auth-storage') || '{}').state?.token}` }
+      });
+      fetchLeads();
+    } catch (error: any) {
+      alert(error.response?.data?.error || '刪除失敗');
+    }
+  };
+
   const fetchLeads = async () => {
     try {
       const res = await axios.get('/api/leads', {
@@ -209,9 +222,20 @@ export default function Leads() {
                       </span>
                     </div>
                   </div>
-                  <span className={clsx("text-xs px-2.5 py-1 rounded-full font-medium whitespace-nowrap", statusColors[lead.status])}>
-                    {statusLabels[lead.status]}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    {user?.role === 'SystemAdmin' && (
+                      <button 
+                        onClick={(e) => handleDeleteLead(e, lead.id)}
+                        className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                        title="刪除"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                    <span className={clsx("text-xs px-2.5 py-1 rounded-full font-medium whitespace-nowrap", statusColors[lead.status])}>
+                      {statusLabels[lead.status]}
+                    </span>
+                  </div>
                 </div>
                 
                 <div className="space-y-2 mt-auto pt-4 text-sm text-slate-600 border-t border-slate-50">
@@ -265,9 +289,20 @@ export default function Leads() {
                         </span>
                       </div>
                     </div>
-                    <span className={clsx("text-xs px-2.5 py-1 rounded-full font-medium whitespace-nowrap", statusColors[lead.status])}>
-                      {statusLabels[lead.status]}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      {user?.role === 'SystemAdmin' && (
+                        <button 
+                          onClick={(e) => handleDeleteLead(e, lead.id)}
+                          className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                          title="刪除"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
+                      <span className={clsx("text-xs px-2.5 py-1 rounded-full font-medium whitespace-nowrap", statusColors[lead.status])}>
+                        {statusLabels[lead.status]}
+                      </span>
+                    </div>
                   </div>
                   
                   <div className="space-y-2 mt-auto pt-4 text-sm text-slate-500 border-t border-slate-200">
