@@ -82,7 +82,10 @@ router.post('/:id/reset-password', authenticateToken, async (req: AuthRequest, r
     const password_hash = await bcrypt.hash(newPassword, 10);
     await prisma.user.update({
       where: { id: userId },
-      data: { password_hash },
+      data: { 
+        password_hash,
+        force_password_change: true 
+      },
     });
     res.json({ message: '密碼已重設' });
   } catch (error) {

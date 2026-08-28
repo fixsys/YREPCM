@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
-import { LogOut, LayoutDashboard, FolderKanban, Shield, BarChart2, Settings, CheckSquare, Network, Briefcase, Smartphone, Monitor, Menu, Calculator, Lightbulb, ClipboardList } from 'lucide-react';
+import { LogOut, LayoutDashboard, FolderKanban, Shield, BarChart2, Settings, CheckSquare, Network, Briefcase, Smartphone, Monitor, Menu, Calculator, Lightbulb, ClipboardList, Key } from 'lucide-react';
 import clsx from 'clsx';
 import { useState } from 'react';
 import NotificationCenter from './NotificationCenter';
@@ -70,6 +70,13 @@ const Layout = ({ children }: { children: ReactNode }) => {
               <span className="text-sm font-medium text-white leading-tight">{user?.name}</span>
               <span className="text-xs text-slate-400">{user?.department} | {user?.role}</span>
             </div>
+            <button 
+              onClick={() => navigate('/change-password')}
+              className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-md transition-colors"
+              title="修改密碼"
+            >
+              <Key size={18} />
+            </button>
             <button 
               onClick={handleLogout}
               className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-md transition-colors"

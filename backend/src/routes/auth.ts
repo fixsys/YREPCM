@@ -41,8 +41,8 @@ router.post('/login', async (req, res) => {
       { expiresIn: '12h' }
     );
 
-    // 檢查是否為 admin 預設密碼 (簡單邏輯: 帳號是 admin 且密碼也是 admin)
-    const requirePasswordChange = (account === 'admin' && password === 'admin');
+    // 檢查是否需要強制修改密碼 (第一次登入或被管理員重置)
+    const requirePasswordChange = user.force_password_change;
 
     res.json({ 
       token, 
@@ -69,6 +69,11 @@ router.post('/change-password', authenticateToken, async (req: AuthRequest, res)
 
   if (!userId) return res.status(401).json({ error: '未授權' });
 
+  // 密碼強度要求: 6位數以上並且包含英文
+  if (newPassword.length < 6 || !/[a-zA-Z]/.test(newPassword)) {
+    return res.status(400).json({ error: '新密碼必須至少6位數，且包含英文字母' });
+  }
+
   try {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) return res.status(404).json({ error: '找不到使用者' });
@@ -81,7 +86,10 @@ router.post('/change-password', authenticateToken, async (req: AuthRequest, res)
     const password_hash = await bcrypt.hash(newPassword, 10);
     await prisma.user.update({
       where: { id: userId },
-      data: { password_hash },
+      data: { 
+        password_hash,
+        force_password_change: false 
+      },
     });
 
     res.json({ message: '密碼修改成功' });

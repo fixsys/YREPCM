@@ -36,9 +36,10 @@ model User {
   name          String
   email         String?
   department_id String?
-  role_id       String?
-  is_active     Boolean     @default(true)
-  created_at    DateTime    @default(now())
+  role_id               String?
+  is_active             Boolean     @default(true)
+  force_password_change Boolean     @default(true)
+  created_at            DateTime    @default(now())
   updated_at    DateTime    @updatedAt
 
   department    Department? @relation(fields: [department_id], references: [id])

@@ -8,11 +8,16 @@ const ChangePassword = () => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
-  const { token, user, setAuth } = useAuthStore();
+  const { token, user, setAuth, requirePasswordChange } = useAuthStore();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (newPassword.length < 6 || !/[a-zA-Z]/.test(newPassword)) {
+      setError('新密碼必須至少6位數，且包含英文字母');
+      return;
+    }
+
     if (newPassword !== confirmPassword) {
       setError('新密碼與確認密碼不符');
       return;
@@ -39,9 +44,11 @@ const ChangePassword = () => {
     <div className="min-h-screen flex items-center justify-center bg-slate-100">
       <div className="bg-white p-8 rounded-xl shadow-xl max-w-md w-full">
         <h2 className="text-2xl font-bold text-slate-800 mb-6">修改密碼</h2>
-        <div className="bg-amber-50 border-l-4 border-amber-500 p-4 mb-6 text-sm text-amber-700">
-          系統安全性要求：這是您第一次使用預設密碼登入，請務必先修改密碼以繼續使用系統。
-        </div>
+        {requirePasswordChange && (
+          <div className="bg-amber-50 border-l-4 border-amber-500 p-4 mb-6 text-sm text-amber-700">
+            系統安全性要求：這是您第一次登入或密碼已被重置，請務必先修改密碼以繼續使用系統。
+          </div>
+        )}
 
         {error && (
           <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm">
@@ -80,12 +87,23 @@ const ChangePassword = () => {
               required
             />
           </div>
-          <button
-            type="submit"
-            className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors mt-6 font-medium"
-          >
-            確認修改
-          </button>
+          <div className="flex gap-4 mt-6">
+            {!requirePasswordChange && (
+              <button
+                type="button"
+                onClick={() => navigate('/')}
+                className="w-full bg-slate-200 text-slate-700 py-2 rounded-lg hover:bg-slate-300 transition-colors font-medium"
+              >
+                返回
+              </button>
+            )}
+            <button
+              type="submit"
+              className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            >
+              確認修改
+            </button>
+          </div>
         </form>
       </div>
     </div>
