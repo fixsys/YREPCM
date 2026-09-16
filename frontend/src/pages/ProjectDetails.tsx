@@ -94,10 +94,10 @@ const ProjectDetails = () => {
     } else if (project) {
       // Default to the original Onsite.tsx categories
       const defaults: any = {
-        '土木': ['整地', '放樣', '開挖', 'PC', '鋼筋綁紮', '大底澆置', '板模', '灌漿', '基礎螺栓', '拆模', '回填', '其他'].map(name => ({ name, contractQuantity: 0, unit: '式' })),
-        '機電': ['DC－模組串列接線', 'DC－直流電纜佈設', 'DC－絕緣阻抗測試', 'DC－逆變器接線', 'AC－交流電纜佈設', 'AC－配電盤安裝', 'AC－接地及防雷施工', 'AC－功能測試', '台電申報／竣工資料', '台電會勘／預計掛表', '其他機電工程'].map(name => ({ name, contractQuantity: 0, unit: '式' })),
-        '模組': ['模組進場點收', '模組搬運上架', '模組定位排列', '中壓塊安裝', '側壓塊安裝', '模組鎖固扭力確認', '模組外觀及破損檢查', '其他模組工程'].map(name => ({ name, contractQuantity: 0, unit: '式' })),
-        '鋼構': ['錨栓及柱腳放樣', '鋼柱吊裝', '鋼柱及主梁吊裝', '次梁及斜撐安裝', '梁柱接頭螺栓安裝', '高強度螺栓終鎖', '現場焊接作業', '柱腳無收縮灌漿', '鍍鋅層修補', '其他鋼構工程'].map(name => ({ name, contractQuantity: 0, unit: '式' })),
+        '土木': ['整地', '放樣', '開挖', 'PC', '鋼筋綁紮', '大底澆置', '板模', '灌漿', '基礎螺栓', '拆模', '回填', '其他'].map(name => ({ name, contractQuantity: 0, unit: '式', startDate: '', endDate: '' })),
+        '機電': ['DC－模組串列接線', 'DC－直流電纜佈設', 'DC－絕緣阻抗測試', 'DC－逆變器接線', 'AC－交流電纜佈設', 'AC－配電盤安裝', 'AC－接地及防雷施工', 'AC－功能測試', '台電申報／竣工資料', '台電會勘／預計掛表', '其他機電工程'].map(name => ({ name, contractQuantity: 0, unit: '式', startDate: '', endDate: '' })),
+        '模組': ['模組進場點收', '模組搬運上架', '模組定位排列', '中壓塊安裝', '側壓塊安裝', '模組鎖固扭力確認', '模組外觀及破損檢查', '其他模組工程'].map(name => ({ name, contractQuantity: 0, unit: '式', startDate: '', endDate: '' })),
+        '鋼構': ['錨栓及柱腳放樣', '鋼柱吊裝', '鋼柱及主梁吊裝', '次梁及斜撐安裝', '梁柱接頭螺栓安裝', '高強度螺栓終鎖', '現場焊接作業', '柱腳無收縮灌漿', '鍍鋅層修補', '其他鋼構工程'].map(name => ({ name, contractQuantity: 0, unit: '式', startDate: '', endDate: '' })),
       };
       setWorkItemsConfig(defaults);
     }
@@ -785,7 +785,7 @@ const ProjectDetails = () => {
           {category} 類別
           <button onClick={() => {
             const newConfig = { ...workItemsConfig };
-            newConfig[category] = [...(newConfig[category] || []), { name: '', contractQuantity: 0, unit: '式' }];
+            newConfig[category] = [...(newConfig[category] || []), { name: '', contractQuantity: 0, unit: '式', startDate: '', endDate: '' }];
             setWorkItemsConfig(newConfig);
           }} className="text-teal-600 font-bold hover:underline text-sm">+ 新增 {category} 工項</button>
         </div>
@@ -822,7 +822,21 @@ const ProjectDetails = () => {
                     setWorkItemsConfig(newConfig);
                   }} className="w-full border rounded px-2 py-1" />
                 </td>
-                <td className="p-2 text-right">
+                <td className="p-2">
+                  <input type="date" value={item.startDate || ''} onChange={e => {
+                    const newConfig = { ...workItemsConfig };
+                    newConfig[category][idx].startDate = e.target.value;
+                    setWorkItemsConfig(newConfig);
+                  }} className="w-full border rounded px-2 py-1" />
+                </td>
+                <td className="p-2">
+                  <input type="date" value={item.endDate || ''} onChange={e => {
+                    const newConfig = { ...workItemsConfig };
+                    newConfig[category][idx].endDate = e.target.value;
+                    setWorkItemsConfig(newConfig);
+                  }} className="w-full border rounded px-2 py-1" />
+                </td>
+                <td className="p-2 text-right whitespace-nowrap">
                   <button onClick={() => {
                     const newConfig = { ...workItemsConfig };
                     newConfig[category] = newConfig[category].filter((_: any, i: number) => i !== idx);
