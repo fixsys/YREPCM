@@ -795,7 +795,9 @@ const ProjectDetails = () => {
               <th className="p-3 text-slate-600">工項名稱</th>
               <th className="p-3 text-slate-600 w-32">契約數量</th>
               <th className="p-3 text-slate-600 w-24">單位</th>
-              <th className="p-3 text-slate-600 text-right w-20">操作</th>
+              <th className="p-3 text-slate-600 w-40">開始日期</th>
+              <th className="p-3 text-slate-600 w-40">結束日期</th>
+              <th className="p-3 text-slate-600 text-center w-24 whitespace-nowrap">操作</th>
             </tr>
           </thead>
           <tbody>
@@ -836,7 +838,7 @@ const ProjectDetails = () => {
                     setWorkItemsConfig(newConfig);
                   }} className="w-full border rounded px-2 py-1" />
                 </td>
-                <td className="p-2 text-right whitespace-nowrap">
+                <td className="p-2 text-center whitespace-nowrap">
                   <button onClick={() => {
                     const newConfig = { ...workItemsConfig };
                     newConfig[category] = newConfig[category].filter((_: any, i: number) => i !== idx);
