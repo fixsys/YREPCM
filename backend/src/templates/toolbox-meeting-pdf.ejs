@@ -311,11 +311,24 @@
       <td colspan="2" style="font-weight: bold;">單位</td>
       <td colspan="2" style="font-weight: bold;">數量(H/台)</td>
     </tr>
-    <% for(let i=0; i<3; i++) { %>
+    <% 
+      let eqs = [];
+      if (meeting.equipments) {
+        if (typeof meeting.equipments === 'string') {
+          try { eqs = JSON.parse(meeting.equipments); } catch(e){}
+        } else if (Array.isArray(meeting.equipments)) {
+          eqs = meeting.equipments;
+        }
+      }
+      for(let i=0; i<3; i++) { 
+        let eq1 = eqs[i*3] || {};
+        let eq2 = eqs[i*3+1] || {};
+        let eq3 = eqs[i*3+2] || {};
+    %>
     <tr style="height: 25px;">
-      <td colspan="2"></td><td colspan="1"></td><td colspan="3"></td>
-      <td colspan="2"></td><td colspan="2"></td><td colspan="3"></td>
-      <td colspan="4"></td><td colspan="2"></td><td colspan="2"></td>
+      <td colspan="2"><%= eq1.name || '' %></td><td colspan="1"><%= eq1.name ? '台' : '' %></td><td colspan="3"><%= eq1.name ? `${eq1.hours || 0}H / ${eq1.quantity || 0}台` : '' %></td>
+      <td colspan="2"><%= eq2.name || '' %></td><td colspan="2"><%= eq2.name ? '台' : '' %></td><td colspan="3"><%= eq2.name ? `${eq2.hours || 0}H / ${eq2.quantity || 0}台` : '' %></td>
+      <td colspan="4"><%= eq3.name || '' %></td><td colspan="2"><%= eq3.name ? '台' : '' %></td><td colspan="2"><%= eq3.name ? `${eq3.hours || 0}H / ${eq3.quantity || 0}台` : '' %></td>
     </tr>
     <% } %>
   </table>

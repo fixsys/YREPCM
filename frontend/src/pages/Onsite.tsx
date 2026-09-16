@@ -66,6 +66,7 @@ const Onsite = () => {
     hazards: [] as string[],
     safety_measures: [] as string[],
     other_risks: '',
+    equipments: [] as any[],
     signatures: [] as string[]
   });
   const [toolboxPhotos, setToolboxPhotos] = useState<File[]>([]);
@@ -321,7 +322,7 @@ const Onsite = () => {
     }
 
     const formData = new FormData();
-    Object.entries(toolboxForm).forEach(([key, val]) => formData.append(key, typeof val === 'object' ? JSON.stringify(val) : String(val)));
+    Object.entries(toolboxForm).forEach(([key, val]) => { if (key === 'equipments') { formData.append(key, JSON.stringify(val.filter(e => e.name && e.quantity > 0))); } else { formData.append(key, typeof val === 'object' ? JSON.stringify(val) : String(val)); } });
     toolboxPhotos.forEach(file => formData.append('photos', file));
 
     try {
@@ -340,7 +341,7 @@ const Onsite = () => {
 
   const handleAddToolbox = () => {
     setEditingToolboxId(null);
-    setToolboxForm({ project_id: '', record_date: new Date().toISOString().slice(0, 10), recorder_id: user?.id || '', worker_count: '', work_category: '土木', work_content: '', safety_check_1: false, safety_check_2: false, safety_check_3: false, work_area: '', work_items: [], hazards: [], safety_measures: [], other_risks: '', signatures: [] });
+    setToolboxForm({ project_id: '', record_date: new Date().toISOString().slice(0, 10), recorder_id: user?.id || '', worker_count: '', work_category: '土木', work_content: '', safety_check_1: false, safety_check_2: false, safety_check_3: false, work_area: '', work_items: [], hazards: [], safety_measures: [], equipments: [], other_risks: '', signatures: [] });
     setToolboxPhotos([]);
     setIsToolboxModalOpen(true);
   };
@@ -361,6 +362,7 @@ const Onsite = () => {
       work_items: safeParseJSON(t.work_items, []),
       hazards: safeParseJSON(t.hazards, []),
       safety_measures: safeParseJSON(t.safety_measures, []),
+      equipments: safeParseJSON(t.equipments, []),
       other_risks: t.other_risks || '',
       signatures: safeParseJSON(t.signatures, [])
     });
@@ -562,6 +564,16 @@ const Onsite = () => {
                     <span>紀錄: {t.recorder?.name}</span>
                     <span>人數: {t.worker_count} 人</span>
                   </div>
+                  {t.equipments && safeParseJSON(t.equipments, []).length > 0 && (
+                    <div className="text-xs text-slate-600 mt-2 border-t border-slate-100 pt-2">
+                      <strong className="block mb-1">機具使用:</strong>
+                      <div className="flex flex-wrap gap-1">
+                        {safeParseJSON(t.equipments, []).map((e: any, i: number) => (
+                          <span key={i} className="inline-block bg-slate-100 px-2 py-0.5 rounded">{e.name} {e.quantity}台 {e.hours}hr</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   {t.photos && (
                     <div className="mt-3 flex gap-2 overflow-x-auto">
                       {safeParseJSON(t.photos, []).map((p: string, i: number) => (
@@ -933,6 +945,39 @@ const Onsite = () => {
                       ))}
                     </div>
                   </div>
+                </div>
+
+                <div className="border-t border-slate-200 pt-4 mt-4 mb-4">
+                  <label className="block text-sm font-bold text-slate-700 mb-2">機具管理</label>
+                  {toolboxForm.equipments.map((eq, idx) => (
+                    <div key={idx} className="flex flex-wrap gap-2 mb-3 p-3 bg-slate-50 border rounded-lg items-center">
+                      <select value={eq.name} onChange={e => {
+                        const newEqs = [...toolboxForm.equipments];
+                        newEqs[idx].name = e.target.value;
+                        setToolboxForm({...toolboxForm, equipments: newEqs});
+                      }} className="flex-1 min-w-[150px] px-3 py-1.5 text-sm border rounded outline-none bg-white">
+                        <option value="">--請選擇機具--</option>
+                        {['怪手/山貓', '切割機/壓路機', '吊車/吊卡', '載重貨車/板車', '水泥車/幫浦車'].map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                      </select>
+                      <input type="number" min="0" value={eq.quantity} onChange={e => {
+                        const newEqs = [...toolboxForm.equipments];
+                        newEqs[idx].quantity = Number(e.target.value);
+                        setToolboxForm({...toolboxForm, equipments: newEqs});
+                      }} placeholder="數量" className="w-[80px] px-3 py-1.5 text-sm border rounded outline-none" />
+                      <span className="text-sm text-slate-500">台</span>
+                      <input type="number" min="0" value={eq.hours} onChange={e => {
+                        const newEqs = [...toolboxForm.equipments];
+                        newEqs[idx].hours = Number(e.target.value);
+                        setToolboxForm({...toolboxForm, equipments: newEqs});
+                      }} placeholder="小時" className="w-[80px] px-3 py-1.5 text-sm border rounded outline-none" />
+                      <span className="text-sm text-slate-500">小時</span>
+                      <button type="button" onClick={() => {
+                        const newEqs = toolboxForm.equipments.filter((_, i) => i !== idx);
+                        setToolboxForm({...toolboxForm, equipments: newEqs});
+                      }} className="p-1.5 text-red-500 hover:bg-red-100 rounded shrink-0"><Trash2 size={16}/></button>
+                    </div>
+                  ))}
+                  <button type="button" onClick={() => setToolboxForm({...toolboxForm, equipments: [...toolboxForm.equipments, {name: '', quantity: 1, hours: 8}]})} className="text-sm text-indigo-600 font-medium hover:underline">+ 新增機具</button>
                 </div>
 
                 <div>

@@ -18,7 +18,7 @@ call npm run build
 echo.
 echo [3/5] Updating Database Schema...
 echo Stopping PM2 temporarily to release files...
-call npx pm2 stop yrpm-system || call pm2 stop yrpm-system
+call npx pm2 stop yrpm-system 2>nul || echo PM2 process not running.
 
 call npx prisma db push
 call npx prisma generate
@@ -32,8 +32,8 @@ call npm run build
 
 echo.
 echo [5/5] Restarting Server (PM2)...
-cd /d "%~dp0"
-call npx pm2 restart yrpm-system || call pm2 restart yrpm-system
+cd /d "%~dp0\backend"
+call npx pm2 restart yrpm-system 2>nul || call npx pm2 start dist/index.js --name yrpm-system
 
 echo.
 echo ==============================================

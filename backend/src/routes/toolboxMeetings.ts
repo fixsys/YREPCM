@@ -49,7 +49,7 @@ router.get('/', authenticateToken, async (req: AuthRequest, res) => {
 router.post('/', authenticateToken, upload.array('photos', 5), async (req: AuthRequest, res) => {
   if (!req.user) return res.status(401).json({ error: '未授權' });
 
-  const { project_id, record_date, recorder_id, worker_count, work_category, work_content, safety_check_1, safety_check_2, safety_check_3, work_area, work_items, hazards, safety_measures, other_risks, signatures } = req.body;
+  const { project_id, record_date, recorder_id, worker_count, work_category, work_content, safety_check_1, safety_check_2, safety_check_3, work_area, work_items, hazards, safety_measures, other_risks, signatures, equipments } = req.body;
   if (!project_id) return res.status(400).json({ error: '必須選擇專案' });
   
   const files = req.files as Express.Multer.File[];
@@ -76,6 +76,7 @@ router.post('/', authenticateToken, upload.array('photos', 5), async (req: AuthR
           work_items: work_items ? JSON.parse(work_items) : [],
           hazards: hazards ? JSON.parse(hazards) : [],
           safety_measures: safety_measures ? JSON.parse(safety_measures) : [],
+          equipments: equipments ? JSON.parse(equipments) : [],
           signatures: signatures ? JSON.parse(signatures) : [],
           photos: JSON.stringify(photoPaths)
         }
@@ -93,7 +94,7 @@ router.put('/:id', authenticateToken, upload.array('photos', 5), async (req: Aut
   if (!req.user) return res.status(401).json({ error: '未授權' });
 
   const { id } = req.params;
-  const { project_id, record_date, recorder_id, worker_count, work_category, work_content, safety_check_1, safety_check_2, safety_check_3, work_area, work_items, hazards, safety_measures, other_risks, signatures } = req.body;
+  const { project_id, record_date, recorder_id, worker_count, work_category, work_content, safety_check_1, safety_check_2, safety_check_3, work_area, work_items, hazards, safety_measures, other_risks, signatures, equipments } = req.body;
 
   try {
     const dataToUpdate: any = {
@@ -111,6 +112,7 @@ router.put('/:id', authenticateToken, upload.array('photos', 5), async (req: Aut
         work_items: work_items ? JSON.parse(work_items) : [],
         hazards: hazards ? JSON.parse(hazards) : [],
         safety_measures: safety_measures ? JSON.parse(safety_measures) : [],
+        equipments: equipments ? JSON.parse(equipments) : [],
         signatures: signatures ? JSON.parse(signatures) : []
       };
 

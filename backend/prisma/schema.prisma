@@ -461,6 +461,7 @@ model ToolboxMeeting {
   safety_check_2  Boolean  @default(false)
   safety_check_3  Boolean  @default(false)
   photos          Json?    
+  equipments      Json?    // 機具管理
   work_area       String?
   work_items      Json?
   hazards         Json?
