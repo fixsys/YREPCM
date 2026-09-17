@@ -445,6 +445,7 @@ const ProjectDetails = () => {
             <button onClick={() => setActiveTab('performance')} className={`px-4 py-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors flex-1 ${activeTab === 'performance' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}>專案績效與貢獻</button>
             <button onClick={() => setActiveTab('files')} className={`px-4 py-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors flex-1 ${activeTab === 'files' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}>專案檔案</button>
             <button onClick={() => setActiveTab('work_items')} className={`px-4 py-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors flex-1 ${activeTab === 'work_items' ? 'bg-teal-50 text-teal-700' : 'text-slate-600 hover:bg-slate-50'}`}>施工細項設定</button>
+            <button onClick={() => setActiveTab('timeline')} className={`px-4 py-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors flex-1 ${activeTab === 'timeline' ? 'bg-teal-50 text-teal-700' : 'text-slate-600 hover:bg-slate-50'}`}>專案時間軸</button>
           </div>
 
           {/* activeTab === 'workflow' && (
@@ -767,7 +768,11 @@ const ProjectDetails = () => {
             </div>
           )}
 
-          {activeTab === 'work_items' && (
+          {activeTab === 'timeline' && (
+          <ProjectTimeline project={project} workItemsConfig={workItemsConfig} logs={logs} />
+        )}
+
+        {activeTab === 'work_items' && (
   <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-6">
     <div className="flex justify-between items-center mb-4 border-b pb-4">
       <div>
