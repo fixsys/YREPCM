@@ -35,16 +35,19 @@ const ProjectTimelineInner: React.FC<ProjectTimelineProps> = ({ project, workIte
     logs.forEach(log => {
       if (log._logType === 'labor' && log.work_items) {
         try {
-          const items = JSON.parse(log.work_items);
-          items.forEach((item: any) => {
-            const currentSum = map.get(item.name) || 0;
-            // Parse progress string like "50%" or "40"
-            const parsedVal = parseInt(item.progress?.toString().replace('%', '') || '0', 10);
-            if (!isNaN(parsedVal)) {
-              map.set(item.name, currentSum + parsedVal);
-            }
-          });
-        } catch (e) {}
+          const items = typeof log.work_items === 'string' ? JSON.parse(log.work_items) : log.work_items;
+          if (Array.isArray(items)) {
+            items.forEach((item: any) => {
+              const currentSum = map.get(item.name) || 0;
+              const parsedVal = parseInt(item.progress?.toString().replace('%', '') || '0', 10);
+              if (!isNaN(parsedVal)) {
+                map.set(item.name, currentSum + parsedVal);
+              }
+            });
+          }
+        } catch (e) {
+          console.error('Error parsing work_items:', e);
+        }
       }
     });
     return map;
