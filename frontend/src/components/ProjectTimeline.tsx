@@ -40,7 +40,12 @@ const ProjectTimeline: React.FC<ProjectTimelineProps> = ({ project, workItemsCon
     let hasItems = false;
 
     Object.keys(workItemsConfig || {}).forEach(category => {
-      const items = (workItemsConfig[category] || []).filter((i: any) => i.startDate && i.endDate && i.name);
+      const items = (workItemsConfig[category] || []).filter((i: any) => {
+        if (!i.startDate || !i.endDate || !i.name) return false;
+        const sTs = new Date(i.startDate).getTime();
+        const eTs = new Date(i.endDate).getTime();
+        return !isNaN(sTs) && !isNaN(eTs);
+      });
       if (items.length > 0) {
         const enrichedItems = items.map((i: any) => {
           const sDate = new Date(i.startDate).getTime();
@@ -117,13 +122,15 @@ const ProjectTimeline: React.FC<ProjectTimelineProps> = ({ project, workItemsCon
   const totalWidth = totalDays * dayWidth;
 
   const getX = (ts: number) => {
+    if (isNaN(ts) || isNaN(minDate)) return 0;
     const days = (ts - minDate) / (1000 * 60 * 60 * 24);
-    return Math.max(0, days * dayWidth);
+    return Math.max(0, days * dayWidth) || 0;
   };
 
   const getWidth = (startTs: number, endTs: number) => {
+    if (isNaN(startTs) || isNaN(endTs)) return 0;
     const days = (endTs - startTs) / (1000 * 60 * 60 * 24) + 1; // +1 to include end day
-    return Math.max(0, days * dayWidth);
+    return Math.max(0, days * dayWidth) || 0;
   };
 
   const todayX = getX(todayTs);
