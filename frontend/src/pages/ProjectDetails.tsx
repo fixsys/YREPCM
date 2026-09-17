@@ -381,9 +381,9 @@ const ProjectDetails = () => {
         <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">{project.status}</span>
       </div>
 
-      <div className="grid grid-cols-1 @lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Project Info */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 space-y-4 lg:col-span-1">
           <div className="flex justify-between items-center border-b pb-2">
             <h3 className="text-lg font-semibold text-slate-800">專案資訊</h3>
             <button onClick={openEditProjectModal} className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center gap-1">
@@ -437,7 +437,7 @@ const ProjectDetails = () => {
         </div>
 
         {/* Right side content (Tabs) */}
-        <div className="lg:col-span-2 space-y-4">
+        <div className="lg:col-span-3 space-y-4">
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-2 flex gap-2 overflow-x-auto">
             {/* <button onClick={() => setActiveTab('workflow')} className={`px-4 py-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors flex-1 ${activeTab === 'workflow' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}>專案工作流</button> */}
             <button onClick={() => setActiveTab('requirements')} className={`px-4 py-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors flex-1 ${activeTab === 'requirements' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}>客戶需求單</button>
