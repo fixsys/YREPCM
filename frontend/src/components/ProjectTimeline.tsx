@@ -250,24 +250,24 @@ const ProjectTimelineInner: React.FC<ProjectTimelineProps> = ({ project, workIte
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col h-[700px]">
       
       {/* Toolbar */}
-      <div className="flex justify-between items-center mb-4 pb-2 border-b">
-        <div>
-          <h3 className="text-lg font-semibold text-slate-800">專案總體與工項時間軸</h3>
+      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-4 pb-2 border-b">
+        <div className="flex-shrink-0">
+          <h3 className="text-lg font-semibold text-slate-800 whitespace-nowrap">專案總體與工項時間軸</h3>
           <p className="text-sm text-slate-500">
             期間：{new Date(minDate).toLocaleDateString()} - {new Date(maxDate).toLocaleDateString()}
           </p>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-50 px-3 py-1.5 rounded-lg border">
-            <span className="w-3 h-3 bg-slate-200 rounded-sm"></span> 預計工期
-            <span className="w-3 h-3 bg-blue-500 rounded-sm ml-2"></span> 實際完成比例
-            <span className="w-3 h-3 bg-red-500 rounded-sm ml-2"></span> 延遲警示
-            <span className="w-px h-3 bg-red-500 mx-2"></span> 今日 ({new Date().toLocaleDateString(undefined, {month:'2-digit', day:'2-digit'})})
+        <div className="flex flex-wrap items-center gap-4 w-full xl:w-auto xl:justify-end">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 bg-slate-50 px-3 py-1.5 rounded-lg border">
+            <div className="flex items-center"><span className="w-3 h-3 bg-slate-200 rounded-sm mr-1"></span> 預計工期</div>
+            <div className="flex items-center"><span className="w-3 h-3 bg-blue-500 rounded-sm mr-1"></span> 實際完成比例</div>
+            <div className="flex items-center"><span className="w-3 h-3 bg-red-500 rounded-sm mr-1"></span> 延遲警示</div>
+            <div className="flex items-center"><span className="w-px h-3 bg-red-500 mr-1"></span> 今日 ({new Date().toLocaleDateString(undefined, {month:'2-digit', day:'2-digit'})})</div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400 mr-2">提示: 按住 Ctrl + 滾輪可縮放</span>
+          <div className="flex items-center gap-2 whitespace-nowrap">
+            <span className="text-xs text-slate-400 hidden sm:inline-block">提示: 按住 Ctrl + 滾輪可縮放</span>
             <button onClick={() => setZoomLevel(Math.max(100, zoomLevel - 25))} className="px-2 py-1 border rounded hover:bg-slate-50">- 縮小</button>
-            <span className="text-sm font-bold w-12 text-center">{zoomLevel}%</span>
+            <span className="text-sm font-bold w-10 text-center">{zoomLevel}%</span>
             <button onClick={() => setZoomLevel(Math.min(600, zoomLevel + 25))} className="px-2 py-1 border rounded hover:bg-slate-50">+ 放大</button>
           </div>
         </div>
