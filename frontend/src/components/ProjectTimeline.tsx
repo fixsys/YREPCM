@@ -337,7 +337,7 @@ const ProjectTimelineInner: React.FC<ProjectTimelineProps> = ({ project, workIte
                     const isDelayed = item.endTs < todayTs && item.actualProgress < 100;
 
                     return (
-                      <div key={iIdx} className="h-10 border-b hover:bg-slate-50 relative group">
+                      <div key={iIdx} className="h-10 border-b hover:bg-slate-50 relative group hover:z-50">
                         
                         {/* Planned Bar (Grey) */}
                         <div className="absolute top-2 h-5 bg-slate-200 rounded-full" style={{ left: x, width: w }}>
