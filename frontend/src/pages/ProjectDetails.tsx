@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuthStore } from '../store/authStore';
 import RequirementForm from './crm/RequirementForm';
+import ProjectTimeline from '../components/ProjectTimeline';
 import { ArrowLeft, Clock, Calendar, User, FileText, Plus, Edit2, Trash2, Paperclip, Building2, AlignLeft, CheckCircle2, UploadCloud, File as FileIcon, Download } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import ProjectWorkflowTab from '../components/ProjectWorkflowTab';
