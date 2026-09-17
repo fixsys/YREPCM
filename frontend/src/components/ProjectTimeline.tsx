@@ -327,7 +327,7 @@ const ProjectTimelineInner: React.FC<ProjectTimelineProps> = ({ project, workIte
             )}
 
             {/* Data Rows */}
-            <div className="flex flex-col relative z-0">
+            <div className="flex flex-col relative">
               {data.map((categoryGroup, cIdx) => (
                 <React.Fragment key={cIdx}>
                   <div className="h-[37px] border-b bg-slate-50/30"></div> {/* Category gap */}
