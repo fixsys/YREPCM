@@ -305,12 +305,6 @@ const ProjectTimelineInner: React.FC<ProjectTimelineProps> = ({ project, workIte
           {/* Top Frozen Row: Timeline Header */}
           <div className="h-12 border-b border-slate-300 sticky top-0 z-10 bg-slate-50 overflow-hidden relative w-full">
             {renderTimeHeaders()}
-            {/* Today Line Header indicator */}
-            {todayX >= 0 && todayX <= totalWidth && (
-              <div className="absolute top-0 bottom-0 bg-red-500 w-px z-20" style={{ left: todayX }}>
-                <div className="absolute top-1 -ml-6 bg-red-500 text-white text-[10px] px-1 rounded whitespace-nowrap">今日</div>
-              </div>
-            )}
           </div>
 
           {/* Timeline Grid & Bars */}
@@ -323,7 +317,9 @@ const ProjectTimelineInner: React.FC<ProjectTimelineProps> = ({ project, workIte
 
             {/* Today Line Line indicator */}
             {todayX >= 0 && todayX <= totalWidth && (
-              <div className="absolute top-0 bottom-0 bg-red-500 w-px border-l border-dashed border-red-500 z-10 pointer-events-none" style={{ left: todayX }}></div>
+              <div className="absolute top-0 bottom-0 border-l-2 border-dashed border-red-500 z-10 pointer-events-none" style={{ left: todayX }}>
+                <div className="absolute top-1.5 -ml-[14px] bg-red-500 text-white text-[10px] px-1 rounded whitespace-nowrap shadow">今日</div>
+              </div>
             )}
 
             {/* Data Rows */}
