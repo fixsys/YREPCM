@@ -30,18 +30,18 @@ const ProjectTimelineInner: React.FC<ProjectTimelineProps> = ({ project, workIte
 
   // Parse actual progress from logs
   // logs are labor reports containing work_items JSON string
-  const actualProgressMap = useMemo(() => {
+  const accumulatedProgressMap = useMemo(() => {
     const map = new Map<string, number>();
     logs.forEach(log => {
       if (log._logType === 'labor' && log.work_items) {
         try {
           const items = JSON.parse(log.work_items);
           items.forEach((item: any) => {
-            const currentMax = map.get(item.name) || 0;
-            // Parse progress string like "50%" or "50"
-            const parsedProgress = parseInt(item.progress?.toString().replace('%', '') || '0', 10);
-            if (!isNaN(parsedProgress) && parsedProgress > currentMax) {
-              map.set(item.name, parsedProgress);
+            const currentSum = map.get(item.name) || 0;
+            // Parse progress string like "50%" or "40"
+            const parsedVal = parseInt(item.progress?.toString().replace('%', '') || '0', 10);
+            if (!isNaN(parsedVal)) {
+              map.set(item.name, currentSum + parsedVal);
             }
           });
         } catch (e) {}
@@ -71,11 +71,20 @@ const ProjectTimelineInner: React.FC<ProjectTimelineProps> = ({ project, workIte
           if (sDate < minDate) minDate = sDate;
           if (eDate > maxDate) maxDate = eDate;
           
+          const accumulated = accumulatedProgressMap.get(i.name) || 0;
+          let actualPercentage = 0;
+          
+          if (i.contractQuantity && i.contractQuantity > 0) {
+            actualPercentage = Math.min(100, Math.round((accumulated / i.contractQuantity) * 100));
+          } else {
+            actualPercentage = Math.min(100, accumulated);
+          }
+
           return {
             ...i,
             startTs: sDate,
             endTs: eDate,
-            actualProgress: actualProgressMap.get(i.name) || 0
+            actualProgress: actualPercentage
           };
         });
         // Sort items by start date
@@ -101,7 +110,7 @@ const ProjectTimelineInner: React.FC<ProjectTimelineProps> = ({ project, workIte
     const totalDays = Math.ceil((paddedMax.getTime() - paddedMin.getTime()) / (1000 * 60 * 60 * 24));
 
     return { data, minDate: paddedMin.getTime(), maxDate: paddedMax.getTime(), totalDays, hasItems: true };
-  }, [workItemsConfig, actualProgressMap]);
+  }, [workItemsConfig, accumulatedProgressMap]);
 
   // Handle Ctrl + Scroll to Zoom
   useEffect(() => {
