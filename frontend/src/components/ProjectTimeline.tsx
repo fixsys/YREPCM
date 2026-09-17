@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { ZoomIn, ZoomOut } from 'lucide-react';
 
 interface ProjectTimelineProps {
   project: any;
@@ -266,9 +267,13 @@ const ProjectTimelineInner: React.FC<ProjectTimelineProps> = ({ project, workIte
           </div>
           <div className="flex items-center gap-2 whitespace-nowrap">
             <span className="text-xs text-slate-400 hidden sm:inline-block">提示: 按住 Ctrl + 滾輪可縮放</span>
-            <button onClick={() => setZoomLevel(Math.max(100, zoomLevel - 25))} className="px-2 py-1 border rounded hover:bg-slate-50">- 縮小</button>
-            <span className="text-sm font-bold w-10 text-center">{zoomLevel}%</span>
-            <button onClick={() => setZoomLevel(Math.min(600, zoomLevel + 25))} className="px-2 py-1 border rounded hover:bg-slate-50">+ 放大</button>
+            <button onClick={() => setZoomLevel(Math.max(100, zoomLevel - 25))} className="p-1.5 border rounded hover:bg-slate-100 text-slate-600 transition-colors" title="縮小">
+              <ZoomOut size={16} />
+            </button>
+            <span className="text-sm font-bold w-12 text-center">{zoomLevel}%</span>
+            <button onClick={() => setZoomLevel(Math.min(600, zoomLevel + 25))} className="p-1.5 border rounded hover:bg-slate-100 text-slate-600 transition-colors" title="放大">
+              <ZoomIn size={16} />
+            </button>
           </div>
         </div>
       </div>
