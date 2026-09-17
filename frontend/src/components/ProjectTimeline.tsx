@@ -341,12 +341,19 @@ const ProjectTimelineInner: React.FC<ProjectTimelineProps> = ({ project, workIte
                       <div key={iIdx} className="h-10 border-b hover:bg-slate-50 relative group hover:z-50">
                         
                         {/* Planned Bar (Grey) */}
-                        <div className="absolute top-2 h-5 bg-slate-200 rounded-full" style={{ left: x, width: w }}>
+                        <div className="absolute top-2 h-5 bg-slate-200 rounded-full flex items-center justify-center" style={{ left: x, width: w }}>
                           
                           {/* Actual Progress Bar (Colored) */}
                           <div className={`absolute top-0 left-0 h-full rounded-full transition-all duration-300 ${getStatusColor(item)}`}
                                style={{ width: `${item.actualProgress}%` }}>
                           </div>
+
+                          {/* Percentage Text */}
+                          {w > 30 && (
+                            <span className="relative z-10 text-[10px] font-bold text-slate-800 pointer-events-none" style={{ textShadow: '0 0 3px white, 0 0 3px white, 0 0 3px white' }}>
+                              {item.actualProgress}%
+                            </span>
+                          )}
 
                           {/* Delayed Warning Icon */}
                           {isDelayed && (
