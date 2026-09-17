@@ -307,7 +307,7 @@ const ProjectTimeline: React.FC<ProjectTimelineProps> = ({ project, workItemsCon
                           
                           {/* Actual Progress Bar (Colored) */}
                           <div className={`absolute top-0 left-0 h-full rounded-full transition-all duration-300 ${getStatusColor(item)}`}
-                               style={{ width: \`\${item.actualProgress}%\` }}>
+                               style={{ width: `${item.actualProgress}%` }}>
                           </div>
 
                           {/* Delayed Warning Icon */}
