@@ -6,7 +6,25 @@ interface ProjectTimelineProps {
   logs: any[];
 }
 
-const ProjectTimeline: React.FC<ProjectTimelineProps> = ({ project, workItemsConfig, logs }) => {
+
+class ErrorBoundary extends React.Component<any, { hasError: boolean, error: any }> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: any) {
+    return { hasError: true, error };
+  }
+  render() {
+    if (this.state.hasError) {
+      return <div className="p-10 bg-red-100 text-red-900 font-bold whitespace-pre-wrap">{this.state.error && this.state.error.toString()}
+{this.state.error && this.state.error.stack}</div>;
+    }
+    return this.props.children;
+  }
+}
+
+const ProjectTimelineInner: React.FC<ProjectTimelineProps> = ({ project, workItemsConfig, logs }) => {
   const [zoomLevel, setZoomLevel] = useState(100);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -347,4 +365,5 @@ const ProjectTimeline: React.FC<ProjectTimelineProps> = ({ project, workItemsCon
   );
 };
 
+const ProjectTimeline = (props: any) => <ErrorBoundary><ProjectTimelineInner {...props} /></ErrorBoundary>;
 export default ProjectTimeline;
