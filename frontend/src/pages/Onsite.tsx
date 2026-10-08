@@ -42,6 +42,7 @@ const TOOLBOX_WORK_AREAS = ['浪板屋頂', '建物屋頂', '地面', '圳溝', 
 const Onsite = () => {
   const { token, user } = useAuthStore();
   const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState<'TOOLBOX' | 'DAILY'>('TOOLBOX');
   const [searchQuery, setSearchQuery] = useState('');
   const [users, setUsers] = useState<any[]>([]);
@@ -314,6 +315,7 @@ const Onsite = () => {
 
   const handleToolboxSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     if (!editingToolboxId && toolboxPhotos.length < 2) {
       return alert('必須上傳至少2張會議照片才能送出！');
     }
@@ -321,6 +323,7 @@ const Onsite = () => {
       return alert('請確認所有工安提醒項目皆已勾選！');
     }
 
+    setIsSubmitting(true);
     const formData = new FormData();
     Object.entries(toolboxForm).forEach(([key, val]) => { if (key === 'equipments') { formData.append(key, JSON.stringify(val.filter(e => e.name && e.quantity > 0))); } else { formData.append(key, typeof val === 'object' ? JSON.stringify(val) : String(val)); } });
     toolboxPhotos.forEach(file => formData.append('photos', file));
@@ -334,8 +337,11 @@ const Onsite = () => {
       setIsToolboxModalOpen(false);
       setToolboxPhotos([]);
       fetchData();
+      alert('工具箱會議紀錄已成功送出！');
     } catch (err) {
       alert(editingToolboxId ? '更新工具箱會議失敗' : '新增工具箱會議失敗');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -372,12 +378,15 @@ const Onsite = () => {
 
   const handleLaborSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     if (!laborForm.drawing_check_confirmed) {
       return alert('未確認不得正式保存施工日報');
     }
     if ((laborPhotosClose.length < 2 || laborPhotosMid.length < 2 || laborPhotosFar.length < 2) && !editingLaborId) {
       return alert('近照、中距離照、遠距照皆須至少上傳 2 張');
     }
+    
+    setIsSubmitting(true);
     try {
       const formData = new FormData();
       Object.entries(laborForm).forEach(([key, value]) => {
@@ -411,8 +420,11 @@ const Onsite = () => {
       });
       setIsLaborModalOpen(false);
       fetchData();
+      alert('每日報工紀錄已成功送出！');
     } catch (err) {
       alert(editingLaborId ? '更新報工紀錄失敗' : '新增報工紀錄失敗');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -1035,7 +1047,9 @@ const Onsite = () => {
             </div>
             <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3 shrink-0 pb-safe">
               <button type="button" onClick={() => setIsToolboxModalOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-200 rounded-lg">取消</button>
-              <button type="submit" form="toolboxForm" className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">送出紀錄</button>
+              <button type="submit" form="toolboxForm" disabled={isSubmitting} className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                {isSubmitting ? '送出中...' : '送出紀錄'}
+              </button>
             </div>
           </div>
         </div>
@@ -1541,7 +1555,9 @@ const Onsite = () => {
             </div>
             <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3 shrink-0 pb-safe">
               <button type="button" onClick={() => setIsLaborModalOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-200 rounded-lg">取消</button>
-              <button type="submit" form="laborForm" className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">送出紀錄</button>
+              <button type="submit" form="laborForm" disabled={isSubmitting} className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                {isSubmitting ? '送出中...' : '送出紀錄'}
+              </button>
             </div>
           </div>
         </div>
