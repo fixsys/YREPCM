@@ -387,9 +387,9 @@ const wb = new ExcelJS.Workbook();
       cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
       cell.alignment = { vertical: 'middle', horizontal: alignLeft ? 'left' : 'center', wrapText: true };
       if (bg) {
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE5E7EB' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEBF1DE' } };
       }
-      cell.font = { name: '微軟正黑體', size: 10 };
+      cell.font = { name: '標楷體', size: 10 };
     };
 
     

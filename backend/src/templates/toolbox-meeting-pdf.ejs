@@ -365,19 +365,19 @@
       </colgroup>
       
       <tr>
-        <td style="background-color: #e5e7eb; height: 22px;">業主</td>
+        <td style="background-color: #ebf1de; height: 22px;">業主</td>
         <td colspan="3" style="height: 22px;"><%= meeting.project?.owner || '' %></td>
-        <td style="background-color: #e5e7eb; height: 22px;">會議日期</td>
+        <td style="background-color: #ebf1de; height: 22px;">會議日期</td>
         <td style="height: 22px;"><%= typeof recordDate !== 'undefined' ? recordDate : new Date(meeting.record_date).toLocaleDateString() %></td>
-        <td style="background-color: #e5e7eb; height: 22px;">星期</td>
+        <td style="background-color: #ebf1de; height: 22px;">星期</td>
         <td style="height: 22px;"><%= typeof dayOfWeek !== 'undefined' ? dayOfWeek : '' %></td>
       </tr>
       <tr>
-        <td style="background-color: #e5e7eb; height: 22px;">工程名稱</td>
+        <td style="background-color: #ebf1de; height: 22px;">工程名稱</td>
         <td colspan="3" style="height: 22px;"><%= meeting.project?.name || '' %></td>
-        <td style="background-color: #e5e7eb; height: 22px;">容量</td>
+        <td style="background-color: #ebf1de; height: 22px;">容量</td>
         <td style="height: 22px;"><%= (typeof capacity !== 'undefined' && capacity) ? (capacity.toLowerCase().includes('w') ? capacity : capacity + ' kW') : '' %></td>
-        <td style="background-color: #e5e7eb; height: 22px;">與會人數</td>
+        <td style="background-color: #ebf1de; height: 22px;">與會人數</td>
         <td style="height: 22px;"><%= meeting.worker_count ? meeting.worker_count + ' 人' : '' %></td>
       </tr>
     </table>

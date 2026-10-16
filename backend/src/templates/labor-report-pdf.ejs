@@ -6,17 +6,17 @@
   <style>
     @page { size: A4 portrait; margin: 10mm; }
     body {
-      font-family: 'Microsoft JhengHei', 'Noto Sans TC', sans-serif;
+      font-family: '標楷體', 'DFKai-SB', 'BiauKai', 'Microsoft JhengHei', serif;
       margin: 0;
       padding: 0;
       color: #000;
-      font-size: 11px;
+      font-size: 12px;
     }
     .header {
+      font-family: 'Microsoft JhengHei', 'Noto Sans TC', sans-serif;
       display: flex;
       align-items: center;
       padding-bottom: 5px;
-      border-bottom: 1px solid #000;
       margin-bottom: 5px;
     }
     .logo-placeholder {
@@ -40,15 +40,18 @@
       margin-bottom: 5px;
     }
     .company-name .en {
-      color: #4a8b71; /* approximate green from image */
+      color: #4a8b71;
       font-size: 18px;
       margin-left: 10px;
+      font-family: 'Times New Roman', serif;
+      font-weight: normal;
     }
     .company-details {
       font-size: 11px;
       color: #333;
     }
     .title {
+      font-family: '標楷體', 'DFKai-SB', 'BiauKai', serif;
       text-align: center;
       font-size: 18px;
       font-weight: bold;
@@ -59,6 +62,7 @@
       width: 100%;
       border-collapse: collapse;
       table-layout: fixed;
+      border: 2px solid #000;
     }
     td, th {
       border: 1px solid #000;
@@ -70,18 +74,9 @@
     .left-align { text-align: left; }
     .no-border-bottom { border-bottom: none; }
     .no-border-top { border-top: none; }
-    .bg-gray { background-color: #e5e7eb !important; }
-    
-    .watermark {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      font-size: 80px;
-      color: rgba(0,0,0,0.1);
-      z-index: -1;
-      pointer-events: none;
-    }
+    .bg-gray { background-color: #ebf1de !important; }
+    .center-divider { border-right: 2px solid #000 !important; }
+    .double-bottom td { border-bottom: 3px double #000 !important; }
     
     .checkbox {
       display: inline-block;
@@ -116,8 +111,6 @@
   </style>
 </head>
 <body>
-  <div class="watermark">第 <%= page %> 頁</div>
-  
   <div class="header">
     
     <% if (typeof logoBase64 !== 'undefined' && logoBase64) { %>
@@ -149,37 +142,37 @@
     <!-- Table 1: Info -->
     <tr>
       <td class="bg-gray">業主</td>
-      <td colspan="3"><%= report.project?.owner || '' %></td>
+      <td colspan="3" class="center-divider"><%= report.project?.owner || '' %></td>
       <td class="bg-gray">填報日期</td>
       <td><%= reportDate %></td>
       <td class="bg-gray">星期</td>
-      <td><%= dayOfWeek %></td>
+      <td>星期<%= dayOfWeek %></td>
     </tr>
     <tr>
       <td class="bg-gray">工程名稱</td>
-      <td colspan="3"><%= report.project?.name || '' %></td>
+      <td colspan="3" class="center-divider"><%= report.project?.name || '' %></td>
       <td class="bg-gray">容量</td>
-      <td><%= report.project?.capacity ? (report.project.capacity.toLowerCase().includes('w') ? report.project.capacity : report.project.capacity + ' kW') : '' %></td>
+      <td><%= report.project?.capacity ? (report.project.capacity.toLowerCase().includes('w') ? report.project.capacity : report.project.capacity + ' kW') : '0' %></td>
       <td class="bg-gray">天氣</td>
       <td><%= report.weather || '' %></td>
     </tr>
     <tr>
       <td colspan="2" class="bg-gray">開工日期</td>
-      <td colspan="2"><%= startDate %></td>
+      <td colspan="2" class="center-divider"><%= startDate %></td>
       <td colspan="2" class="bg-gray">總工期</td>
       <td><%= totalDuration %></td>
       <td>天</td>
     </tr>
     <tr>
       <td colspan="2" class="bg-gray">預計完工日期</td>
-      <td colspan="2"><%= endDate %></td>
+      <td colspan="2" class="center-divider"><%= endDate %></td>
       <td colspan="2" class="bg-gray">累計工期</td>
       <td><%= accumulatedDuration %></td>
       <td>天</td>
     </tr>
-    <tr>
+    <tr class="double-bottom">
       <td colspan="2" class="bg-gray">延展工期</td>
-      <td colspan="2">0</td>
+      <td colspan="2" class="center-divider" style="color: #ff0000;">0</td>
       <td colspan="2" class="bg-gray">剩餘工期</td>
       <td><%= remainingDuration %></td>
       <td>天</td>
@@ -282,8 +275,6 @@
     <% for(let pIndex=0; pIndex<allPhotos.length; pIndex+=6) { %>
     <div style="page-break-before: always;"></div>
     
-    <div class="watermark">第 <%= 2 + Math.floor(pIndex/6) %> 頁</div>
-    
     <div class="header">
       
     <% if (typeof logoBase64 !== 'undefined' && logoBase64) { %>
@@ -314,15 +305,15 @@
       
       <tr>
         <td class="bg-gray">業主</td>
-        <td colspan="3"><%= report.project?.owner || '' %></td>
+        <td colspan="3" class="center-divider"><%= report.project?.owner || '' %></td>
         <td class="bg-gray">填報日期</td>
         <td><%= reportDate %></td>
         <td class="bg-gray">星期</td>
-        <td><%= dayOfWeek %></td>
+        <td><%= dayOfWeek ? (dayOfWeek.startsWith('星期') ? dayOfWeek : '星期' + dayOfWeek) : '' %></td>
       </tr>
       <tr>
         <td class="bg-gray">工程名稱</td>
-        <td colspan="3"><%= report.project?.name || '' %></td>
+        <td colspan="3" class="center-divider"><%= report.project?.name || '' %></td>
         <td class="bg-gray">容量</td>
         <td><%= capacity ? (capacity.toLowerCase().includes('w') ? capacity : capacity + ' kW') : '' %></td>
         <td class="bg-gray">本日天氣</td>
