@@ -87,26 +87,46 @@ const ProjectDetails = () => {
   const [activeTab, setActiveTab] = useState<'requirements' | 'logs' | 'tasks' | 'performance' | 'files' | 'work_items' | 'workflow'>('tasks');
   const [tasks, setTasks] = useState<any[]>([]);
   const [workItemsConfig, setWorkItemsConfig] = useState<any>({});
+  const [newCategoryName, setNewCategoryName] = useState('');
   
   // Initialize config when project loads
   useEffect(() => {
-    if (project && project.work_items_config && !Array.isArray(project.work_items_config) && Object.keys(project.work_items_config).length > 0) {
+    if (project && project.work_items_config && !Array.isArray(project.work_items_config)) {
       setWorkItemsConfig(project.work_items_config);
     } else if (project) {
-      // Default to the original Onsite.tsx categories
-      const defaults: any = {
-        '土木': ['整地', '放樣', '開挖', 'PC', '鋼筋綁紮', '大底澆置', '板模', '灌漿', '基礎螺栓', '拆模', '回填', '其他'].map(name => ({ name, contractQuantity: 0, unit: '式', startDate: '', endDate: '' })),
-        '機電': ['DC－模組串列接線', 'DC－直流電纜佈設', 'DC－絕緣阻抗測試', 'DC－逆變器接線', 'AC－交流電纜佈設', 'AC－配電盤安裝', 'AC－接地及防雷施工', 'AC－功能測試', '台電申報／竣工資料', '台電會勘／預計掛表', '其他機電工程'].map(name => ({ name, contractQuantity: 0, unit: '式', startDate: '', endDate: '' })),
-        '模組': ['模組進場點收', '模組搬運上架', '模組定位排列', '中壓塊安裝', '側壓塊安裝', '模組鎖固扭力確認', '模組外觀及破損檢查', '其他模組工程'].map(name => ({ name, contractQuantity: 0, unit: '式', startDate: '', endDate: '' })),
-        '鋼構': ['錨栓及柱腳放樣', '鋼柱吊裝', '鋼柱及主梁吊裝', '次梁及斜撐安裝', '梁柱接頭螺栓安裝', '高強度螺栓終鎖', '現場焊接作業', '柱腳無收縮灌漿', '鍍鋅層修補', '其他鋼構工程'].map(name => ({ name, contractQuantity: 0, unit: '式', startDate: '', endDate: '' })),
-      };
-      setWorkItemsConfig(defaults);
+      setWorkItemsConfig({});
     }
   }, [project]);
+
+  const handleAddCategory = (catName?: string) => {
+    const targetName = (catName ?? newCategoryName).trim();
+    if (!targetName) {
+      return alert('請輸入類別名稱');
+    }
+    if (workItemsConfig[targetName]) {
+      return alert(`「${targetName}」類別已存在`);
+    }
+    setWorkItemsConfig({
+      ...workItemsConfig,
+      [targetName]: []
+    });
+    if (!catName) setNewCategoryName('');
+  };
+
+  const handleDeleteCategory = (category: string) => {
+    const items = workItemsConfig[category] || [];
+    if (items.length > 0 && !window.confirm(`確定要刪除「${category}」類別及其底下的 ${items.length} 個工項嗎？`)) {
+      return;
+    }
+    const newConfig = { ...workItemsConfig };
+    delete newConfig[category];
+    setWorkItemsConfig(newConfig);
+  };
 
   const handleSaveWorkItems = async () => {
     try {
       await axios.put(`/api/projects/${id}/work-items`, { work_items_config: workItemsConfig }, { headers: { Authorization: `Bearer ${token}` } });
+      setProject((prev: any) => prev ? { ...prev, work_items_config: workItemsConfig } : prev);
       alert('施工細項設定已儲存！報工表單將自動套用此設定。');
     } catch (err) {
       alert('儲存失敗');
@@ -775,88 +795,153 @@ const ProjectDetails = () => {
 
         {activeTab === 'work_items' && (
   <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-6">
-    <div className="flex justify-between items-center mb-4 border-b pb-4">
+    <div className="flex flex-wrap justify-between items-center gap-4 mb-4 border-b pb-4">
       <div>
         <h3 className="text-lg font-semibold text-slate-800">施工細項設定</h3>
         <p className="text-sm text-slate-500">預先設定本專案各類別需要進行報工的工項、契約數量與單位。報工時，將自動帶入對應數值。</p>
       </div>
-      <button onClick={handleSaveWorkItems} className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg font-bold">
+      <button onClick={handleSaveWorkItems} className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg font-bold shadow-sm">
         儲存設定
       </button>
     </div>
-    
-    {Object.keys(workItemsConfig).map(category => (
-      <div key={category} className="border border-slate-200 rounded-lg overflow-hidden">
-        <div className="bg-slate-100 p-3 font-bold text-slate-700 flex justify-between items-center">
-          {category} 類別
-          <button onClick={() => {
-            const newConfig = { ...workItemsConfig };
-            newConfig[category] = [...(newConfig[category] || []), { name: '', contractQuantity: 0, unit: '式', startDate: '', endDate: '' }];
-            setWorkItemsConfig(newConfig);
-          }} className="text-teal-600 font-bold hover:underline text-sm">+ 新增 {category} 工項</button>
-        </div>
-        <table className="w-full text-left">
-          <thead className="bg-slate-50 border-b">
-            <tr>
-              <th className="p-3 text-slate-600">工項名稱</th>
-              <th className="p-3 text-slate-600 w-32">契約數量</th>
-              <th className="p-3 text-slate-600 w-24">單位</th>
-              <th className="p-3 text-slate-600 w-40">開始日期</th>
-              <th className="p-3 text-slate-600 w-40">結束日期</th>
-              <th className="p-3 text-slate-600 text-center w-24 whitespace-nowrap">操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(workItemsConfig[category] || []).map((item: any, idx: number) => (
-              <tr key={idx} className="border-b">
-                <td className="p-2">
-                  <input type="text" value={item.name} onChange={e => {
-                    const newConfig = { ...workItemsConfig };
-                    newConfig[category][idx].name = e.target.value;
-                    setWorkItemsConfig(newConfig);
-                  }} className="w-full border rounded px-2 py-1" />
-                </td>
-                <td className="p-2">
-                  <input type="number" value={item.contractQuantity} onChange={e => {
-                    const newConfig = { ...workItemsConfig };
-                    newConfig[category][idx].contractQuantity = Number(e.target.value);
-                    setWorkItemsConfig(newConfig);
-                  }} className="w-full border rounded px-2 py-1" />
-                </td>
-                <td className="p-2">
-                  <input type="text" value={item.unit} onChange={e => {
-                    const newConfig = { ...workItemsConfig };
-                    newConfig[category][idx].unit = e.target.value;
-                    setWorkItemsConfig(newConfig);
-                  }} className="w-full border rounded px-2 py-1" />
-                </td>
-                <td className="p-2">
-                  <input type="date" value={item.startDate || ''} onChange={e => {
-                    const newConfig = { ...workItemsConfig };
-                    newConfig[category][idx].startDate = e.target.value;
-                    setWorkItemsConfig(newConfig);
-                  }} className="w-full border rounded px-2 py-1" />
-                </td>
-                <td className="p-2">
-                  <input type="date" value={item.endDate || ''} onChange={e => {
-                    const newConfig = { ...workItemsConfig };
-                    newConfig[category][idx].endDate = e.target.value;
-                    setWorkItemsConfig(newConfig);
-                  }} className="w-full border rounded px-2 py-1" />
-                </td>
-                <td className="p-2 text-center whitespace-nowrap">
-                  <button onClick={() => {
-                    const newConfig = { ...workItemsConfig };
-                    newConfig[category] = newConfig[category].filter((_: any, i: number) => i !== idx);
-                    setWorkItemsConfig(newConfig);
-                  }} className="text-red-500 hover:text-red-700 font-bold p-1">刪除</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+
+    <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 flex flex-wrap items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center gap-2 flex-1 min-w-[260px]">
+        <input
+          type="text"
+          value={newCategoryName}
+          onChange={e => setNewCategoryName(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              handleAddCategory();
+            }
+          }}
+          placeholder="輸入新類別名稱 (例如：土木、水電、景觀...)"
+          className="px-3 py-2 border border-slate-300 rounded-lg bg-white text-sm outline-none focus:ring-2 focus:ring-teal-500 w-72"
+        />
+        <button
+          type="button"
+          onClick={() => handleAddCategory()}
+          className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1"
+        >
+          <Plus size={16} /> 新增類別
+        </button>
       </div>
-    ))}
+      <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+        <span>快速新增常用類別：</span>
+        {['土木', '機電', '模組', '鋼構'].map(preset => {
+          const exists = Boolean(workItemsConfig[preset]);
+          return (
+            <button
+              key={preset}
+              type="button"
+              disabled={exists}
+              onClick={() => handleAddCategory(preset)}
+              className={`px-2.5 py-1 rounded border font-medium transition-colors ${
+                exists
+                  ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                  : 'bg-white text-slate-700 border-slate-300 hover:border-teal-500 hover:text-teal-600'
+              }`}
+            >
+              + {preset}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+    
+    {Object.keys(workItemsConfig).length === 0 ? (
+      <div className="text-center py-10 text-slate-500 bg-slate-50 rounded-lg border border-dashed border-slate-300">
+        目前尚未建立任何工程類別，請由上方輸入或點擊快速新增類別後，再自行新增工項。
+      </div>
+    ) : (
+      Object.keys(workItemsConfig).map(category => (
+        <div key={category} className="border border-slate-200 rounded-lg overflow-hidden">
+          <div className="bg-slate-100 p-3 font-bold text-slate-700 flex justify-between items-center">
+            <span>{category} 類別</span>
+            <div className="flex items-center gap-4">
+              <button onClick={() => {
+                const newConfig = { ...workItemsConfig };
+                newConfig[category] = [...(newConfig[category] || []), { name: '', contractQuantity: 0, unit: '式', startDate: '', endDate: '' }];
+                setWorkItemsConfig(newConfig);
+              }} className="text-teal-600 font-bold hover:underline text-sm">+ 新增 {category} 工項</button>
+              <button onClick={() => handleDeleteCategory(category)} className="text-red-500 hover:text-red-700 font-medium text-xs flex items-center gap-1">
+                <Trash2 size={14} /> 刪除類別
+              </button>
+            </div>
+          </div>
+          <table className="w-full text-left">
+            <thead className="bg-slate-50 border-b">
+              <tr>
+                <th className="p-3 text-slate-600">工項名稱</th>
+                <th className="p-3 text-slate-600 w-32">契約數量</th>
+                <th className="p-3 text-slate-600 w-24">單位</th>
+                <th className="p-3 text-slate-600 w-40">開始日期</th>
+                <th className="p-3 text-slate-600 w-40">結束日期</th>
+                <th className="p-3 text-slate-600 text-center w-24 whitespace-nowrap">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(workItemsConfig[category] || []).length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="p-6 text-center text-slate-400 text-sm">
+                    尚無工項，請點擊右上角「+ 新增 {category} 工項」自行建立
+                  </td>
+                </tr>
+              ) : (
+                (workItemsConfig[category] || []).map((item: any, idx: number) => (
+                  <tr key={idx} className="border-b">
+                    <td className="p-2">
+                      <input type="text" value={item.name} placeholder="請輸入工項名稱" onChange={e => {
+                        const newConfig = { ...workItemsConfig };
+                        newConfig[category][idx].name = e.target.value;
+                        setWorkItemsConfig(newConfig);
+                      }} className="w-full border rounded px-2 py-1" />
+                    </td>
+                    <td className="p-2">
+                      <input type="number" value={item.contractQuantity} onChange={e => {
+                        const newConfig = { ...workItemsConfig };
+                        newConfig[category][idx].contractQuantity = Number(e.target.value);
+                        setWorkItemsConfig(newConfig);
+                      }} className="w-full border rounded px-2 py-1" />
+                    </td>
+                    <td className="p-2">
+                      <input type="text" value={item.unit} onChange={e => {
+                        const newConfig = { ...workItemsConfig };
+                        newConfig[category][idx].unit = e.target.value;
+                        setWorkItemsConfig(newConfig);
+                      }} className="w-full border rounded px-2 py-1" />
+                    </td>
+                    <td className="p-2">
+                      <input type="date" value={item.startDate || ''} onChange={e => {
+                        const newConfig = { ...workItemsConfig };
+                        newConfig[category][idx].startDate = e.target.value;
+                        setWorkItemsConfig(newConfig);
+                      }} className="w-full border rounded px-2 py-1" />
+                    </td>
+                    <td className="p-2">
+                      <input type="date" value={item.endDate || ''} onChange={e => {
+                        const newConfig = { ...workItemsConfig };
+                        newConfig[category][idx].endDate = e.target.value;
+                        setWorkItemsConfig(newConfig);
+                      }} className="w-full border rounded px-2 py-1" />
+                    </td>
+                    <td className="p-2 text-center whitespace-nowrap">
+                      <button onClick={() => {
+                        const newConfig = { ...workItemsConfig };
+                        newConfig[category] = newConfig[category].filter((_: any, i: number) => i !== idx);
+                        setWorkItemsConfig(newConfig);
+                      }} className="text-red-500 hover:text-red-700 font-bold p-1">刪除</button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      ))
+    )}
   </div>
 )}
 

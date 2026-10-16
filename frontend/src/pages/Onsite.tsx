@@ -163,7 +163,7 @@ const Onsite = () => {
     }
   };
 
-  const WORK_CATEGORIES = ['土木', '機電', '模組', '鋼構'];
+  const DEFAULT_WORK_CATEGORIES = ['土木', '機電', '模組', '鋼構'];
   const WEATHER_OPTIONS = ['晴', '陰', '雨', '大雨', '颱風', '其他'];
 
   const categoryToItems: Record<string, string[]> = useMemo(() => {
@@ -176,7 +176,7 @@ const Onsite = () => {
     
     if (laborForm.project_id) {
       const project = projects.find(p => p.id === laborForm.project_id);
-      if (project && project.work_items_config) {
+      if (project && project.work_items_config && !Array.isArray(project.work_items_config) && Object.keys(project.work_items_config).length > 0) {
         const config = project.work_items_config as Record<string, any[]>;
         const mapped: Record<string, string[]> = {};
         for (const cat in config) {
@@ -184,15 +184,41 @@ const Onsite = () => {
             mapped[cat] = config[cat].filter(item => item && item.name).map((item: any) => item.name);
           }
         }
-        return { ...defaultCategories, ...mapped };
+        if (Object.keys(mapped).length > 0) {
+          return mapped;
+        }
       }
     }
     return defaultCategories;
   }, [laborForm.project_id, projects]);
 
+  const WORK_CATEGORIES = useMemo(() => {
+    const cats = Object.keys(categoryToItems);
+    return cats.length > 0 ? cats : DEFAULT_WORK_CATEGORIES;
+  }, [categoryToItems]);
+
+  const toolboxCategories = useMemo(() => {
+    if (toolboxForm.project_id) {
+      const project = projects.find(p => p.id === toolboxForm.project_id);
+      if (project && project.work_items_config && !Array.isArray(project.work_items_config)) {
+        const cats = Object.keys(project.work_items_config);
+        if (cats.length > 0) return cats;
+      }
+    }
+    return DEFAULT_WORK_CATEGORIES;
+  }, [toolboxForm.project_id, projects]);
+
+  useEffect(() => {
+    if (isLaborModalOpen && WORK_CATEGORIES.length > 0 && !WORK_CATEGORIES.includes(laborForm.work_category)) {
+      const firstCat = WORK_CATEGORIES[0];
+      setLaborForm(prev => ({ ...prev, work_category: firstCat }));
+      setWorkItems([{ name: categoryToItems[firstCat]?.[0] || '', progress: '', worker_count: '', work_hours: '' }]);
+    }
+  }, [isLaborModalOpen, WORK_CATEGORIES, laborForm.work_category, categoryToItems]);
+
   useEffect(() => {
     if (isLaborModalOpen && workItems.length === 0) {
-      const defaultName = categoryToItems[laborForm.work_category][0];
+      const defaultName = categoryToItems[laborForm.work_category]?.[0] || '';
       const newItem: WorkItem = { name: defaultName, progress: '' };
       if (laborForm.work_category === '土木' && INSPECTION_TEMPLATES[defaultName]) {
         const tpl = INSPECTION_TEMPLATES[defaultName];
@@ -430,14 +456,15 @@ const Onsite = () => {
 
   const handleAddLabor = () => {
     setEditingLaborId(null);
-    setLaborForm({ project_id: '', report_date: new Date().toISOString().slice(0, 10), weather: '晴', recorder_id: user?.id || '', pm_id: '', work_category: '土木', drawing_number: '', drawing_revision: '', construction_location: '', drawing_check_result: '符合圖說', drawing_check_confirmed: false, safety_check_1: false, safety_check_2: false, safety_check_3: false, tomorrow_plan: '', additional_notes: '' });
+    const defaultCat = WORK_CATEGORIES[0] || '土木';
+    setLaborForm({ project_id: '', report_date: new Date().toISOString().slice(0, 10), weather: '晴', recorder_id: user?.id || '', pm_id: '', work_category: defaultCat, drawing_number: '', drawing_revision: '', construction_location: '', drawing_check_result: '符合圖說', drawing_check_confirmed: false, safety_check_1: false, safety_check_2: false, safety_check_3: false, tomorrow_plan: '', additional_notes: '' });
     setLaborPhotosClose([]);
     setLaborPhotosMid([]);
     setLaborPhotosFar([]);
     setEngineers(['']);
-    setDispatchWorkers([{ name: '', start_time: '08:00', end_time: '17:00', work_category: '土木', work_item: categoryToItems['土木'][0], work_hours: 8 }]);
+    setDispatchWorkers([{ name: '', start_time: '08:00', end_time: '17:00', work_category: defaultCat, work_item: categoryToItems[defaultCat]?.[0] || '', work_hours: 8 }]);
     setEquipments([]);
-    setWorkItems([{name: categoryToItems['土木'][0], progress: '', worker_count: '', work_hours: ''}]);
+    setWorkItems([{name: categoryToItems[defaultCat]?.[0] || '', progress: '', worker_count: '', work_hours: ''}]);
     setIsLaborModalOpen(true);
   };
 
@@ -467,11 +494,11 @@ const Onsite = () => {
     if (l.engineers) setEngineers(safeParseJSON(l.engineers, ['']));
     else setEngineers(['']);
     if (l.dispatch_workers) setDispatchWorkers(safeParseJSON(l.dispatch_workers, []));
-    else setDispatchWorkers([{ name: '', start_time: '08:00', end_time: '17:00', work_category: '土木', work_item: categoryToItems['土木'][0], work_hours: 8 }]);
+    else setDispatchWorkers([{ name: '', start_time: '08:00', end_time: '17:00', work_category: l.work_category || '土木', work_item: categoryToItems[l.work_category || '土木']?.[0] || '', work_hours: 8 }]);
     if (l.equipments) setEquipments(safeParseJSON(l.equipments, []));
     else setEquipments([]);
-    if (l.work_items) setWorkItems(safeParseJSON(l.work_items, [{name: categoryToItems[l.work_category][0], progress: '', worker_count: '', work_hours: ''}]));
-    else setWorkItems([{name: categoryToItems[l.work_category][0], progress: '', worker_count: '', work_hours: ''}]);
+    if (l.work_items) setWorkItems(safeParseJSON(l.work_items, [{name: categoryToItems[l.work_category]?.[0] || '', progress: '', worker_count: '', work_hours: ''}]));
+    else setWorkItems([{name: categoryToItems[l.work_category]?.[0] || '', progress: '', worker_count: '', work_hours: ''}]);
     setIsLaborModalOpen(true);
   };
 
@@ -783,7 +810,7 @@ const Onsite = () => {
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">今日工作類別</label>
                     <select value={toolboxForm.work_category} onChange={e => setToolboxForm({...toolboxForm, work_category: e.target.value})} className="w-full px-3 py-2 border rounded-lg outline-none">
-                      {WORK_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                      {Array.from(new Set([toolboxForm.work_category, ...toolboxCategories])).filter(Boolean).map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                   </div>
                 </div>
@@ -1149,25 +1176,36 @@ const Onsite = () => {
                         <select value={worker.work_category} onChange={e => {
                           const newWorkers = [...dispatchWorkers];
                           newWorkers[idx].work_category = e.target.value;
-                          newWorkers[idx].work_item = categoryToItems[e.target.value][0] || '';
+                          newWorkers[idx].work_item = categoryToItems[e.target.value]?.[0] || '';
                           setDispatchWorkers(newWorkers);
                         }} className="w-[84px] px-2 py-1.5 text-sm border rounded outline-none bg-white">
-                          {WORK_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                          {Array.from(new Set([worker.work_category, ...WORK_CATEGORIES])).filter(Boolean).map(c => <option key={c} value={c}>{c}</option>)}
                         </select>
                         
-                        <select value={worker.work_item || ''} onChange={e => {
-                          const newWorkers = [...dispatchWorkers];
-                          newWorkers[idx].work_item = e.target.value;
-                          setDispatchWorkers(newWorkers);
-                        }} className="flex-1 min-w-[120px] px-2 py-1.5 text-sm border rounded outline-none bg-white">
-                          {Array.from(new Set([worker.work_item, ...(categoryToItems[worker.work_category] || [])])).filter(Boolean).map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                        </select>
+                        {(categoryToItems[worker.work_category] || []).length > 0 ? (
+                          <select value={worker.work_item || ''} onChange={e => {
+                            const newWorkers = [...dispatchWorkers];
+                            newWorkers[idx].work_item = e.target.value;
+                            setDispatchWorkers(newWorkers);
+                          }} className="flex-1 min-w-[120px] px-2 py-1.5 text-sm border rounded outline-none bg-white">
+                            {Array.from(new Set([worker.work_item, ...(categoryToItems[worker.work_category] || [])])).filter(Boolean).map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                          </select>
+                        ) : (
+                          <input type="text" value={worker.work_item || ''} placeholder="請輸入工項名稱" onChange={e => {
+                            const newWorkers = [...dispatchWorkers];
+                            newWorkers[idx].work_item = e.target.value;
+                            setDispatchWorkers(newWorkers);
+                          }} className="flex-1 min-w-[120px] px-2 py-1.5 text-sm border rounded outline-none bg-white" />
+                        )}
 
                         <button type="button" onClick={() => setDispatchWorkers(dispatchWorkers.filter((_, i) => i !== idx))} className="p-1.5 text-red-500 hover:bg-red-100 rounded shrink-0"><Trash2 size={16}/></button>
                       </div>
                     </div>
                   ))}
-                  <button type="button" onClick={() => setDispatchWorkers([...dispatchWorkers, {name: '', start_time: '08:00', end_time: '17:00', work_category: '土木', work_item: categoryToItems['土木'][0], work_hours: 8}])} className="text-sm text-indigo-600 font-medium hover:underline">+ 新增派工人員</button>
+                  <button type="button" onClick={() => {
+                    const defaultCat = laborForm.work_category || WORK_CATEGORIES[0] || '土木';
+                    setDispatchWorkers([...dispatchWorkers, {name: '', start_time: '08:00', end_time: '17:00', work_category: defaultCat, work_item: categoryToItems[defaultCat]?.[0] || '', work_hours: 8}]);
+                  }} className="text-sm text-indigo-600 font-medium hover:underline">+ 新增派工人員</button>
                 </div>
 
                 <div className="border-t border-slate-200 pt-4 mt-4">
@@ -1204,33 +1242,41 @@ const Onsite = () => {
                   <label className="block text-sm font-bold text-slate-700 mb-2">工作類別與工項進度</label>
                   <select value={laborForm.work_category} onChange={e => {
                     setLaborForm({...laborForm, work_category: e.target.value});
-                    setWorkItems([{name: categoryToItems[e.target.value][0], progress: '', worker_count: '', work_hours: ''}]);
+                    setWorkItems([{name: categoryToItems[e.target.value]?.[0] || '', progress: '', worker_count: '', work_hours: ''}]);
                   }} className="w-full px-3 py-2 border rounded-lg outline-none mb-4 font-medium bg-slate-50">
-                    {WORK_CATEGORIES.map(c => <option key={c} value={c}>{c}工程</option>)}
+                    {Array.from(new Set([laborForm.work_category, ...WORK_CATEGORIES])).filter(Boolean).map(c => <option key={c} value={c}>{c}工程</option>)}
                   </select>
 
                   <div className="space-y-3">
                     {workItems.map((item, idx) => (
                       <div key={idx} className="mb-3">
                         <div className="flex gap-2">
-                          <select value={item.name} onChange={e => {
-                            const newItems = [...workItems];
-                            newItems[idx].name = e.target.value;
-                            if (laborForm.work_category === '土木' && INSPECTION_TEMPLATES[e.target.value]) {
-                              const tpl = INSPECTION_TEMPLATES[e.target.value];
-                              newItems[idx].inspection = {
-                                fields: tpl.fields.reduce((acc, f) => ({...acc, [f]: ''}), {}),
-                                checks: new Array(tpl.checks.length).fill(false),
-                                result: tpl.results[0],
-                                note: ''
-                              };
-                            } else {
-                              delete newItems[idx].inspection;
-                            }
-                            setWorkItems(newItems);
-                          }} className="flex-1 px-3 py-2 border rounded-lg outline-none">
-                            {Array.from(new Set([item.name, ...(categoryToItems[laborForm.work_category] || [])])).filter(Boolean).map(opts => <option key={opts} value={opts}>{opts}</option>)}
-                          </select>
+                          {(categoryToItems[laborForm.work_category] || []).length > 0 ? (
+                            <select value={item.name} onChange={e => {
+                              const newItems = [...workItems];
+                              newItems[idx].name = e.target.value;
+                              if (laborForm.work_category === '土木' && INSPECTION_TEMPLATES[e.target.value]) {
+                                const tpl = INSPECTION_TEMPLATES[e.target.value];
+                                newItems[idx].inspection = {
+                                  fields: tpl.fields.reduce((acc, f) => ({...acc, [f]: ''}), {}),
+                                  checks: new Array(tpl.checks.length).fill(false),
+                                  result: tpl.results[0],
+                                  note: ''
+                                };
+                              } else {
+                                delete newItems[idx].inspection;
+                              }
+                              setWorkItems(newItems);
+                            }} className="flex-1 px-3 py-2 border rounded-lg outline-none">
+                              {Array.from(new Set([item.name, ...(categoryToItems[laborForm.work_category] || [])])).filter(Boolean).map(opts => <option key={opts} value={opts}>{opts}</option>)}
+                            </select>
+                          ) : (
+                            <input type="text" value={item.name} placeholder="請輸入工項名稱" onChange={e => {
+                              const newItems = [...workItems];
+                              newItems[idx].name = e.target.value;
+                              setWorkItems(newItems);
+                            }} className="flex-1 px-3 py-2 border rounded-lg outline-none" />
+                          )}
                           <input type="text" readOnly value={item.worker_count ? `${item.worker_count} 人` : ''} placeholder="人數" className="w-24 px-3 py-2 border rounded-lg outline-none bg-slate-100 text-slate-500 cursor-not-allowed text-center font-medium" />
                           <input type="text" readOnly value={item.work_hours ? `${item.work_hours} hr` : ''} placeholder="工時" className="w-24 px-3 py-2 border rounded-lg outline-none bg-slate-100 text-slate-500 cursor-not-allowed text-center font-medium" />
                           <button type="button" onClick={() => setWorkItems(workItems.filter((_, i) => i !== idx))} className="p-2 text-red-500 hover:bg-red-50 rounded-lg shrink-0"><Trash2 size={20}/></button>
@@ -1329,7 +1375,7 @@ const Onsite = () => {
                     ))}
                   </div>
                   <button type="button" onClick={() => {
-                    const defaultName = categoryToItems[laborForm.work_category][0];
+                    const defaultName = categoryToItems[laborForm.work_category]?.[0] || '';
                     const newItem: WorkItem = { name: defaultName, progress: '', worker_count: '', work_hours: '' };
                     if (laborForm.work_category === '土木' && INSPECTION_TEMPLATES[defaultName]) {
                       const tpl = INSPECTION_TEMPLATES[defaultName];
