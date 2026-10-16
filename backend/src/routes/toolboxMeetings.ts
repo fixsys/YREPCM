@@ -155,13 +155,41 @@ router.get('/:id/export-pdf', authenticateToken, async (req: AuthRequest, res) =
         logoBase64 = `data:image/png;base64,${fs.readFileSync(logoPath).toString('base64')}`;
     }
 
-    const allPhotos = meeting.photos && Array.isArray(meeting.photos) ? (meeting.photos as string[]).map((p: string) => {
-      const pPath = path.join(process.cwd(), p);
-      if (fs.existsSync(pPath)) {
-        return `data:image/jpeg;base64,${fs.readFileSync(pPath).toString('base64')}`;
+    let photoUrls: string[] = [];
+    try {
+      photoUrls = typeof meeting.photos === 'string'
+        ? JSON.parse(meeting.photos)
+        : (Array.isArray(meeting.photos) ? (meeting.photos as string[]) : []);
+    } catch (e) {}
+
+    const getAbsPath = (url: string) => {
+      if (!url) return null;
+      return path.join(__dirname, '../../uploads', url.replace('/uploads/', ''));
+    };
+
+    const getBase64 = (url: string) => {
+      const p = getAbsPath(url);
+      if (p && fs.existsSync(p)) {
+        const ext = path.extname(p).substring(1) || 'jpeg';
+        const b64 = fs.readFileSync(p).toString('base64');
+        return `data:image/${ext};base64,${b64}`;
       }
       return null;
-    }).filter(Boolean) : [];
+    };
+
+    const allPhotos = photoUrls
+      .map((url: string, i: number) => ({
+        url,
+        title: `會議照片 ${i + 1}`,
+        base64: getBase64(url)
+      }))
+      .filter(p => p.base64);
+
+    const recDate = new Date(meeting.record_date);
+    const recordDate = `${recDate.getFullYear()}/${(recDate.getMonth() + 1).toString().padStart(2, '0')}/${recDate.getDate().toString().padStart(2, '0')}`;
+    const days = ['日', '一', '二', '三', '四', '五', '六'];
+    const dayOfWeek = days[recDate.getDay()];
+    const capacity = meeting.project?.capacity || '';
 
     let templatePath = path.join(__dirname, '../templates/toolbox-meeting-pdf.ejs');
     if (!fs.existsSync(templatePath)) {
@@ -173,6 +201,9 @@ router.get('/:id/export-pdf', authenticateToken, async (req: AuthRequest, res) =
 
     const html = await ejs.renderFile(templatePath, {
       meeting,
+      recordDate,
+      dayOfWeek,
+      capacity,
       allPhotos,
       logoBase64
     });
