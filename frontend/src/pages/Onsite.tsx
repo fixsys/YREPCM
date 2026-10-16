@@ -100,6 +100,7 @@ const Onsite = () => {
   const [laborPhotosClose, setLaborPhotosClose] = useState<File[]>([]);
   const [laborPhotosMid, setLaborPhotosMid] = useState<File[]>([]);
   const [laborPhotosFar, setLaborPhotosFar] = useState<File[]>([]);
+  const [laborPhotosOther, setLaborPhotosOther] = useState<File[]>([]);
   const [engineers, setEngineers] = useState<string[]>(['']);
   type DispatchWorker = {
     name: string;
@@ -424,6 +425,7 @@ const Onsite = () => {
       laborPhotosClose.forEach(file => formData.append('photos_close', file));
       laborPhotosMid.forEach(file => formData.append('photos_mid', file));
       laborPhotosFar.forEach(file => formData.append('photos_far', file));
+      laborPhotosOther.forEach(file => formData.append('photos_other', file));
       
       const workItemsToSave = workItems.filter(w => w.name && w.progress).map((w, idx) => {
         const itemCopy = { ...w };
@@ -461,6 +463,7 @@ const Onsite = () => {
     setLaborPhotosClose([]);
     setLaborPhotosMid([]);
     setLaborPhotosFar([]);
+    setLaborPhotosOther([]);
     setEngineers(['']);
     setDispatchWorkers([{ name: '', start_time: '08:00', end_time: '17:00', work_category: defaultCat, work_item: categoryToItems[defaultCat]?.[0] || '', work_hours: 8 }]);
     setEquipments([]);
@@ -491,6 +494,7 @@ const Onsite = () => {
     setLaborPhotosClose([]);
     setLaborPhotosMid([]);
     setLaborPhotosFar([]);
+    setLaborPhotosOther([]);
     if (l.engineers) setEngineers(safeParseJSON(l.engineers, ['']));
     else setEngineers(['']);
     if (l.dispatch_workers) setDispatchWorkers(safeParseJSON(l.dispatch_workers, []));
@@ -1564,6 +1568,51 @@ const Onsite = () => {
                   {editingLaborId && <p className="text-xs text-orange-500 mt-3 text-center">重新上傳會完全覆蓋舊有照片</p>}
                 </div>
 
+                {/* 其他照片補充 */}
+                <div className="border border-dashed border-teal-300 bg-white rounded-xl p-4 mt-6 shadow-sm">
+                  <div className="flex justify-between items-center mb-1">
+                    <h5 className="font-bold text-slate-700">其他照片補充 <span className="text-slate-500 font-normal text-sm">(選填，最多 18 張)</span></h5>
+                    <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600">{laborPhotosOther.length} / 18 張</span>
+                  </div>
+                  <p className="text-xs text-slate-400 mb-3">其他現場施工、材料或補充紀錄照片</p>
+                  <div className="flex gap-2">
+                    <label className="flex-1 cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg border border-slate-200 text-center text-sm flex items-center justify-center gap-1">
+                      <span>📸</span> 拍照
+                      <input type="file" accept="image/*" capture="environment" onChange={e => {
+                        if (e.target.files) {
+                          setLaborPhotosOther(prev => {
+                            const newFiles = [...prev, ...Array.from(e.target.files!)];
+                            if (newFiles.length > 18) { alert('其他照片補充最多只能上傳 18 張'); return newFiles.slice(0, 18); }
+                            return newFiles;
+                          });
+                        }
+                      }} className="hidden" />
+                    </label>
+                    <label className="flex-1 cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg border border-slate-200 text-center text-sm flex items-center justify-center gap-1">
+                      <span>🖼️</span> 從相簿選擇
+                      <input type="file" multiple accept="image/*" onChange={e => {
+                        if (e.target.files) {
+                          setLaborPhotosOther(prev => {
+                            const newFiles = [...prev, ...Array.from(e.target.files!)];
+                            if (newFiles.length > 18) { alert('其他照片補充最多只能上傳 18 張'); return newFiles.slice(0, 18); }
+                            return newFiles;
+                          });
+                        }
+                      }} className="hidden" />
+                    </label>
+                  </div>
+                  {laborPhotosOther.length > 0 && (
+                    <div className="mt-2 flex gap-2 flex-wrap">
+                      {laborPhotosOther.map((f, i) => (
+                        <div key={i} className="flex items-center gap-1 text-xs px-2 py-1 bg-slate-100 rounded text-slate-600">
+                          <span className="truncate max-w-[120px]">{f.name}</span>
+                          <button type="button" onClick={() => setLaborPhotosOther(prev => prev.filter((_, idx) => idx !== i))} className="text-red-500 font-bold hover:text-red-700 ml-1">×</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 <div className="border border-orange-200 bg-orange-50/30 rounded-xl p-4 mt-6">
                   <h4 className="font-bold text-orange-800 mb-3">工安確認 (必填)</h4>
                   <div className="space-y-3">
@@ -1934,6 +1983,16 @@ const Onsite = () => {
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                             {safeParseJSON(viewingRecord.data.photos, {}).far.map((p: string, i: number) => (
                               <img key={i} src={`${p}`} alt="遠距照" className="w-full h-48 object-cover rounded-xl border shadow-sm" />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {safeParseJSON(viewingRecord.data.photos, {}).other?.length > 0 && (
+                        <div className="mb-4">
+                          <h4 className="font-bold text-slate-600 mb-2">其他照片補充</h4>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            {safeParseJSON(viewingRecord.data.photos, {}).other.map((p: string, i: number) => (
+                              <img key={i} src={`${p}`} alt="其他照片補充" className="w-full h-48 object-cover rounded-xl border shadow-sm" />
                             ))}
                           </div>
                         </div>

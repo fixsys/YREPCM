@@ -59,7 +59,7 @@ router.post('/', authenticateToken, upload.any(), async (req: AuthRequest, res) 
 
   let parsedWorkItems = work_items ? JSON.parse(work_items) : null;
   
-  let photosObj: any = { close: [], mid: [], far: [] };
+  let photosObj: any = { close: [], mid: [], far: [], other: [] };
   let hasPhotos = false;
   if (req.files) {
     const files = req.files as Express.Multer.File[];
@@ -79,6 +79,11 @@ router.post('/', authenticateToken, upload.any(), async (req: AuthRequest, res) 
       } else if (file.fieldname === 'photos_far') {
         photosObj.far.push(`/uploads/labor/${file.filename}`);
         hasPhotos = true;
+      } else if (file.fieldname === 'photos_other') {
+        if (photosObj.other.length < 18) {
+          photosObj.other.push(`/uploads/labor/${file.filename}`);
+          hasPhotos = true;
+        }
       }
     });
   }
@@ -126,7 +131,7 @@ router.put('/:id', authenticateToken, upload.any(), async (req: AuthRequest, res
 
   let parsedWorkItems = work_items ? JSON.parse(work_items) : null;
   
-  let photosObj: any = { close: [], mid: [], far: [] };
+  let photosObj: any = { close: [], mid: [], far: [], other: [] };
   let hasPhotos = false;
   if (req.files) {
     const files = req.files as Express.Multer.File[];
@@ -146,6 +151,11 @@ router.put('/:id', authenticateToken, upload.any(), async (req: AuthRequest, res
       } else if (file.fieldname === 'photos_far') {
         photosObj.far.push(`/uploads/labor/${file.filename}`);
         hasPhotos = true;
+      } else if (file.fieldname === 'photos_other') {
+        if (photosObj.other.length < 18) {
+          photosObj.other.push(`/uploads/labor/${file.filename}`);
+          hasPhotos = true;
+        }
       }
     });
   }
@@ -338,6 +348,7 @@ router.get('/:id/export', authenticateToken, async (req: AuthRequest, res) => {
     if (parsedPhotos.close) parsedPhotos.close.forEach((url: string, i: number) => allPhotos.push({ url, title: `施工近照 ${i+1}` }));
     if (parsedPhotos.mid) parsedPhotos.mid.forEach((url: string, i: number) => allPhotos.push({ url, title: `施工中距離照 ${i+1}` }));
     if (parsedPhotos.far) parsedPhotos.far.forEach((url: string, i: number) => allPhotos.push({ url, title: `施工遠距照 ${i+1}` }));
+    if (parsedPhotos.other) parsedPhotos.other.forEach((url: string, i: number) => allPhotos.push({ url, title: `其他照片補充 ${i+1}` }));
 
     workItems.forEach((item: any, idx: number) => {
       if (item.inspection && item.inspection.photo) {
@@ -814,6 +825,7 @@ router.get('/:id/export-pdf', authenticateToken, async (req: AuthRequest, res) =
     if (parsedPhotos.close) parsedPhotos.close.forEach((url: string, i: number) => allPhotos.push({ url, title: `施工近照 ${i+1}` }));
     if (parsedPhotos.mid) parsedPhotos.mid.forEach((url: string, i: number) => allPhotos.push({ url, title: `施工中距離照 ${i+1}` }));
     if (parsedPhotos.far) parsedPhotos.far.forEach((url: string, i: number) => allPhotos.push({ url, title: `施工遠距照 ${i+1}` }));
+    if (parsedPhotos.other) parsedPhotos.other.forEach((url: string, i: number) => allPhotos.push({ url, title: `其他照片補充 ${i+1}` }));
 
     workItems.forEach((item: any, idx: number) => {
       if (item.inspection && item.inspection.photo) {
