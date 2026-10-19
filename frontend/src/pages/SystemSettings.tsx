@@ -7,6 +7,7 @@ const AVAILABLE_MODULES = [
   { id: 'dashboard', name: '總覽看板' },
   { id: 'crm', name: '業務開發' },
   { id: 'onsite', name: '現場報工' },
+  { id: 'manufacturing', name: '製造報工' },
   { id: 'budget', name: '預算分析' },
   { id: 'tasks', name: '個人任務' },
   { id: 'projects', name: '專案管理' },

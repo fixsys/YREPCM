@@ -31,8 +31,10 @@ const upload = multer({ storage: storage });
 // Get daily labor reports
 router.get('/', authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const { project_id } = req.query;
-    const whereClause = project_id ? { project_id: String(project_id) } : {};
+    const { project_id, module_type } = req.query;
+    const whereClause: any = {};
+    if (project_id) whereClause.project_id = String(project_id);
+    if (module_type) whereClause.module_type = String(module_type);
     
     const reports = await prisma.dailyLaborReport.findMany({
       where: whereClause,
@@ -54,7 +56,7 @@ router.get('/', authenticateToken, async (req: AuthRequest, res) => {
 router.post('/', authenticateToken, upload.any(), async (req: AuthRequest, res) => {
   if (!req.user) return res.status(401).json({ error: '未授權' });
 
-  const { project_id, report_date, weather, recorder_id, pm_id, engineers, dispatch_workers, equipments, work_category, work_items, drawing_number, drawing_revision, construction_location, drawing_check_result, drawing_check_confirmed, safety_check_1, safety_check_2, safety_check_3, tomorrow_plan, additional_notes } = req.body;
+  const { project_id, module_type, report_date, weather, recorder_id, pm_id, engineers, dispatch_workers, equipments, work_category, work_items, drawing_number, drawing_revision, construction_location, drawing_check_result, drawing_check_confirmed, safety_check_1, safety_check_2, safety_check_3, tomorrow_plan, additional_notes } = req.body;
   if (!project_id) return res.status(400).json({ error: '必須選擇專案' });
 
   let parsedWorkItems = work_items ? JSON.parse(work_items) : null;
@@ -92,6 +94,7 @@ router.post('/', authenticateToken, upload.any(), async (req: AuthRequest, res) 
     const report = await prisma.dailyLaborReport.create({
       data: {
         project_id,
+        module_type: module_type || 'ONSITE',
         report_date: new Date(report_date),
         weather,
         recorder_id: recorder_id || req.user.id,

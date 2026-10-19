@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
-import { LogOut, LayoutDashboard, FolderKanban, Shield, BarChart2, Settings, CheckSquare, Network, Briefcase, Smartphone, Monitor, Menu, Calculator, Lightbulb, ClipboardList, Key } from 'lucide-react';
+import { LogOut, LayoutDashboard, FolderKanban, Shield, BarChart2, Settings, CheckSquare, Network, Briefcase, Smartphone, Monitor, Menu, Calculator, Lightbulb, ClipboardList, Factory, Key } from 'lucide-react';
 import clsx from 'clsx';
 import { useState } from 'react';
 import NotificationCenter from './NotificationCenter';
@@ -21,6 +21,7 @@ const Layout = ({ children }: { children: ReactNode }) => {
     { id: 'dashboard', name: '總覽看板', path: '/', icon: LayoutDashboard },
     { id: 'crm', name: '業務開發', path: '/crm/leads', icon: Briefcase },
     { id: 'onsite', name: '現場報工', path: '/onsite', icon: ClipboardList },
+    { id: 'manufacturing', name: '製造報工', path: '/manufacturing', icon: Factory },
     { id: 'budget', name: '預算分析', path: '/budget', icon: Calculator },
     { id: 'tasks', name: '個人任務', path: '/tasks', icon: CheckSquare },
     { id: 'projects', name: '專案管理', path: '/projects', icon: FolderKanban },
@@ -41,6 +42,8 @@ const Layout = ({ children }: { children: ReactNode }) => {
 
   if (loginSystem === '2') {
     navItems = navItems.filter(item => item.path === '/onsite');
+  } else if (loginSystem === '3') {
+    navItems = navItems.filter(item => item.path === '/manufacturing');
   }
 
   const desktopLayout = (

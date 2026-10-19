@@ -30,8 +30,10 @@ const upload = multer({ storage: storage });
 // Get toolbox meetings
 router.get('/', authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const { project_id } = req.query;
-    const whereClause = project_id ? { project_id: String(project_id) } : {};
+    const { project_id, module_type } = req.query;
+    const whereClause: any = {};
+    if (project_id) whereClause.project_id = String(project_id);
+    if (module_type) whereClause.module_type = String(module_type);
 
     const meetings = await prisma.toolboxMeeting.findMany({
       where: whereClause,
@@ -49,7 +51,7 @@ router.get('/', authenticateToken, async (req: AuthRequest, res) => {
 router.post('/', authenticateToken, upload.array('photos', 5), async (req: AuthRequest, res) => {
   if (!req.user) return res.status(401).json({ error: '未授權' });
 
-  const { project_id, record_date, recorder_id, worker_count, work_category, work_content, safety_check_1, safety_check_2, safety_check_3, work_area, work_items, hazards, safety_measures, other_risks, signatures, equipments } = req.body;
+  const { project_id, module_type, record_date, recorder_id, worker_count, work_category, work_content, safety_check_1, safety_check_2, safety_check_3, work_area, work_items, hazards, safety_measures, other_risks, signatures, equipments } = req.body;
   if (!project_id) return res.status(400).json({ error: '必須選擇專案' });
   
   const files = req.files as Express.Multer.File[];
@@ -63,6 +65,7 @@ router.post('/', authenticateToken, upload.array('photos', 5), async (req: AuthR
     const meeting = await prisma.toolboxMeeting.create({
       data: {
           project_id,
+          module_type: module_type || 'ONSITE',
           record_date: new Date(record_date),
           recorder_id: recorder_id || req.user.id,
           worker_count: parseInt(worker_count) || 0,

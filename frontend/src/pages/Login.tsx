@@ -29,6 +29,8 @@ const Login = () => {
       
       if (loginType === '2') {
         navigate('/onsite');
+      } else if (loginType === '3') {
+        navigate('/manufacturing');
       } else {
         if (requirePasswordChange) {
           navigate('/change-password');
@@ -74,6 +76,7 @@ const Login = () => {
           >
             <option value="1">專案管理</option>
             <option value="2">現場報工</option>
+            <option value="3">製造報工</option>
           </select>
         </div>
 

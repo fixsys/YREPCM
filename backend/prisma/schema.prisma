@@ -452,6 +452,7 @@ model Quotation {
 model ToolboxMeeting {
   id              String   @id @default(uuid())
   project_id      String?  
+  module_type     String   @default("ONSITE") // ONSITE, MANUFACTURING
   record_date     DateTime @db.Date
   recorder_id     String
   worker_count    Int
@@ -478,6 +479,7 @@ model ToolboxMeeting {
 model DailyLaborReport {
   id              String   @id @default(uuid())
   project_id      String?  
+  module_type     String   @default("ONSITE") // ONSITE, MANUFACTURING
   report_date     DateTime @db.Date
   weather         String
   recorder_id     String

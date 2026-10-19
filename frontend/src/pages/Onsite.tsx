@@ -39,7 +39,10 @@ const TOOLBOX_PPE = ['安全帽', '安全鞋', '施工背心', '全身背負式�
 const TOOLBOX_SAFETY_FACILITIES = ['合梯', '爬梯', '施工架', '安全母索', '安全防墜網', '吊籠/護欄', '警示圍籬', '防火毯', '搶救設備', '滅火器', '通風設備', '檢電器', '高壓電防護設備', '接地棒', '漏電斷路器', '照明設備', '通訊設備', '氧乙炔焊防回火裝置', '電焊防電擊裝置'];
 const TOOLBOX_WORK_AREAS = ['浪板屋頂', '建物屋頂', '地面', '圳溝', '蓄水池', '其他'];
 
-const Onsite = () => {
+const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
+  const isManufacturing = mode === 'MANUFACTURING';
+  const pageTitle = isManufacturing ? '製造報工中心' : '現場報工中心';
+  const dailyLabel = isManufacturing ? '每日生產回報' : '每日報工';
   const { token, user } = useAuthStore();
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -302,14 +305,14 @@ const Onsite = () => {
 
   useEffect(() => {
     fetchData();
-  }, [token]);
+  }, [token, mode]);
 
   const fetchData = async () => {
     setLoading(true);
     try {
       const [tbRes, laborRes, uRes, projRes] = await Promise.all([
-        axios.get('/api/toolbox-meetings', { headers: { Authorization: `Bearer ${token}` } }),
-        axios.get('/api/labor-reports', { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get(`/api/toolbox-meetings?module_type=${mode}`, { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get(`/api/labor-reports?module_type=${mode}`, { headers: { Authorization: `Bearer ${token}` } }),
         axios.get('/api/users', { headers: { Authorization: `Bearer ${token}` } }),
         axios.get('/api/projects', { headers: { Authorization: `Bearer ${token}` } })
       ]);
@@ -352,6 +355,7 @@ const Onsite = () => {
 
     setIsSubmitting(true);
     const formData = new FormData();
+    formData.append('module_type', mode);
     Object.entries(toolboxForm).forEach(([key, val]) => { if (key === 'equipments') { formData.append(key, JSON.stringify(val.filter(e => e.name && e.quantity > 0))); } else { formData.append(key, typeof val === 'object' ? JSON.stringify(val) : String(val)); } });
     toolboxPhotos.forEach(file => formData.append('photos', file));
 
@@ -416,6 +420,7 @@ const Onsite = () => {
     setIsSubmitting(true);
     try {
       const formData = new FormData();
+      formData.append('module_type', mode);
       Object.entries(laborForm).forEach(([key, value]) => {
         formData.append(key, String(value));
       });
@@ -448,9 +453,9 @@ const Onsite = () => {
       });
       setIsLaborModalOpen(false);
       fetchData();
-      alert('每日報工紀錄已成功送出！');
+      alert(`${dailyLabel}紀錄已成功送出！`);
     } catch (err) {
-      alert(editingLaborId ? '更新報工紀錄失敗' : '新增報工紀錄失敗');
+      alert(editingLaborId ? `更新${dailyLabel}失敗` : `新增${dailyLabel}失敗`);
     } finally {
       setIsSubmitting(false);
     }
@@ -536,7 +541,7 @@ const Onsite = () => {
   return (
     <div className="flex flex-col h-full bg-slate-50">
       <div className="flex flex-col gap-4 mb-6">
-        <h1 className="text-2xl font-bold text-slate-800">現場報工中心</h1>
+        <h1 className="text-2xl font-bold text-slate-800">{pageTitle}</h1>
         
         <div className="flex flex-col gap-3 w-full">
           <div className="relative w-full">
@@ -562,7 +567,7 @@ const Onsite = () => {
               className="bg-teal-600 text-white p-2 md:px-4 md:py-2 rounded-lg shadow-md hover:bg-teal-700 transition flex items-center justify-center shrink-0 flex-1 md:flex-none"
             >
               <Plus size={20} />
-              <span className="ml-2">新增每日報工</span>
+              <span className="ml-2">新增{dailyLabel}</span>
             </button>
           </div>
         </div>
@@ -579,7 +584,7 @@ const Onsite = () => {
           onClick={() => setActiveTab('DAILY')}
           className={`w-1/2 md:w-auto px-6 py-3 font-medium text-sm flex items-center justify-center gap-2 border-b-2 transition-colors ${activeTab === 'DAILY' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
         >
-          <CheckSquare size={18} /> 每日報工
+          <CheckSquare size={18} /> {dailyLabel}
         </button>
       </div>
 
@@ -715,7 +720,7 @@ const Onsite = () => {
             ))}
             {filteredLabor.length === 0 && (
               <div className="col-span-full py-12 text-center text-slate-400 bg-white rounded-xl border border-dashed border-slate-300">
-                目前沒有每日報工紀錄
+                目前沒有{dailyLabel}紀錄
               </div>
             )}
           </div>
@@ -1091,7 +1096,7 @@ const Onsite = () => {
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-end md:items-center justify-center z-50 md:p-4">
           <div className="bg-white w-full max-w-2xl max-h-[90vh] rounded-t-2xl md:rounded-xl shadow-2xl flex flex-col overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
-              <h3 className="text-lg font-bold text-slate-800">{editingLaborId ? '編輯' : '新增'}每日報工紀錄</h3>
+              <h3 className="text-lg font-bold text-slate-800">{editingLaborId ? '編輯' : '新增'}{dailyLabel}紀錄</h3>
               <button onClick={() => setIsLaborModalOpen(false)} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
             </div>
             <div className="p-6 overflow-y-auto flex-1">

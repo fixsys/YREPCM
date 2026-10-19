@@ -52,7 +52,8 @@ function App() {
                 <Route path="/crm/leads/:id" element={<LeadDetail />} />
                 <Route path="/budget" element={<Budget />} />
                 <Route path="/budget/:id" element={<BudgetDetail />} />
-                <Route path="/onsite" element={<Onsite />} />
+                <Route path="/onsite" element={<Onsite mode="ONSITE" />} />
+                <Route path="/manufacturing" element={<Onsite mode="MANUFACTURING" />} />
                 <Route path="/simulators" element={<SimulatorsDashboard />} />
                 <Route path="/simulators/solar" element={<SolarModuleSim />} />
                 <Route path="/workflow-builder" element={(user?.level && user.level >= 100) ? <WorkflowBuilder /> : <Navigate to="/" />} />
