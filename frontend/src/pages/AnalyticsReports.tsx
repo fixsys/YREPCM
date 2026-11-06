@@ -64,13 +64,10 @@ const AnalyticsReports = () => {
 
   // --- 新增「出工表」State ---
   const [attendanceMonth, setAttendanceMonth] = useState(() => new Date().toISOString().slice(0, 7));
-  const [attendanceProjectId, setAttendanceProjectId] = useState('');
   const [attendanceModuleType, setAttendanceModuleType] = useState('');
-  const [attendanceKeyword, setAttendanceKeyword] = useState('');
   const [activeSheetTab, setActiveSheetTab] = useState<'SUMMARY' | number>('SUMMARY');
   const [loadingAttendance, setLoadingAttendance] = useState(false);
   const [exportingExcel, setExportingExcel] = useState(false);
-  const [projects, setProjects] = useState<any[]>([]);
   const [attendanceData, setAttendanceData] = useState<{
     year: number;
     month: number;
@@ -106,23 +103,11 @@ const AnalyticsReports = () => {
     }
   };
 
-  const fetchProjects = async () => {
-    try {
-      const res = await axios.get('/api/projects', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setProjects(res.data || []);
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
   const fetchAttendanceReport = async () => {
     setLoadingAttendance(true);
     try {
       const params = new URLSearchParams();
       if (attendanceMonth) params.append('month', attendanceMonth);
-      if (attendanceProjectId) params.append('project_id', attendanceProjectId);
       if (attendanceModuleType) params.append('module_type', attendanceModuleType);
 
       const res = await axios.get(`/api/reports/attendance?${params.toString()}`, {
@@ -137,13 +122,12 @@ const AnalyticsReports = () => {
   };
 
   useEffect(() => {
-    fetchProjects();
     fetchWorkLogsReport();
   }, []);
 
   useEffect(() => {
     fetchAttendanceReport();
-  }, [attendanceMonth, attendanceProjectId, attendanceModuleType]);
+  }, [attendanceMonth, attendanceModuleType]);
 
   const exportWorkLogsCSV = () => {
     if (reports.length === 0) return alert('沒有資料可匯出');
@@ -179,7 +163,6 @@ const AnalyticsReports = () => {
     try {
       const params = new URLSearchParams();
       if (attendanceMonth) params.append('month', attendanceMonth);
-      if (attendanceProjectId) params.append('project_id', attendanceProjectId);
       if (attendanceModuleType) params.append('module_type', attendanceModuleType);
 
       const res = await axios.get(`/api/reports/attendance/export-excel?${params.toString()}`, {
@@ -206,29 +189,12 @@ const AnalyticsReports = () => {
     }
   };
 
-  const filteredSummaryRows = useMemo(() => {
-    if (!attendanceKeyword.trim()) return attendanceData.rows;
-    const kw = attendanceKeyword.trim().toLowerCase();
-    return attendanceData.rows.filter(r =>
-      r.worker_name.toLowerCase().includes(kw) ||
-      r.project_name.toLowerCase().includes(kw) ||
-      r.work_item.toLowerCase().includes(kw) ||
-      r.work_category.toLowerCase().includes(kw)
-    );
-  }, [attendanceData.rows, attendanceKeyword]);
+  const filteredSummaryRows = attendanceData.rows;
 
   const filteredDayRows = useMemo(() => {
     if (activeSheetTab === 'SUMMARY') return [];
-    const dayList = attendanceData.dailyRecords[activeSheetTab] || [];
-    if (!attendanceKeyword.trim()) return dayList;
-    const kw = attendanceKeyword.trim().toLowerCase();
-    return dayList.filter(r =>
-      r.worker_name.toLowerCase().includes(kw) ||
-      r.project_name.toLowerCase().includes(kw) ||
-      r.work_item.toLowerCase().includes(kw) ||
-      r.work_category.toLowerCase().includes(kw)
-    );
-  }, [attendanceData.dailyRecords, activeSheetTab, attendanceKeyword]);
+    return attendanceData.dailyRecords[activeSheetTab] || [];
+  }, [attendanceData.dailyRecords, activeSheetTab]);
 
   const activeDayDateInfo = useMemo(() => {
     if (activeSheetTab === 'SUMMARY') return null;
@@ -296,7 +262,7 @@ const AnalyticsReports = () => {
             <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
               <Search size={18} className="text-slate-400" /> 出工表篩選條件
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end max-w-xl">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">統計月份</label>
                 <input
@@ -305,19 +271,6 @@ const AnalyticsReports = () => {
                   onChange={e => setAttendanceMonth(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
                 />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">案場 / 專案</label>
-                <select
-                  value={attendanceProjectId}
-                  onChange={e => setAttendanceProjectId(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                >
-                  <option value="">所有案場</option>
-                  {projects.map(p => (
-                    <option key={p.id} value={p.id}>{p.project_code} - {p.name}</option>
-                  ))}
-                </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">報工來源</label>
@@ -330,16 +283,6 @@ const AnalyticsReports = () => {
                   <option value="ONSITE">現場報工</option>
                   <option value="MANUFACTURING">製造報工</option>
                 </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">關鍵字搜尋 (姓名/案場/工種)</label>
-                <input
-                  type="text"
-                  value={attendanceKeyword}
-                  onChange={e => setAttendanceKeyword(e.target.value)}
-                  placeholder="輸入姓名、案場或施工工種..."
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
-                />
               </div>
             </div>
           </div>
