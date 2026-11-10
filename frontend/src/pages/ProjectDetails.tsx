@@ -1024,12 +1024,12 @@ const ProjectDetails = () => {
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-100 border-b border-slate-200 text-slate-700 text-sm font-bold">
-                      <th className="py-3 px-4 w-16 text-center border-r border-slate-200">項次</th>
-                      <th className="py-3 px-4 w-36 border-r border-slate-200">項目</th>
-                      <th className="py-3 px-4 w-32 text-center border-r border-slate-200">負責部門</th>
-                      <th className="py-3 px-4 w-36 text-center border-r border-slate-200">負責人員</th>
-                      <th className="py-3 px-4 border-r border-slate-200">已上傳檔案與協作更新紀錄 (上傳人 / 時間)</th>
-                      <th className="py-3 px-4 w-32 text-center">分項上傳</th>
+                      <th className="py-3 px-3 w-16 min-w-[60px] text-center whitespace-nowrap border-r border-slate-200">項次</th>
+                      <th className="py-3 px-4 w-32 min-w-[110px] whitespace-nowrap border-r border-slate-200">項目</th>
+                      <th className="py-3 px-3 w-28 min-w-[96px] text-center whitespace-nowrap border-r border-slate-200">負責部門</th>
+                      <th className="py-3 px-3 w-28 min-w-[100px] text-center whitespace-nowrap border-r border-slate-200">負責人員</th>
+                      <th className="py-3 px-4 min-w-[280px] border-r border-slate-200">已上傳檔案與協作更新紀錄 (上傳人 / 時間)</th>
+                      <th className="py-3 px-3 w-32 min-w-[124px] text-center whitespace-nowrap">分項上傳</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 text-sm">
@@ -1051,17 +1051,17 @@ const ProjectDetails = () => {
 
                       return (
                         <tr key={item.category} className="hover:bg-slate-50/70 transition-colors">
-                          <td className="py-4 px-4 text-center font-bold text-slate-700 border-r border-slate-200 bg-slate-50/50">
+                          <td className="py-4 px-3 text-center font-bold text-slate-700 whitespace-nowrap border-r border-slate-200 bg-slate-50/50">
                             {item.indexLabel}
                           </td>
-                          <td className="py-4 px-4 font-bold text-slate-800 border-r border-slate-200">
+                          <td className="py-4 px-4 font-bold text-slate-800 whitespace-nowrap border-r border-slate-200">
                             {item.category}
                           </td>
-                          <td className="py-4 px-4 text-center text-slate-600 border-r border-slate-200">
+                          <td className="py-4 px-3 text-center text-slate-600 whitespace-nowrap border-r border-slate-200">
                             {item.departments.filter(Boolean).length > 0 ? (
                               <div className="flex flex-col gap-1 items-center">
                                 {item.departments.filter(Boolean).map((dept, i) => (
-                                  <span key={i} className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-xs font-medium">
+                                  <span key={i} className="px-2.5 py-0.5 bg-slate-100 text-slate-700 rounded text-xs font-medium whitespace-nowrap">
                                     {dept}
                                   </span>
                                 ))}
@@ -1070,7 +1070,7 @@ const ProjectDetails = () => {
                               <span className="text-slate-400">-</span>
                             )}
                           </td>
-                          <td className="py-4 px-4 text-center font-medium text-slate-700 border-r border-slate-200">
+                          <td className="py-4 px-3 text-center font-medium text-slate-700 whitespace-nowrap border-r border-slate-200">
                             {responsibleDisplay}
                           </td>
                           <td className="py-3 px-4 border-r border-slate-200">
@@ -1093,22 +1093,22 @@ const ProjectDetails = () => {
                                       key={file.id}
                                       className="flex items-center justify-between gap-3 p-2.5 rounded-lg border border-slate-200 bg-white hover:border-blue-300 transition-colors"
                                     >
-                                      <div className="flex items-start gap-2.5 min-w-0">
+                                      <div className="flex items-start gap-2.5 min-w-0 flex-1">
                                         <FileIcon size={18} className="text-blue-500 flex-shrink-0 mt-0.5" />
-                                        <div className="min-w-0">
+                                        <div className="min-w-0 flex-1">
                                           <a
                                             href={`${file.file_path}`}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="text-sm font-semibold text-blue-600 hover:underline truncate block"
+                                            className="text-sm font-semibold text-blue-600 hover:underline break-all block"
                                           >
                                             {file.file_name}
                                           </a>
-                                          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 mt-0.5">
-                                            <span className="inline-flex items-center gap-1 font-medium text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded">
+                                          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 mt-1">
+                                            <span className="inline-flex items-center gap-1 font-medium text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded whitespace-nowrap">
                                               <User size={11} /> 上傳人：{file.uploader?.name || '未知'}
                                             </span>
-                                            <span className="inline-flex items-center gap-1 text-slate-500">
+                                            <span className="inline-flex items-center gap-1 text-slate-500 whitespace-nowrap">
                                               <Clock size={11} /> 時間：{formattedTime}
                                             </span>
                                           </div>
@@ -1129,12 +1129,12 @@ const ProjectDetails = () => {
                               </div>
                             )}
                           </td>
-                          <td className="py-4 px-4 text-center">
+                          <td className="py-4 px-3 text-center whitespace-nowrap">
                             <button
                               onClick={() => openFileUploadForCategory(item.category)}
-                              className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 transition-colors border border-blue-200"
+                              className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-colors border border-blue-200"
                             >
-                              <UploadCloud size={14} /> 上傳 / 更新
+                              <UploadCloud size={14} className="shrink-0" /> 上傳 / 更新
                             </button>
                           </td>
                         </tr>
