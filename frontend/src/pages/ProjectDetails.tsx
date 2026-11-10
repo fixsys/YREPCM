@@ -57,10 +57,18 @@ const TASK_CATALOG = [
   }
 ];
 
-const FILE_CATEGORIES = [
-  '合約', '預算書', '施工規範', '施工進度表', '追加項目',
-  '結構計算書', '結構簽證', 'BOM表', '內部異常單', '施工自主檢查表'
+const EXECUTION_BOOK_ITEMS = [
+  { indexLabel: '一', category: '合約', departments: ['業務部', '法務部'], legacyAliases: ['合約', '一、合約'] },
+  { indexLabel: '二', category: '預算書', departments: ['預算組'], legacyAliases: ['預算書', '二、預算書'] },
+  { indexLabel: '三', category: '施工計畫', departments: ['工務部'], legacyAliases: ['施工計畫', '三、施工計畫', '施工規範', '施工進度表', '施工品檢表', '施工自主檢查表'] },
+  { indexLabel: '四', category: '採購計畫', departments: ['採購'], legacyAliases: ['採購計畫', '四、採購計畫', '追加項目'] },
+  { indexLabel: '五', category: '結構計算書', departments: ['工務部'], legacyAliases: ['結構計算書', '五、結構計算書', '結構計算書及圖說', '結構簽證'] },
+  { indexLabel: '六', category: '加工圖面', departments: ['設計部'], legacyAliases: ['加工圖面', '六、加工圖面'] },
+  { indexLabel: '七', category: 'Bom表', departments: ['設計部'], legacyAliases: ['Bom表', 'BOM表', '七、Bom表'] },
+  { indexLabel: '八', category: '內部異常單', departments: [''], legacyAliases: ['內部異常單', '八、內部異常單'] },
 ];
+
+const FILE_CATEGORIES = EXECUTION_BOOK_ITEMS.map(item => item.category);
 
 const ProjectDetails = () => {
   const { id } = useParams<{ id: string }>();
@@ -358,6 +366,39 @@ const ProjectDetails = () => {
     }
   };
 
+  const [isExportingBookPdf, setIsExportingBookPdf] = useState(false);
+
+  const openFileUploadForCategory = (category: string) => {
+    setFileCategory(category);
+    setUploadFile(null);
+    setFileSubmitError('');
+    setIsFileModalOpen(true);
+  };
+
+  const handleExportExecutionBookPdf = async () => {
+    if (!id) return;
+    setIsExportingBookPdf(true);
+    try {
+      const response = await axios.get(`/api/projects/${id}/files/export-pdf`, {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: 'blob'
+      });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${project?.project_code || 'Project'}_開案執行書.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error: any) {
+      alert('匯出開案執行書 PDF 失敗，請稍後再試');
+    } finally {
+      setIsExportingBookPdf(false);
+    }
+  };
+
   const handleFileUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!uploadFile) return setFileSubmitError('請選擇檔案');
@@ -464,7 +505,7 @@ const ProjectDetails = () => {
             <button onClick={() => setActiveTab('logs')} className={`px-4 py-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors flex-1 ${activeTab === 'logs' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}>施工日誌</button>
             <button onClick={() => setActiveTab('tasks')} className={`px-4 py-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors flex-1 ${activeTab === 'tasks' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}>任務與工時</button>
             <button onClick={() => setActiveTab('performance')} className={`px-4 py-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors flex-1 ${activeTab === 'performance' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}>專案績效與貢獻</button>
-            <button onClick={() => setActiveTab('files')} className={`px-4 py-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors flex-1 ${activeTab === 'files' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}>專案檔案</button>
+            <button onClick={() => setActiveTab('files')} className={`px-4 py-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors flex-1 ${activeTab === 'files' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}>開案執行書</button>
             <button onClick={() => setActiveTab('work_items')} className={`px-4 py-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors flex-1 ${activeTab === 'work_items' ? 'bg-teal-50 text-teal-700' : 'text-slate-600 hover:bg-slate-50'}`}>施工細項設定</button>
             <button onClick={() => setActiveTab('timeline')} className={`px-4 py-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors flex-1 ${activeTab === 'timeline' ? 'bg-teal-50 text-teal-700' : 'text-slate-600 hover:bg-slate-50'}`}>專案時間軸</button>
           </div>
@@ -946,48 +987,155 @@ const ProjectDetails = () => {
 )}
 
 {activeTab === 'files' && (
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-lg font-semibold text-slate-800">專案相關檔案</h3>
-                <button onClick={() => setIsFileModalOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors">
-                  <UploadCloud size={16} /> 上傳檔案
-                </button>
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-6">
+              <div className="flex flex-wrap justify-between items-start gap-4 border-b border-slate-200 pb-4">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-800">開案執行書</h3>
+                  <p className="text-sm text-slate-500 mt-1">
+                    依開案執行書目錄順序由各負責部門同仁分項協作上傳與更新，自動記錄上傳人名稱與時間，並支援整份執行書依序整合成單一 PDF 匯出（含封面、目錄、各章節分隔頁與附件）。
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={handleExportExecutionBookPdf}
+                    disabled={isExportingBookPdf}
+                    className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-bold shadow-sm transition-colors"
+                  >
+                    <Download size={16} />
+                    {isExportingBookPdf ? '整合匯出 PDF 中...' : '匯出 PDF (整份執行書)'}
+                  </button>
+                  <button
+                    onClick={() => openFileUploadForCategory(EXECUTION_BOOK_ITEMS[0].category)}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-bold shadow-sm transition-colors"
+                  >
+                    <UploadCloud size={16} /> 上傳項次檔案
+                  </button>
+                </div>
               </div>
-              <div className="space-y-6">
-                {FILE_CATEGORIES.map(category => {
-                  const categoryFiles = projectFiles.filter((f: any) => f.category === category);
-                  if (categoryFiles.length === 0) return null;
-                  return (
-                    <div key={category}>
-                      <h4 className="text-md font-bold text-slate-700 border-b pb-2 mb-3">{category}</h4>
-                      <div className="grid grid-cols-1 @md:grid-cols-2 gap-3">
-                        {categoryFiles.map((file: any) => (
-                          <div key={file.id} className="flex items-center justify-between p-3 border border-slate-100 rounded-lg bg-slate-50 hover:border-blue-300 transition-colors">
-                            <div className="flex items-center gap-3 overflow-hidden">
-                              <FileIcon size={20} className="text-slate-400 flex-shrink-0" />
-                              <div className="overflow-hidden">
-                                <a href={`${file.file_path}`} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-blue-600 hover:underline truncate block">
-                                  {file.file_name}
-                                </a>
-                                <p className="text-xs text-slate-500 mt-0.5">{new Date(file.uploaded_at).toLocaleDateString()} · 上傳者: {file.uploader?.name}</p>
+
+              {/* 開案執行書目錄與分項協作總表 (對照 新目錄v7.docx) */}
+              <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-100 border-b border-slate-200 text-slate-700 text-sm font-bold">
+                      <th className="py-3 px-4 w-16 text-center border-r border-slate-200">項次</th>
+                      <th className="py-3 px-4 w-36 border-r border-slate-200">項目</th>
+                      <th className="py-3 px-4 w-32 text-center border-r border-slate-200">負責部門</th>
+                      <th className="py-3 px-4 w-36 text-center border-r border-slate-200">負責人員</th>
+                      <th className="py-3 px-4 border-r border-slate-200">已上傳檔案與協作更新紀錄 (上傳人 / 時間)</th>
+                      <th className="py-3 px-4 w-32 text-center">分項上傳</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 text-sm">
+                    {EXECUTION_BOOK_ITEMS.map(item => {
+                      const itemFiles = projectFiles.filter((f: any) => item.legacyAliases.includes(f.category));
+                      const uniqueUploaders = Array.from(
+                        new Set(itemFiles.map((f: any) => f.uploader?.name).filter(Boolean))
+                      ) as string[];
+
+                      let defaultRep = '';
+                      if (item.category === '合約') defaultRep = project.salesRep?.name || '';
+                      else if (item.category === '施工計畫' || item.category === '結構計算書') defaultRep = project.engRep?.name || '';
+                      else if (item.category === '採購計畫') defaultRep = project.procurementRep?.name || '';
+                      else if (item.category === '加工圖面' || item.category === 'Bom表') defaultRep = project.designRep?.name || '';
+
+                      const responsibleDisplay = uniqueUploaders.length > 0
+                        ? uniqueUploaders.join('、')
+                        : (defaultRep || '待上傳');
+
+                      return (
+                        <tr key={item.category} className="hover:bg-slate-50/70 transition-colors">
+                          <td className="py-4 px-4 text-center font-bold text-slate-700 border-r border-slate-200 bg-slate-50/50">
+                            {item.indexLabel}
+                          </td>
+                          <td className="py-4 px-4 font-bold text-slate-800 border-r border-slate-200">
+                            {item.category}
+                          </td>
+                          <td className="py-4 px-4 text-center text-slate-600 border-r border-slate-200">
+                            {item.departments.filter(Boolean).length > 0 ? (
+                              <div className="flex flex-col gap-1 items-center">
+                                {item.departments.filter(Boolean).map((dept, i) => (
+                                  <span key={i} className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-xs font-medium">
+                                    {dept}
+                                  </span>
+                                ))}
                               </div>
-                            </div>
-                            {((user?.level && user.level >= 100) || user?.id === file.uploaded_by) && (
-                              <button onClick={() => handleDeleteFile(file.id)} className="p-1.5 text-slate-400 hover:text-red-600 rounded transition-colors ml-2 flex-shrink-0">
-                                <Trash2 size={16} />
-                              </button>
+                            ) : (
+                              <span className="text-slate-400">-</span>
                             )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-                {projectFiles.length === 0 && (
-                  <div className="text-center py-8 text-slate-500 bg-slate-50 rounded-lg border border-dashed border-slate-300">
-                    目前尚無專案檔案，請點擊右上角新增
-                  </div>
-                )}
+                          </td>
+                          <td className="py-4 px-4 text-center font-medium text-slate-700 border-r border-slate-200">
+                            {responsibleDisplay}
+                          </td>
+                          <td className="py-3 px-4 border-r border-slate-200">
+                            {itemFiles.length === 0 ? (
+                              <span className="text-xs text-slate-400 italic">尚無上傳紀錄</span>
+                            ) : (
+                              <div className="space-y-2">
+                                {itemFiles.map((file: any) => {
+                                  const formattedTime = new Date(file.uploaded_at).toLocaleString('zh-TW', {
+                                    year: 'numeric',
+                                    month: '2-digit',
+                                    day: '2-digit',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                    second: '2-digit',
+                                    hour12: false
+                                  });
+                                  return (
+                                    <div
+                                      key={file.id}
+                                      className="flex items-center justify-between gap-3 p-2.5 rounded-lg border border-slate-200 bg-white hover:border-blue-300 transition-colors"
+                                    >
+                                      <div className="flex items-start gap-2.5 min-w-0">
+                                        <FileIcon size={18} className="text-blue-500 flex-shrink-0 mt-0.5" />
+                                        <div className="min-w-0">
+                                          <a
+                                            href={`${file.file_path}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-sm font-semibold text-blue-600 hover:underline truncate block"
+                                          >
+                                            {file.file_name}
+                                          </a>
+                                          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 mt-0.5">
+                                            <span className="inline-flex items-center gap-1 font-medium text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded">
+                                              <User size={11} /> 上傳人：{file.uploader?.name || '未知'}
+                                            </span>
+                                            <span className="inline-flex items-center gap-1 text-slate-500">
+                                              <Clock size={11} /> 時間：{formattedTime}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                      {((user?.level && user.level >= 100) || user?.role === 'SystemAdmin' || user?.id === file.uploaded_by) && (
+                                        <button
+                                          onClick={() => handleDeleteFile(file.id)}
+                                          title="刪除此檔案"
+                                          className="p-1.5 text-slate-400 hover:text-red-600 rounded transition-colors flex-shrink-0"
+                                        >
+                                          <Trash2 size={15} />
+                                        </button>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-4 px-4 text-center">
+                            <button
+                              onClick={() => openFileUploadForCategory(item.category)}
+                              className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 transition-colors border border-blue-200"
+                            >
+                              <UploadCloud size={14} /> 上傳 / 更新
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
@@ -1368,21 +1516,26 @@ const ProjectDetails = () => {
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-              <h3 className="text-lg font-bold text-slate-800">上傳專案檔案</h3>
+              <h3 className="text-lg font-bold text-slate-800">上傳開案執行書檔案</h3>
               <button onClick={() => setIsFileModalOpen(false)} className="text-slate-400 hover:text-slate-600">✕</button>
             </div>
             <form onSubmit={handleFileUpload} className="p-6 space-y-4">
               {fileSubmitError && <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm">{fileSubmitError}</div>}
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">檔案分類</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">執行書目錄項次</label>
                 <select value={fileCategory} onChange={e => setFileCategory(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500">
-                  {FILE_CATEGORIES.map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
+                  {EXECUTION_BOOK_ITEMS.map(item => {
+                    const deptStr = item.departments.filter(Boolean).join(' / ');
+                    return (
+                      <option key={item.category} value={item.category}>
+                        項次{item.indexLabel}：{item.category}{deptStr ? ` (${deptStr})` : ''}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">選擇檔案</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">選擇檔案 (支援 PDF、圖檔或各類附件，PDF/圖檔匯出時將自動整合至該項次章節後)</label>
                 <input type="file" onChange={e => setUploadFile(e.target.files?.[0] || null)} className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" required />
               </div>
               <div className="pt-4 flex justify-end gap-3 border-t border-slate-100 mt-6">
