@@ -105,12 +105,45 @@ router.post('/', authenticateToken, upload.any(), async (req: AuthRequest, res) 
   }
 });
 
+const exportProgressMap = new Map<string, {
+  percent: number;
+  step: string;
+  detail: string;
+  currentIndex: number;
+  updatedAt: number;
+}>();
+
+// Get real-time PDF export progress
+router.get('/export-progress', authenticateToken, async (req: AuthRequest, res) => {
+  const projectId = req.params.projectId as string;
+  const progress = exportProgressMap.get(projectId) || {
+    percent: 5,
+    step: '正在初始化 PDF 整合引擎...',
+    detail: '準備讀取專案與執行書資料',
+    currentIndex: -1,
+    updatedAt: Date.now()
+  };
+  res.json(progress);
+});
+
 // Export entire 開案執行書 as a single merged PDF
 router.get('/export-pdf', authenticateToken, async (req: AuthRequest, res) => {
   const projectId = req.params.projectId as string;
   let browser: any = null;
 
+  const updateProgress = (percent: number, step: string, detail: string, currentIndex: number) => {
+    exportProgressMap.set(projectId, {
+      percent: Math.min(100, Math.max(0, Math.round(percent))),
+      step,
+      detail,
+      currentIndex,
+      updatedAt: Date.now()
+    });
+  };
+
   try {
+    updateProgress(8, '正在讀取專案與開案執行書資料...', '載入部門負責人與各章節附件清單', -1);
+
     const project = await prisma.project.findUnique({
       where: { id: projectId },
       include: {
@@ -410,11 +443,23 @@ router.get('/export-pdf', authenticateToken, async (req: AuthRequest, res) => {
       </html>
     `;
 
+    updateProgress(14, '正在產生「開案執行書封面」與「目錄頁」...', `${project.project_code} - ${project.name}`, -1);
     await appendHtmlPagesToPdf(coverAndTocHtml);
 
     // 2. For each item in EXECUTION_BOOK_ITEMS order:
     //    Insert Section Divider Page (matching 新目錄v7.docx 標楷體 100pt centered) + Uploaded Files
-    for (const item of EXECUTION_BOOK_ITEMS) {
+    for (let idx = 0; idx < EXECUTION_BOOK_ITEMS.length; idx++) {
+      const item = EXECUTION_BOOK_ITEMS[idx];
+      const itemFiles = getItemFiles(item);
+      const basePercent = 18 + (idx / EXECUTION_BOOK_ITEMS.length) * 72;
+
+      updateProgress(
+        basePercent,
+        `正在處理 項次${item.indexLabel}：${item.category}`,
+        itemFiles.length > 0 ? `正在產生章節分隔頁 (共 ${itemFiles.length} 個附件待整合)` : '正在產生章節分隔頁',
+        idx
+      );
+
       const dividerHtml = `
         <!DOCTYPE html>
         <html lang="zh-TW">
@@ -446,8 +491,16 @@ router.get('/export-pdf', authenticateToken, async (req: AuthRequest, res) => {
       `;
       await appendHtmlPagesToPdf(dividerHtml);
 
-      const itemFiles = getItemFiles(item);
-      for (const fileRecord of itemFiles) {
+      for (let fIdx = 0; fIdx < itemFiles.length; fIdx++) {
+        const fileRecord = itemFiles[fIdx];
+        const filePercent = basePercent + ((fIdx + 1) / (itemFiles.length + 1)) * (72 / EXECUTION_BOOK_ITEMS.length);
+        updateProgress(
+          filePercent,
+          `正在整合 項次${item.indexLabel}：${item.category}`,
+          `合併附件 (${fIdx + 1}/${itemFiles.length})：${fileRecord.file_name}`,
+          idx
+        );
+
         const diskPath = path.join(__dirname, '../../', fileRecord.file_path);
         const ext = path.extname(fileRecord.file_name || fileRecord.file_path).toLowerCase();
         const uploadTimeStr = new Date(fileRecord.uploaded_at).toLocaleString('zh-TW', {
@@ -547,7 +600,10 @@ router.get('/export-pdf', authenticateToken, async (req: AuthRequest, res) => {
       }
     }
 
+    updateProgress(95, '正在封裝並壓縮最終 PDF 執行書...', '寫入完整頁面索引與輸出串流', 8);
     const finalPdfBytes = await mergedPdf.save();
+    updateProgress(100, '匯出完成！正在啟動瀏覽器下載...', `${project.project_code}_開案執行書.pdf`, 8);
+
     const safeFilename = encodeURIComponent(`${project.project_code}_開案執行書.pdf`);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${safeFilename}`);

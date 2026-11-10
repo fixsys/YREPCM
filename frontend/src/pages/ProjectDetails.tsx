@@ -368,6 +368,12 @@ const ProjectDetails = () => {
   };
 
   const [isExportingBookPdf, setIsExportingBookPdf] = useState(false);
+  const [exportProgress, setExportProgress] = useState({
+    percent: 0,
+    step: '準備啟動 PDF 整合引擎...',
+    detail: '',
+    currentIndex: -1
+  });
 
   const openFileUploadForCategory = (category: string) => {
     setFileCategory(category);
@@ -379,11 +385,44 @@ const ProjectDetails = () => {
   const handleExportExecutionBookPdf = async () => {
     if (!id) return;
     setIsExportingBookPdf(true);
+    setExportProgress({
+      percent: 5,
+      step: '正在啟動 PDF 整合引擎...',
+      detail: '準備產生開案執行書封面與目錄頁',
+      currentIndex: -1
+    });
+
+    const pollInterval = window.setInterval(async () => {
+      try {
+        const progRes = await axios.get(`/api/projects/${id}/files/export-progress`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (progRes.data && typeof progRes.data.percent === 'number') {
+          setExportProgress(prev => ({
+            percent: Math.max(prev.percent, progRes.data.percent),
+            step: progRes.data.step || prev.step,
+            detail: progRes.data.detail || prev.detail,
+            currentIndex: typeof progRes.data.currentIndex === 'number' ? progRes.data.currentIndex : prev.currentIndex
+          }));
+        }
+      } catch {
+        // Ignore transient polling errors
+      }
+    }, 350);
+
     try {
       const response = await axios.get(`/api/projects/${id}/files/export-pdf`, {
         headers: { Authorization: `Bearer ${token}` },
         responseType: 'blob'
       });
+      window.clearInterval(pollInterval);
+      setExportProgress({
+        percent: 100,
+        step: '整合完成！正在下載 PDF 檔案...',
+        detail: `${project?.project_code || 'Project'}_開案執行書.pdf`,
+        currentIndex: 8
+      });
+
       const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -393,9 +432,13 @@ const ProjectDetails = () => {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
+
+      await new Promise(resolve => setTimeout(resolve, 650));
     } catch (error: any) {
+      window.clearInterval(pollInterval);
       alert('匯出開案執行書 PDF 失敗，請稍後再試');
     } finally {
+      window.clearInterval(pollInterval);
       setIsExportingBookPdf(false);
     }
   };
@@ -1594,6 +1637,88 @@ const ProjectDetails = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* PDF Export Progress Modal */}
+      {isExportingBookPdf && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-100 p-6 space-y-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="relative w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600">
+                  <FileText size={24} className="animate-pulse" />
+                  <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                  </span>
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-800">正在整合匯出開案執行書 PDF</h3>
+                  <p className="text-xs text-slate-500">依序合成封面、目錄、各章節分隔頁與上傳附件</p>
+                </div>
+              </div>
+              <div className="text-2xl font-extrabold text-emerald-600 tabular-nums">
+                {exportProgress.percent}%
+              </div>
+            </div>
+
+            {/* Animated Progress Bar */}
+            <div className="space-y-2">
+              <div className="w-full h-3.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200 p-0.5">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-blue-600 via-teal-500 to-emerald-500 transition-all duration-300 ease-out relative overflow-hidden"
+                  style={{ width: `${Math.max(5, exportProgress.percent)}%` }}
+                >
+                  <div className="absolute inset-0 bg-white/25 animate-pulse" />
+                </div>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-bold text-slate-700 truncate pr-2">{exportProgress.step}</span>
+                <span className="text-slate-400 whitespace-nowrap">請勿關閉視窗</span>
+              </div>
+              {exportProgress.detail && (
+                <div className="text-xs text-blue-600 bg-blue-50/80 border border-blue-100 rounded-lg px-3 py-1.5 truncate font-medium">
+                  {exportProgress.detail}
+                </div>
+              )}
+            </div>
+
+            {/* Stage Checklist */}
+            <div className="grid grid-cols-3 gap-2 pt-1">
+              {[
+                { label: '封面與目錄', idx: -1 },
+                ...EXECUTION_BOOK_ITEMS.map((it, i) => ({
+                  label: `${it.indexLabel}、${it.category}`,
+                  idx: i
+                }))
+              ].map(stage => {
+                const isDone = exportProgress.currentIndex > stage.idx || exportProgress.percent === 100;
+                const isCurrent = exportProgress.currentIndex === stage.idx && exportProgress.percent < 100;
+                return (
+                  <div
+                    key={stage.label}
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 border transition-all whitespace-nowrap ${
+                      isDone
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                        : isCurrent
+                        ? 'bg-blue-50 border-blue-400 text-blue-700 font-bold shadow-sm'
+                        : 'bg-slate-50 border-slate-200 text-slate-400'
+                    }`}
+                  >
+                    {isDone ? (
+                      <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+                    ) : isCurrent ? (
+                      <span className="w-3 h-3 rounded-full border-2 border-blue-600 border-t-transparent animate-spin shrink-0" />
+                    ) : (
+                      <span className="w-3 h-3 rounded-full border border-slate-300 shrink-0" />
+                    )}
+                    <span className="truncate">{stage.label}</span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}
