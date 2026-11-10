@@ -63,36 +63,42 @@ router.get('/', authenticateToken, async (req: AuthRequest, res) => {
   }
 });
 
-// Upload file
-router.post('/', authenticateToken, upload.single('file'), async (req: AuthRequest, res) => {
+// Upload one or multiple files (no file count limit)
+router.post('/', authenticateToken, upload.any(), async (req: AuthRequest, res) => {
   if (!req.user) return res.status(401).json({ error: '未授權' });
   const projectId = req.params.projectId as string;
   const { category } = req.body;
-  const file = req.file;
+  const uploadedFiles = (req.files as Express.Multer.File[]) || (req.file ? [req.file] : []);
 
-  if (!file) return res.status(400).json({ error: '無上傳檔案' });
+  if (!uploadedFiles || uploadedFiles.length === 0) {
+    return res.status(400).json({ error: '無上傳檔案' });
+  }
   if (!category) return res.status(400).json({ error: '未提供檔案類別' });
 
   try {
-    const projectFile = await prisma.projectFile.create({
-      data: {
-        project_id: projectId,
-        category,
-        file_name: file.originalname,
-        file_path: `/uploads/projects/${file.filename}`,
-        uploaded_by: req.user.id
-      },
-      include: {
-        uploader: {
-          select: {
-            id: true,
-            name: true,
-            department: { select: { name: true } }
+    const createdFiles = await Promise.all(
+      uploadedFiles.map(file =>
+        prisma.projectFile.create({
+          data: {
+            project_id: projectId,
+            category,
+            file_name: file.originalname,
+            file_path: `/uploads/projects/${file.filename}`,
+            uploaded_by: req.user!.id
+          },
+          include: {
+            uploader: {
+              select: {
+                id: true,
+                name: true,
+                department: { select: { name: true } }
+              }
+            }
           }
-        }
-      }
-    });
-    res.json(projectFile);
+        })
+      )
+    );
+    res.json(createdFiles);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: '上傳檔案失敗' });

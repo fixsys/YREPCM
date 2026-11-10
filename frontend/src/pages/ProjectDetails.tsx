@@ -149,7 +149,8 @@ const ProjectDetails = () => {
   // File Modal State
   const [isFileModalOpen, setIsFileModalOpen] = useState(false);
   const [fileCategory, setFileCategory] = useState(FILE_CATEGORIES[0]);
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
+  const [isUploadingFiles, setIsUploadingFiles] = useState(false);
   const [fileSubmitError, setFileSubmitError] = useState('');
 
   // Task Modal State
@@ -370,7 +371,7 @@ const ProjectDetails = () => {
 
   const openFileUploadForCategory = (category: string) => {
     setFileCategory(category);
-    setUploadFile(null);
+    setUploadFiles([]);
     setFileSubmitError('');
     setIsFileModalOpen(true);
   };
@@ -401,20 +402,25 @@ const ProjectDetails = () => {
 
   const handleFileUpload = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!uploadFile) return setFileSubmitError('請選擇檔案');
+    if (uploadFiles.length === 0) return setFileSubmitError('請至少選擇一個檔案');
     setFileSubmitError('');
+    setIsUploadingFiles(true);
     const formData = new FormData();
     formData.append('category', fileCategory);
-    formData.append('file', uploadFile);
+    uploadFiles.forEach(file => {
+      formData.append('files', file);
+    });
     try {
       await axios.post(`/api/projects/${id}/files`, formData, {
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' }
       });
       setIsFileModalOpen(false);
-      setUploadFile(null);
+      setUploadFiles([]);
       fetchData();
     } catch (error: any) {
       setFileSubmitError(error.response?.data?.error || '上傳失敗');
+    } finally {
+      setIsUploadingFiles(false);
     }
   };
 
@@ -1535,12 +1541,57 @@ const ProjectDetails = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">選擇檔案 (支援 PDF、圖檔或各類附件，PDF/圖檔匯出時將自動整合至該項次章節後)</label>
-                <input type="file" onChange={e => setUploadFile(e.target.files?.[0] || null)} className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" required />
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  選擇檔案 (不限檔案數量，可一次框選或分批加入多個檔案)
+                </label>
+                <input
+                  type="file"
+                  multiple
+                  onChange={e => {
+                    const selected = e.target.files ? Array.from(e.target.files) : [];
+                    if (selected.length > 0) {
+                      setUploadFiles(prev => [...prev, ...selected]);
+                      e.target.value = '';
+                    }
+                  }}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                {uploadFiles.length > 0 && (
+                  <div className="mt-3 space-y-1.5 max-h-48 overflow-y-auto border border-slate-200 rounded-lg p-2.5 bg-slate-50">
+                    <div className="flex justify-between items-center text-xs text-slate-500 pb-1 border-b border-slate-200">
+                      <span>已選擇 {uploadFiles.length} 個檔案</span>
+                      <button
+                        type="button"
+                        onClick={() => setUploadFiles([])}
+                        className="text-red-500 hover:underline font-medium"
+                      >
+                        全部清除
+                      </button>
+                    </div>
+                    {uploadFiles.map((f, idx) => (
+                      <div key={`${f.name}-${idx}`} className="flex items-center justify-between text-xs bg-white px-2.5 py-1.5 rounded border border-slate-200">
+                        <span className="truncate text-slate-700 font-medium pr-2">{f.name}</span>
+                        <button
+                          type="button"
+                          onClick={() => setUploadFiles(prev => prev.filter((_, i) => i !== idx))}
+                          className="text-slate-400 hover:text-red-600 flex-shrink-0"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="pt-4 flex justify-end gap-3 border-t border-slate-100 mt-6">
                 <button type="button" onClick={() => setIsFileModalOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium transition-colors">取消</button>
-                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors">確認上傳</button>
+                <button
+                  type="submit"
+                  disabled={isUploadingFiles || uploadFiles.length === 0}
+                  className="px-4 py-2 bg-blue-600 disabled:bg-blue-300 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors"
+                >
+                  {isUploadingFiles ? '上傳中...' : `確認上傳${uploadFiles.length > 0 ? ` (${uploadFiles.length} 個檔案)` : ''}`}
+                </button>
               </div>
             </form>
           </div>
