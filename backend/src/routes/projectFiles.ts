@@ -5,6 +5,7 @@ import path from 'path';
 import fs from 'fs';
 import puppeteer from 'puppeteer';
 import { PDFDocument } from 'pdf-lib';
+import * as XLSX from 'xlsx';
 import { authenticateToken, AuthRequest } from '../middleware/authMiddleware';
 
 const router = Router({ mergeParams: true });
@@ -565,6 +566,223 @@ router.get('/export-pdf', authenticateToken, async (req: AuthRequest, res) => {
               continue;
             } catch (imgErr) {
               console.error(`Failed to render image ${fileRecord.file_name}:`, imgErr);
+            }
+          } else if (['.xlsx', '.xls', '.csv'].includes(ext)) {
+            try {
+              const workbook = XLSX.readFile(diskPath, { cellNF: true, cellDates: true });
+              let renderedAnySheet = false;
+
+              for (let sIdx = 0; sIdx < workbook.SheetNames.length; sIdx++) {
+                const sheetName = workbook.SheetNames[sIdx];
+                const ws = workbook.Sheets[sheetName];
+                if (!ws) continue;
+
+                // Determine actual non-empty cell bounds (avoids 16,384-column ghost formatting ranges)
+                let maxR = -1;
+                let maxC = -1;
+                for (const key of Object.keys(ws)) {
+                  if (key[0] === '!') continue;
+                  const cell = ws[key];
+                  if (cell && cell.v !== undefined && String(cell.v).trim() !== '') {
+                    const decoded = XLSX.utils.decode_cell(key);
+                    if (decoded.r > maxR) maxR = decoded.r;
+                    if (decoded.c > maxC) maxC = decoded.c;
+                  }
+                }
+
+                if (maxR < 0 || maxC < 0) continue;
+                maxC = Math.min(maxC, 50);
+
+                // Split very tall sheets into 75-row chunks so each captured image scales legibly onto A4
+                const ROWS_PER_CHUNK = maxR + 1 <= 85 ? maxR + 1 : 75;
+                const totalChunks = Math.ceil((maxR + 1) / ROWS_PER_CHUNK);
+                const merges: Array<{ s: { r: number; c: number }; e: { r: number; c: number } }> = ws['!merges'] || [];
+
+                for (let chunkIdx = 0; chunkIdx < totalChunks; chunkIdx++) {
+                  const startR = chunkIdx * ROWS_PER_CHUNK;
+                  const endR = Math.min(maxR, startR + ROWS_PER_CHUNK - 1);
+
+                  updateProgress(
+                    filePercent,
+                    `正在轉換 Excel 為圖片 — 項次${item.indexLabel}：${item.category}`,
+                    `${fileRecord.file_name} [分頁：${sheetName}${totalChunks > 1 ? ` (${chunkIdx + 1}/${totalChunks})` : ''}]`,
+                    idx
+                  );
+
+                  const skipMap = new Set<string>();
+                  const spanMap = new Map<string, { rowspan: number; colspan: number }>();
+
+                  for (const m of merges) {
+                    const sr = Math.max(m.s.r, startR);
+                    const er = Math.min(m.e.r, endR);
+                    const sc = Math.max(m.s.c, 0);
+                    const ec = Math.min(m.e.c, maxC);
+                    if (sr <= er && sc <= ec && (er > sr || ec > sc)) {
+                      spanMap.set(`${sr},${sc}`, { rowspan: er - sr + 1, colspan: ec - sc + 1 });
+                      for (let rr = sr; rr <= er; rr++) {
+                        for (let cc = sc; cc <= ec; cc++) {
+                          if (rr !== sr || cc !== sc) {
+                            skipMap.add(`${rr},${cc}`);
+                          }
+                        }
+                      }
+                    }
+                  }
+
+                  let rowsHtml = '';
+                  for (let r = startR; r <= endR; r++) {
+                    let cellsHtml = '';
+                    for (let c = 0; c <= maxC; c++) {
+                      const coordKey = `${r},${c}`;
+                      if (skipMap.has(coordKey)) continue;
+
+                      const span = spanMap.get(coordKey);
+                      const spanAttrs =
+                        (span && span.rowspan > 1 ? ` rowspan="${span.rowspan}"` : '') +
+                        (span && span.colspan > 1 ? ` colspan="${span.colspan}"` : '');
+
+                      const addr = XLSX.utils.encode_cell({ r, c });
+                      const cell = ws[addr];
+                      let text = '';
+                      if (cell && cell.v !== undefined) {
+                        try {
+                          text = XLSX.utils.format_cell(cell);
+                        } catch {
+                          text = String(cell.v);
+                        }
+                      }
+                      const isNumeric = cell && cell.t === 'n';
+                      const isHeaderRow = r === startR && chunkIdx === 0 && r === 0;
+                      cellsHtml += `<td${spanAttrs} class="${isNumeric ? 'num' : ''}${isHeaderRow ? ' hdr' : ''}">${escapeHtml(text)}</td>`;
+                    }
+                    rowsHtml += `<tr>${cellsHtml}</tr>`;
+                  }
+
+                  // Step A: Render the Excel table in Puppeteer and screenshot it as a high-res PNG image
+                  const capturePage = await browser.newPage();
+                  let excelImgDataUri = '';
+                  try {
+                    await capturePage.setViewport({ width: 1600, height: 1200, deviceScaleFactor: 1.5 });
+                    const sheetHtml = `
+                      <!DOCTYPE html>
+                      <html lang="zh-TW">
+                      <head>
+                        <meta charset="UTF-8" />
+                        <style>
+                          body { margin: 0; padding: 0; background: #ffffff; }
+                          #excel-capture {
+                            display: inline-block;
+                            background: #ffffff;
+                            padding: 12px;
+                            font-family: "Microsoft JhengHei", "微軟正黑體", sans-serif;
+                          }
+                          table {
+                            border-collapse: collapse;
+                            border: 1.5px solid #334155;
+                            font-size: 10.5pt;
+                            color: #0f172a;
+                          }
+                          td {
+                            border: 1px solid #64748b;
+                            padding: 4px 8px;
+                            vertical-align: middle;
+                            white-space: pre-wrap;
+                            max-width: 340px;
+                            word-break: break-word;
+                            line-height: 1.35;
+                          }
+                          td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+                          td.hdr { background-color: #f1f5f9; font-weight: 700; text-align: center; }
+                        </style>
+                      </head>
+                      <body>
+                        <div id="excel-capture">
+                          <table>${rowsHtml}</table>
+                        </div>
+                      </body>
+                      </html>
+                    `;
+                    await capturePage.setContent(sheetHtml, { waitUntil: 'networkidle0' });
+                    const captureEl = await capturePage.$('#excel-capture');
+                    if (captureEl) {
+                      const pngBuffer = await captureEl.screenshot({ type: 'png' });
+                      excelImgDataUri = `data:image/png;base64,${Buffer.from(pngBuffer).toString('base64')}`;
+                    }
+                  } finally {
+                    await capturePage.close();
+                  }
+
+                  // Step B: Place the captured Excel PNG image scaled to fit A4 into the execution book PDF
+                  if (excelImgDataUri) {
+                    const sheetLabel = `${sheetName}${totalChunks > 1 ? ` (${chunkIdx + 1}/${totalChunks})` : ''}`;
+                    const excelA4PageHtml = `
+                      <!DOCTYPE html>
+                      <html lang="zh-TW">
+                      <head>
+                        <meta charset="UTF-8" />
+                        <style>
+                          @page { size: A4 portrait; margin: 0; }
+                          body {
+                            margin: 0;
+                            padding: 12mm 14mm;
+                            width: 210mm;
+                            height: 297mm;
+                            box-sizing: border-box;
+                            font-family: "Microsoft JhengHei", "微軟正黑體", sans-serif;
+                            display: flex;
+                            flex-direction: column;
+                            background: #ffffff;
+                          }
+                          .meta-bar {
+                            font-size: 9.5pt;
+                            color: #475569;
+                            border-bottom: 1px solid #cbd5e1;
+                            padding-bottom: 2.5mm;
+                            margin-bottom: 4mm;
+                            display: flex;
+                            justify-content: space-between;
+                            gap: 8px;
+                          }
+                          .img-wrap {
+                            flex: 1;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            overflow: hidden;
+                            width: 100%;
+                            height: 262mm;
+                          }
+                          .img-wrap img {
+                            width: 100%;
+                            height: 100%;
+                            max-width: 182mm;
+                            max-height: 262mm;
+                            object-fit: contain;
+                          }
+                        </style>
+                      </head>
+                      <body>
+                        <div class="meta-bar">
+                          <span><strong>${escapeHtml(item.indexLabel)}、${escapeHtml(item.category)}</strong> — ${escapeHtml(fileRecord.file_name)} [分頁：${escapeHtml(sheetLabel)}]</span>
+                          <span>上傳人：${escapeHtml(fileRecord.uploader?.name || '未知')} (${escapeHtml(uploadTimeStr)})</span>
+                        </div>
+                        <div class="img-wrap">
+                          <img src="${excelImgDataUri}" alt="${escapeHtml(sheetLabel)}" />
+                        </div>
+                      </body>
+                      </html>
+                    `;
+                    await appendHtmlPagesToPdf(excelA4PageHtml);
+                    renderedAnySheet = true;
+                  }
+                }
+              }
+
+              if (renderedAnySheet) {
+                continue;
+              }
+            } catch (excelErr) {
+              console.error(`Failed to render Excel ${fileRecord.file_name} as image:`, excelErr);
             }
           }
         }
