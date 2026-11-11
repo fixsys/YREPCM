@@ -265,12 +265,13 @@ router.get('/export-pdf', authenticateToken, async (req: AuthRequest, res) => {
 
     const mergedPdf = await PDFDocument.create();
 
-    const appendHtmlPagesToPdf = async (htmlContent: string) => {
+    const appendHtmlPagesToPdf = async (htmlContent: string, isLandscape: boolean = false) => {
       const page = await browser.newPage();
       try {
         await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
         const pdfBytes = await page.pdf({
           format: 'A4',
+          landscape: isLandscape,
           printBackground: true,
           margin: { top: '0mm', right: '0mm', bottom: '0mm', left: '0mm' }
         });
@@ -593,8 +594,8 @@ router.get('/export-pdf', authenticateToken, async (req: AuthRequest, res) => {
                 if (maxR < 0 || maxC < 0) continue;
                 maxC = Math.min(maxC, 50);
 
-                // Split very tall sheets into 75-row chunks so each captured image scales legibly onto A4
-                const ROWS_PER_CHUNK = maxR + 1 <= 85 ? maxR + 1 : 75;
+                // Split tall sheets into ~38-row chunks so each captured image matches A4 Landscape aspect ratio
+                const ROWS_PER_CHUNK = maxR + 1 <= 45 ? maxR + 1 : 38;
                 const totalChunks = Math.ceil((maxR + 1) / ROWS_PER_CHUNK);
                 const merges: Array<{ s: { r: number; c: number }; e: { r: number; c: number } }> = ws['!merges'] || [];
 
@@ -604,7 +605,7 @@ router.get('/export-pdf', authenticateToken, async (req: AuthRequest, res) => {
 
                   updateProgress(
                     filePercent,
-                    `正在轉換 Excel 為圖片 — 項次${item.indexLabel}：${item.category}`,
+                    `正在轉換 Excel 為橫式圖片 — 項次${item.indexLabel}：${item.category}`,
                     `${fileRecord.file_name} [分頁：${sheetName}${totalChunks > 1 ? ` (${chunkIdx + 1}/${totalChunks})` : ''}]`,
                     idx
                   );
@@ -662,7 +663,7 @@ router.get('/export-pdf', authenticateToken, async (req: AuthRequest, res) => {
                   const capturePage = await browser.newPage();
                   let excelImgDataUri = '';
                   try {
-                    await capturePage.setViewport({ width: 1600, height: 1200, deviceScaleFactor: 1.5 });
+                    await capturePage.setViewport({ width: 1920, height: 1200, deviceScaleFactor: 2 });
                     const sheetHtml = `
                       <!DOCTYPE html>
                       <html lang="zh-TW">
@@ -673,26 +674,26 @@ router.get('/export-pdf', authenticateToken, async (req: AuthRequest, res) => {
                           #excel-capture {
                             display: inline-block;
                             background: #ffffff;
-                            padding: 12px;
+                            padding: 10px;
                             font-family: "Microsoft JhengHei", "微軟正黑體", sans-serif;
                           }
                           table {
                             border-collapse: collapse;
-                            border: 1.5px solid #334155;
-                            font-size: 10.5pt;
+                            border: 1.5px solid #1e293b;
+                            font-size: 11pt;
                             color: #0f172a;
                           }
                           td {
                             border: 1px solid #64748b;
-                            padding: 4px 8px;
+                            padding: 5px 8px;
                             vertical-align: middle;
                             white-space: pre-wrap;
-                            max-width: 340px;
+                            max-width: 360px;
                             word-break: break-word;
                             line-height: 1.35;
                           }
                           td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-                          td.hdr { background-color: #f1f5f9; font-weight: 700; text-align: center; }
+                          td.hdr { background-color: #e2e8f0; font-weight: 700; text-align: center; }
                         </style>
                       </head>
                       <body>
@@ -712,21 +713,21 @@ router.get('/export-pdf', authenticateToken, async (req: AuthRequest, res) => {
                     await capturePage.close();
                   }
 
-                  // Step B: Place the captured Excel PNG image scaled to fit A4 into the execution book PDF
+                  // Step B: Place the captured Excel PNG image scaled to fit A4 Landscape into the execution book PDF
                   if (excelImgDataUri) {
                     const sheetLabel = `${sheetName}${totalChunks > 1 ? ` (${chunkIdx + 1}/${totalChunks})` : ''}`;
-                    const excelA4PageHtml = `
+                    const excelA4LandscapeHtml = `
                       <!DOCTYPE html>
                       <html lang="zh-TW">
                       <head>
                         <meta charset="UTF-8" />
                         <style>
-                          @page { size: A4 portrait; margin: 0; }
+                          @page { size: A4 landscape; margin: 0; }
                           body {
                             margin: 0;
-                            padding: 12mm 14mm;
-                            width: 210mm;
-                            height: 297mm;
+                            padding: 10mm 12mm;
+                            width: 297mm;
+                            height: 210mm;
                             box-sizing: border-box;
                             font-family: "Microsoft JhengHei", "微軟正黑體", sans-serif;
                             display: flex;
@@ -737,8 +738,8 @@ router.get('/export-pdf', authenticateToken, async (req: AuthRequest, res) => {
                             font-size: 9.5pt;
                             color: #475569;
                             border-bottom: 1px solid #cbd5e1;
-                            padding-bottom: 2.5mm;
-                            margin-bottom: 4mm;
+                            padding-bottom: 2mm;
+                            margin-bottom: 3mm;
                             display: flex;
                             justify-content: space-between;
                             gap: 8px;
@@ -750,13 +751,13 @@ router.get('/export-pdf', authenticateToken, async (req: AuthRequest, res) => {
                             justify-content: center;
                             overflow: hidden;
                             width: 100%;
-                            height: 262mm;
+                            height: 180mm;
                           }
                           .img-wrap img {
                             width: 100%;
                             height: 100%;
-                            max-width: 182mm;
-                            max-height: 262mm;
+                            max-width: 273mm;
+                            max-height: 180mm;
                             object-fit: contain;
                           }
                         </style>
@@ -772,7 +773,7 @@ router.get('/export-pdf', authenticateToken, async (req: AuthRequest, res) => {
                       </body>
                       </html>
                     `;
-                    await appendHtmlPagesToPdf(excelA4PageHtml);
+                    await appendHtmlPagesToPdf(excelA4LandscapeHtml, true);
                     renderedAnySheet = true;
                   }
                 }
