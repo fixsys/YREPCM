@@ -243,7 +243,10 @@ router.get('/:id/export', authenticateToken, async (req: AuthRequest, res) => {
       }
       for (const eq of eList) {
         const name = eq.name || '機具';
-        accumulatedEquip[name] = (accumulatedEquip[name] || 0) + (Number(eq.qty) || 1);
+        const qty = Number(eq.quantity ?? eq.qty) || 1;
+        const rawHours = Number(eq.hours) || 0;
+        const eqHours = (qty > 1 && rawHours === 8) ? qty * 8 : (rawHours || qty * 8);
+        accumulatedEquip[name] = (accumulatedEquip[name] || 0) + eqHours;
       }
     }
 
@@ -308,7 +311,8 @@ router.get('/:id/export', authenticateToken, async (req: AuthRequest, res) => {
     const todayEquips: Record<string, number> = {};
     for (const eq of equips) {
       const name = eq.name || '機具';
-      todayEquips[name] = (todayEquips[name] || 0) + (Number(eq.qty) || 1);
+      const qty = Number(eq.quantity ?? eq.qty) || 1;
+      todayEquips[name] = (todayEquips[name] || 0) + qty;
     }
 
     const workerStats: { category: string, today: number, accumulated: number }[] = [];
@@ -739,7 +743,10 @@ router.get('/:id/export-pdf', authenticateToken, async (req: AuthRequest, res) =
       }
       for (const eq of eList) {
         const name = eq.name || '機具';
-        accumulatedEquip[name] = (accumulatedEquip[name] || 0) + (Number(eq.qty) || 1); // using qty instead of hours
+        const qty = Number(eq.quantity ?? eq.qty) || 1;
+        const rawHours = Number(eq.hours) || 0;
+        const eqHours = (qty > 1 && rawHours === 8) ? qty * 8 : (rawHours || qty * 8);
+        accumulatedEquip[name] = (accumulatedEquip[name] || 0) + eqHours;
       }
     }
 
@@ -792,7 +799,8 @@ router.get('/:id/export-pdf', authenticateToken, async (req: AuthRequest, res) =
     const todayEquips: Record<string, number> = {};
     for (const eq of equips) {
       const name = eq.name || '機具';
-      todayEquips[name] = (todayEquips[name] || 0) + (Number(eq.qty) || 1);
+      const qty = Number(eq.quantity ?? eq.qty) || 1;
+      todayEquips[name] = (todayEquips[name] || 0) + qty;
     }
 
     // Merge into arrays for the template (5 rows max)

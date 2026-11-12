@@ -1009,7 +1009,9 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                       </select>
                       <input type="number" min="0" value={eq.quantity} onChange={e => {
                         const newEqs = [...toolboxForm.equipments];
-                        newEqs[idx].quantity = Number(e.target.value);
+                        const qty = Number(e.target.value);
+                        newEqs[idx].quantity = qty;
+                        newEqs[idx].hours = qty * 8;
                         setToolboxForm({...toolboxForm, equipments: newEqs});
                       }} placeholder="數量" className="w-[80px] px-3 py-1.5 text-sm border rounded outline-none" />
                       <span className="text-sm text-slate-500">台</span>
@@ -1231,7 +1233,9 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                       </select>
                       <input type="number" min="0" value={eq.quantity} onChange={e => {
                         const newEqs = [...equipments];
-                        newEqs[idx].quantity = Number(e.target.value);
+                        const qty = Number(e.target.value);
+                        newEqs[idx].quantity = qty;
+                        newEqs[idx].hours = qty * 8;
                         setEquipments(newEqs);
                       }} placeholder="數量" className="w-[80px] px-3 py-1.5 text-sm border rounded outline-none" />
                       <span className="text-sm text-slate-500">台</span>
@@ -1839,6 +1843,39 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                             <tr className="bg-indigo-50 font-bold text-sm">
                               <td colSpan={4} className="border border-slate-300 p-2 text-right">總派工時數：</td>
                               <td className="border border-slate-300 p-2 text-right text-indigo-700">{safeParseJSON(viewingRecord.data.dispatch_workers, []).reduce((acc: number, w: any) => acc + (Number(w.work_hours) || 0), 0)} hr</td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {viewingRecord.data.equipments && safeParseJSON(viewingRecord.data.equipments, []).length > 0 && (
+                    <div className="mt-6 mb-8">
+                      <h3 className="text-xl font-bold mb-3 border-l-4 border-indigo-600 pl-3">機具管理</h3>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse border border-slate-300">
+                          <thead>
+                            <tr className="bg-slate-100 text-sm">
+                              <th className="border border-slate-300 p-2">機具名稱</th>
+                              <th className="border border-slate-300 p-2 text-right">數量 (台)</th>
+                              <th className="border border-slate-300 p-2 text-right">使用時數 (hr)</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {safeParseJSON(viewingRecord.data.equipments, []).map((eq: any, i: number) => (
+                              <tr key={i} className="text-sm">
+                                <td className="border border-slate-300 p-2">{eq.name}</td>
+                                <td className="border border-slate-300 p-2 text-right">{eq.quantity || 0}</td>
+                                <td className="border border-slate-300 p-2 text-right font-medium">{eq.hours || 0}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot>
+                            <tr className="bg-indigo-50 font-bold text-sm">
+                              <td className="border border-slate-300 p-2 text-right">總計：</td>
+                              <td className="border border-slate-300 p-2 text-right text-indigo-700">{safeParseJSON(viewingRecord.data.equipments, []).reduce((acc: number, eq: any) => acc + (Number(eq.quantity) || 0), 0)} 台</td>
+                              <td className="border border-slate-300 p-2 text-right text-indigo-700">{safeParseJSON(viewingRecord.data.equipments, []).reduce((acc: number, eq: any) => acc + (Number(eq.hours) || 0), 0)} hr</td>
                             </tr>
                           </tfoot>
                         </table>
