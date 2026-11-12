@@ -637,58 +637,71 @@ const ProjectDetails = () => {
                           <Download size={16} /> 匯出 PDF
                         </button>
                       )}
-                      {log._logType === 'labor' && (
-                        <button 
-                          onClick={async () => {
-                            try {
-                              const res = await axios.get(`/api/labor-reports/${log.id}/export`, {
-                                headers: { Authorization: `Bearer ${token}` },
-                                responseType: 'blob'
-                              });
-                              const url = window.URL.createObjectURL(new Blob([res.data]));
-                              const link = document.createElement('a');
-                              link.href = url;
-                              link.setAttribute('download', `施工日誌-${new Date(log._date).toLocaleDateString().replace(/\//g, '')}.xlsx`);
-                              document.body.appendChild(link);
-                              link.click();
-                              link.remove();
-                              window.URL.revokeObjectURL(url);
-                            } catch (e) {
-                              console.error(e);
-                              alert('匯出失敗');
-                            }
-                          }}
-                          className="whitespace-nowrap px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-700 font-bold hover:bg-emerald-100 hover:border-emerald-300 transition-colors shadow-sm flex items-center gap-2 text-sm"
-                        >
-                          <Download size={16} /> 匯出 Excel
-                        </button>
-                      )}
-                      {log._logType === 'labor' && (
-                        <button 
-                          onClick={async () => {
-                            try {
-                              const res = await axios.get(`/api/labor-reports/${log.id}/export-pdf`, {
-                                headers: { Authorization: `Bearer ${token}` },
-                                responseType: 'blob'
-                              });
-                              const url = window.URL.createObjectURL(new Blob([res.data]));
-                              const link = document.createElement('a');
-                              link.href = url;
-                              link.setAttribute('download', `施工日誌-${new Date(log._date).toLocaleDateString().replace(/\//g, '')}.pdf`);
-                              document.body.appendChild(link);
-                              link.click();
-                              link.remove();
-                              window.URL.revokeObjectURL(url);
-                            } catch (e) {
-                              console.error(e);
-                              alert('匯出 PDF 失敗');
-                            }
-                          }}
-                          className="whitespace-nowrap px-4 py-2 bg-red-50 border border-red-200 rounded-lg text-red-700 font-bold hover:bg-red-100 hover:border-red-300 transition-colors shadow-sm flex items-center gap-2 text-sm"
-                        >
-                          <Download size={16} /> 匯出 PDF
-                        </button>
-                      )}
+                      {log._logType === 'labor' && (() => {
+                        const d = new Date(log._date);
+                        const rocDate = `${d.getFullYear() - 1911}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+                        const siteName = (project?.name || log.project?.name || '').trim();
+                        let parsedItems: any[] = [];
+                        try {
+                          parsedItems = typeof log.work_items === 'string' ? JSON.parse(log.work_items) : (Array.isArray(log.work_items) ? log.work_items : []);
+                        } catch {}
+                        const itemNames = Array.from(new Set(parsedItems.map((w: any) => (w?.name || '').trim()).filter(Boolean))).join('、');
+                        const workPart = itemNames || (log.work_category ? `${log.work_category}工程` : '施工日誌');
+                        const baseFileName = `${rocDate}${siteName}${workPart}`.replace(/[\\/:*?"<>|]/g, '_');
+
+                        return (
+                          <>
+                            <button 
+                              onClick={async () => {
+                                try {
+                                  const res = await axios.get(`/api/labor-reports/${log.id}/export`, {
+                                    headers: { Authorization: `Bearer ${token}` },
+                                    responseType: 'blob'
+                                  });
+                                  const url = window.URL.createObjectURL(new Blob([res.data]));
+                                  const link = document.createElement('a');
+                                  link.href = url;
+                                  link.setAttribute('download', `${baseFileName}.xlsx`);
+                                  document.body.appendChild(link);
+                                  link.click();
+                                  link.remove();
+                                  window.URL.revokeObjectURL(url);
+                                } catch (e) {
+                                  console.error(e);
+                                  alert('匯出失敗');
+                                }
+                              }}
+                              className="whitespace-nowrap px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-700 font-bold hover:bg-emerald-100 hover:border-emerald-300 transition-colors shadow-sm flex items-center gap-2 text-sm"
+                            >
+                              <Download size={16} /> 匯出 Excel
+                            </button>
+                            <button 
+                              onClick={async () => {
+                                try {
+                                  const res = await axios.get(`/api/labor-reports/${log.id}/export-pdf`, {
+                                    headers: { Authorization: `Bearer ${token}` },
+                                    responseType: 'blob'
+                                  });
+                                  const url = window.URL.createObjectURL(new Blob([res.data]));
+                                  const link = document.createElement('a');
+                                  link.href = url;
+                                  link.setAttribute('download', `${baseFileName}.pdf`);
+                                  document.body.appendChild(link);
+                                  link.click();
+                                  link.remove();
+                                  window.URL.revokeObjectURL(url);
+                                } catch (e) {
+                                  console.error(e);
+                                  alert('匯出 PDF 失敗');
+                                }
+                              }}
+                              className="whitespace-nowrap px-4 py-2 bg-red-50 border border-red-200 rounded-lg text-red-700 font-bold hover:bg-red-100 hover:border-red-300 transition-colors shadow-sm flex items-center gap-2 text-sm"
+                            >
+                              <Download size={16} /> 匯出 PDF
+                            </button>
+                          </>
+                        );
+                      })()}
                       <button 
                         onClick={() => navigate(`/onsite?viewType=${log._logType}&viewId=${log.id}`)}
                         className="whitespace-nowrap px-4 py-2 bg-white border border-slate-300 rounded-lg text-slate-700 font-bold hover:bg-slate-50 hover:text-blue-600 hover:border-blue-300 transition-colors shadow-sm flex items-center gap-2 text-sm"

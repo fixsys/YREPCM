@@ -691,8 +691,21 @@ ${report.recorder?.name || ''}`;
       }
     }
 
+    const buildLaborReportFilename = (rep: any, items: any[]) => {
+      const d = new Date(rep.report_date);
+      const rocYear = d.getFullYear() - 1911;
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const rocDate = `${rocYear}${month}${day}`;
+      const siteName = (rep.project?.name || '').trim();
+      const itemNames = Array.from(new Set(items.map((w: any) => (w?.name || '').trim()).filter(Boolean))).join('、');
+      const workPart = itemNames || (rep.work_category ? `${rep.work_category}工程` : '施工日誌');
+      return `${rocDate}${siteName}${workPart}`.replace(/[\\/:*?"<>|]/g, '_');
+    };
+    const baseFilename = buildLaborReportFilename(report, workItems);
+
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename="labor-report-${report.id}.xlsx"`);
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(`${baseFilename}.xlsx`)}`);
     
     await wb.xlsx.write(res);
     res.end();
@@ -907,9 +920,16 @@ let templatePath = path.join(__dirname, '../templates/labor-report-pdf.ejs');
     });
     await browser.close();
 
+    const d = new Date(report.report_date);
+    const rocDate = `${d.getFullYear() - 1911}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+    const siteName = (report.project?.name || '').trim();
+    const itemNames = Array.from(new Set(workItems.map((w: any) => (w?.name || '').trim()).filter(Boolean))).join('、');
+    const workPart = itemNames || (report.work_category ? `${report.work_category}工程` : '施工日誌');
+    const baseFilename = `${rocDate}${siteName}${workPart}`.replace(/[\\/:*?"<>|]/g, '_');
+
     res.set({
       'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename="labor-report-${report.id}.pdf"`,
+      'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(`${baseFilename}.pdf`)}`,
       'Content-Length': String(pdfBuffer.length)
     });
     res.end(pdfBuffer);
