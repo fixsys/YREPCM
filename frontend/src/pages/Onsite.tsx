@@ -50,6 +50,17 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [users, setUsers] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
+  const [dispatchOrders, setDispatchOrders] = useState<any[]>([]);
+
+  const formatDispatchItemLabel = (it: any) => {
+    const desc = (it?.description || '').trim();
+    const meta: string[] = [];
+    if (it?.drawing_no) meta.push(`圖號:${it.drawing_no}`);
+    if (it?.spec) meta.push(`規格:${it.spec}`);
+    if (it?.quantity) meta.push(`數量:${it.quantity}`);
+    const metaStr = meta.length > 0 ? ` (${meta.join(' / ')})` : '';
+    return `${desc || it?.category || '加工工項'}${metaStr}`;
+  };
 
   // 工具箱會議 State
   const [toolboxMeetings, setToolboxMeetings] = useState<any[]>([]);
@@ -57,6 +68,7 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
   const [editingToolboxId, setEditingToolboxId] = useState<string | null>(null);
   const [toolboxForm, setToolboxForm] = useState({
     project_id: '',
+    dispatch_order_id: '',
     record_date: new Date().toISOString().slice(0, 10),
     recorder_id: user?.id || '',
     worker_count: '',
@@ -84,6 +96,7 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
   const [editingLaborId, setEditingLaborId] = useState<string | null>(null);
   const [laborForm, setLaborForm] = useState({
     project_id: '',
+    dispatch_order_id: '',
     report_date: new Date().toISOString().slice(0, 10),
     weather: '晴',
     recorder_id: user?.id || '',
@@ -177,6 +190,36 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
       '模組': ['模組進場點收', '模組搬運上架', '模組定位排列', '中壓塊安裝', '側壓塊安裝', '模組鎖固扭力確認', '模組外觀及破損檢查', '其他模組工程'],
       '鋼構': ['錨栓及柱腳放樣', '鋼柱吊裝', '鋼柱及主梁吊裝', '次梁及斜撐安裝', '梁柱接頭螺栓安裝', '高強度螺栓終鎖', '現場焊接作業', '柱腳無收縮灌漿', '鍍鋅層修補', '其他鋼構工程'],
     };
+
+    if (isManufacturing) {
+      const selectedOrder = dispatchOrders.find(o => o.id === laborForm.dispatch_order_id);
+      if (selectedOrder && Array.isArray(selectedOrder.items) && selectedOrder.items.length > 0) {
+        const mapped: Record<string, string[]> = {};
+        selectedOrder.items.forEach((it: any) => {
+          const cat = (it.category || '生產加工').trim();
+          const label = formatDispatchItemLabel(it);
+          if (!mapped[cat]) mapped[cat] = [];
+          if (!mapped[cat].includes(label)) mapped[cat].push(label);
+        });
+        if (Object.keys(mapped).length > 0) return mapped;
+      }
+
+      if (laborForm.project_id) {
+        const projectOrders = dispatchOrders.filter(o => o.project_id === laborForm.project_id);
+        const mapped: Record<string, string[]> = {};
+        projectOrders.forEach(o => {
+          if (Array.isArray(o.items)) {
+            o.items.forEach((it: any) => {
+              const cat = (it.category || '生產加工').trim();
+              const label = formatDispatchItemLabel(it);
+              if (!mapped[cat]) mapped[cat] = [];
+              if (!mapped[cat].includes(label)) mapped[cat].push(label);
+            });
+          }
+        });
+        if (Object.keys(mapped).length > 0) return mapped;
+      }
+    }
     
     if (laborForm.project_id) {
       const project = projects.find(p => p.id === laborForm.project_id);
@@ -194,7 +237,7 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
       }
     }
     return defaultCategories;
-  }, [laborForm.project_id, projects]);
+  }, [isManufacturing, laborForm.dispatch_order_id, laborForm.project_id, dispatchOrders, projects]);
 
   const WORK_CATEGORIES = useMemo(() => {
     const cats = Object.keys(categoryToItems);
@@ -202,6 +245,13 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
   }, [categoryToItems]);
 
   const toolboxCategories = useMemo(() => {
+    if (isManufacturing && toolboxForm.dispatch_order_id) {
+      const selectedOrder = dispatchOrders.find(o => o.id === toolboxForm.dispatch_order_id);
+      if (selectedOrder && Array.isArray(selectedOrder.items) && selectedOrder.items.length > 0) {
+        const cats = Array.from(new Set(selectedOrder.items.map((it: any) => (it.category || '生產加工').trim()))).filter(Boolean) as string[];
+        if (cats.length > 0) return cats;
+      }
+    }
     if (toolboxForm.project_id) {
       const project = projects.find(p => p.id === toolboxForm.project_id);
       if (project && project.work_items_config && !Array.isArray(project.work_items_config)) {
@@ -210,7 +260,7 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
       }
     }
     return DEFAULT_WORK_CATEGORIES;
-  }, [toolboxForm.project_id, projects]);
+  }, [isManufacturing, toolboxForm.dispatch_order_id, toolboxForm.project_id, dispatchOrders, projects]);
 
   useEffect(() => {
     if (isLaborModalOpen && WORK_CATEGORIES.length > 0 && !WORK_CATEGORIES.includes(laborForm.work_category)) {
@@ -310,16 +360,18 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [tbRes, laborRes, uRes, projRes] = await Promise.all([
+      const [tbRes, laborRes, uRes, projRes, doRes] = await Promise.all([
         axios.get(`/api/toolbox-meetings?module_type=${mode}`, { headers: { Authorization: `Bearer ${token}` } }),
         axios.get(`/api/labor-reports?module_type=${mode}`, { headers: { Authorization: `Bearer ${token}` } }),
         axios.get('/api/users', { headers: { Authorization: `Bearer ${token}` } }),
-        axios.get('/api/projects', { headers: { Authorization: `Bearer ${token}` } })
+        axios.get('/api/projects', { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get('/api/dispatch-orders', { headers: { Authorization: `Bearer ${token}` } }).catch(() => ({ data: [] }))
       ]);
       setToolboxMeetings(tbRes.data);
       setLaborReports(laborRes.data);
       setUsers(uRes.data);
       setProjects(projRes.data);
+      setDispatchOrders(doRes.data || []);
     } catch (error) {
       console.error(error);
     } finally {
@@ -378,7 +430,7 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
 
   const handleAddToolbox = () => {
     setEditingToolboxId(null);
-    setToolboxForm({ project_id: '', record_date: new Date().toISOString().slice(0, 10), recorder_id: user?.id || '', worker_count: '', work_category: '土木', work_content: '', safety_check_1: false, safety_check_2: false, safety_check_3: false, work_area: '', work_items: [], hazards: [], safety_measures: [], equipments: [], other_risks: '', signatures: [] });
+    setToolboxForm({ project_id: '', dispatch_order_id: '', record_date: new Date().toISOString().slice(0, 10), recorder_id: user?.id || '', worker_count: '', work_category: isManufacturing ? '鋼構加工' : '土木', work_content: '', safety_check_1: false, safety_check_2: false, safety_check_3: false, work_area: '', work_items: [], hazards: [], safety_measures: [], equipments: [], other_risks: '', signatures: [] });
     setToolboxPhotos([]);
     setIsToolboxModalOpen(true);
   };
@@ -387,6 +439,7 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
     setEditingToolboxId(t.id);
     setToolboxForm({
       project_id: t.project_id,
+      dispatch_order_id: t.dispatch_order_id || '',
       record_date: new Date(t.record_date).toISOString().slice(0, 10),
       recorder_id: t.recorder_id,
       worker_count: t.worker_count.toString(),
@@ -463,8 +516,8 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
 
   const handleAddLabor = () => {
     setEditingLaborId(null);
-    const defaultCat = WORK_CATEGORIES[0] || '土木';
-    setLaborForm({ project_id: '', report_date: new Date().toISOString().slice(0, 10), weather: '晴', recorder_id: user?.id || '', pm_id: '', work_category: defaultCat, drawing_number: '', drawing_revision: '', construction_location: '', drawing_check_result: '符合圖說', drawing_check_confirmed: false, safety_check_1: false, safety_check_2: false, safety_check_3: false, tomorrow_plan: '', additional_notes: '' });
+    const defaultCat = WORK_CATEGORIES[0] || (isManufacturing ? '鋼構加工' : '土木');
+    setLaborForm({ project_id: '', dispatch_order_id: '', report_date: new Date().toISOString().slice(0, 10), weather: '晴', recorder_id: user?.id || '', pm_id: '', work_category: defaultCat, drawing_number: '', drawing_revision: '', construction_location: '', drawing_check_result: '符合圖說', drawing_check_confirmed: false, safety_check_1: false, safety_check_2: false, safety_check_3: false, tomorrow_plan: '', additional_notes: '' });
     setLaborPhotosClose([]);
     setLaborPhotosMid([]);
     setLaborPhotosFar([]);
@@ -480,6 +533,7 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
     setEditingLaborId(l.id);
     setLaborForm({
       project_id: l.project_id,
+      dispatch_order_id: l.dispatch_order_id || '',
       report_date: new Date(l.report_date).toISOString().slice(0, 10),
       weather: l.weather,
       recorder_id: l.recorder_id,
@@ -595,8 +649,15 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
               <div key={t.id} className="bg-white rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-all flex flex-col">
                 <div className="p-4 flex flex-col flex-1">
                   <div className="flex flex-col gap-2 mb-2">
-                    <div className="flex justify-between items-start">
-                      <span className="text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded text-sm">{t.project?.project_code || '無專案'}</span>
+                    <div className="flex justify-between items-start gap-2 flex-wrap">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded text-sm">{t.project?.project_code || '無專案'}</span>
+                        {t.dispatchOrder?.dispatch_no && (
+                          <span className="text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded text-xs font-bold font-mono">
+                            派工單: {t.dispatchOrder.dispatch_no}
+                          </span>
+                        )}
+                      </div>
                       <span className="text-xs text-slate-500 flex items-center gap-1 shrink-0">
                         <Clock size={12}/> {new Date(t.record_date).toLocaleDateString()}
                       </span>
@@ -652,8 +713,15 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
               <div key={l.id} className="bg-white rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-all flex flex-col">
                 <div className="p-4 flex flex-col flex-1">
                   <div className="flex flex-col gap-2 mb-2">
-                    <div className="flex justify-between items-start">
-                      <span className="text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded text-sm">{l.project?.project_code || '無專案'}</span>
+                    <div className="flex justify-between items-start gap-2 flex-wrap">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded text-sm">{l.project?.project_code || '無專案'}</span>
+                        {l.dispatchOrder?.dispatch_no && (
+                          <span className="text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded text-xs font-bold font-mono">
+                            派工單: {l.dispatchOrder.dispatch_no}
+                          </span>
+                        )}
+                      </div>
                       <span className="text-xs text-slate-500 flex items-center gap-1 shrink-0">
                         <Clock size={12}/> {new Date(l.report_date).toLocaleDateString()}
                       </span>
@@ -795,8 +863,44 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
             <div className="p-6 overflow-y-auto flex-1">
               <form id="toolboxForm" onSubmit={handleToolboxSubmit} className="space-y-4">
                 <div className="grid grid-cols-1 gap-4">
+                  {isManufacturing && (
+                    <div>
+                      <label className="block text-sm font-bold text-blue-700 mb-1">派工單號 * (選擇後自動帶出專案與派工工項)</label>
+                      <select
+                        required
+                        value={toolboxForm.dispatch_order_id}
+                        onChange={e => {
+                          const orderId = e.target.value;
+                          const order = dispatchOrders.find(o => o.id === orderId);
+                          if (order) {
+                            const orderItems: any[] = Array.isArray(order.items) ? order.items : [];
+                            const firstCat = (orderItems[0]?.category || '生產加工').trim();
+                            const itemLabels = orderItems.map(it => formatDispatchItemLabel(it));
+                            setToolboxForm({
+                              ...toolboxForm,
+                              dispatch_order_id: orderId,
+                              project_id: order.project_id,
+                              work_category: firstCat,
+                              work_content: itemLabels.join('、') || toolboxForm.work_content,
+                              work_items: itemLabels.map(name => ({ name, note: '' }))
+                            });
+                          } else {
+                            setToolboxForm({ ...toolboxForm, dispatch_order_id: '' });
+                          }
+                        }}
+                        className="w-full px-3 py-2 border-2 border-blue-300 bg-blue-50/40 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                      >
+                        <option value="">-- 請選擇生產派工單號 --</option>
+                        {dispatchOrders.map(o => (
+                          <option key={o.id} value={o.id}>
+                            {o.dispatch_no} ({o.project?.project_code} - {o.project?.name}) [{o.urgency}]
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">專案代碼 *</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">專案代碼 * {isManufacturing && toolboxForm.dispatch_order_id ? '(已由派工單自動帶出)' : ''}</label>
                     <select required value={toolboxForm.project_id} onChange={e => setToolboxForm({...toolboxForm, project_id: e.target.value})} className="w-full px-3 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500">
                       <option value="">-- 請選擇專案 --</option>
                       {projects.filter(p => p.status !== '評估中').map(p => <option key={p.id} value={p.id}>{p.project_code} - {p.name}</option>)}
@@ -852,26 +956,34 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                   <div className="mb-4">
                     <label className="block text-sm font-medium text-slate-700 mb-2">工作內容 (勾選並填寫備註)</label>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                      {TOOLBOX_WORK_ITEMS.map(item => {
-                         const existingItem = toolboxForm.work_items.find(w => w.name === item);
-                         return (
-                           <div key={item} className="flex items-center gap-2 text-sm text-slate-700">
-                             <input type="checkbox" checked={!!existingItem} onChange={e => {
-                               if (e.target.checked) setToolboxForm({...toolboxForm, work_items: [...toolboxForm.work_items, { name: item, note: '' }]});
-                               else setToolboxForm({...toolboxForm, work_items: toolboxForm.work_items.filter(w => w.name !== item)});
-                             }} className="w-4 h-4 text-indigo-600" />
-                             <span className="shrink-0">{item}</span>
-                             {existingItem && (
-                               <input type="text" placeholder="備註..." value={existingItem.note} onChange={e => {
-                                 setToolboxForm({
-                                   ...toolboxForm,
-                                   work_items: toolboxForm.work_items.map(w => w.name === item ? { ...w, note: e.target.value } : w)
-                                 });
-                               }} className="flex-1 ml-2 border-b border-slate-300 outline-none px-1 text-xs" />
-                             )}
-                           </div>
-                         );
-                      })}
+                      {(() => {
+                        const dispatchOrderItems = isManufacturing && toolboxForm.dispatch_order_id
+                          ? safeParseJSON(dispatchOrders.find((o: any) => o.id === toolboxForm.dispatch_order_id)?.items, [])
+                              .map((it: any) => formatDispatchItemLabel(it))
+                              .filter(Boolean)
+                          : [];
+                        const allOptions = Array.from(new Set([...dispatchOrderItems, ...TOOLBOX_WORK_ITEMS]));
+                        return allOptions.map(item => {
+                          const existingItem = toolboxForm.work_items.find(w => w.name === item);
+                          return (
+                            <div key={item} className="flex items-center gap-2 text-sm text-slate-700">
+                              <input type="checkbox" checked={!!existingItem} onChange={e => {
+                                if (e.target.checked) setToolboxForm({...toolboxForm, work_items: [...toolboxForm.work_items, { name: item, note: '' }]});
+                                else setToolboxForm({...toolboxForm, work_items: toolboxForm.work_items.filter(w => w.name !== item)});
+                              }} className="w-4 h-4 text-indigo-600" />
+                              <span className="shrink-0">{item}</span>
+                              {existingItem && (
+                                <input type="text" placeholder="備註..." value={existingItem.note} onChange={e => {
+                                  setToolboxForm({
+                                    ...toolboxForm,
+                                    work_items: toolboxForm.work_items.map(w => w.name === item ? { ...w, note: e.target.value } : w)
+                                  });
+                                }} className="flex-1 ml-2 border-b border-slate-300 outline-none px-1 text-xs" />
+                              )}
+                            </div>
+                          );
+                        });
+                      })()}
                     </div>
                   </div>
 
@@ -1104,6 +1216,57 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
             <div className="p-6 overflow-y-auto flex-1">
               <form id="laborForm" onSubmit={handleLaborSubmit} className="space-y-4">
                 <div className="grid grid-cols-1 gap-4">
+                  {isManufacturing && (
+                    <div className="bg-amber-50/70 border border-amber-200 p-3.5 rounded-lg">
+                      <label className="block text-sm font-bold text-amber-900 mb-1">派工單號 * (選擇後自動帶入專案代碼與派工單工項)</label>
+                      <select
+                        required={isManufacturing}
+                        value={laborForm.dispatch_order_id}
+                        onChange={e => {
+                          const orderId = e.target.value;
+                          const order = dispatchOrders.find((o: any) => o.id === orderId);
+                          if (order) {
+                            const items = safeParseJSON(order.items, []);
+                            const catMap: Record<string, string[]> = {};
+                            items.forEach((it: any) => {
+                              const cat = it.category || '生產製造加工';
+                              const label = formatDispatchItemLabel(it);
+                              if (!catMap[cat]) catMap[cat] = [];
+                              if (label && !catMap[cat].includes(label)) catMap[cat].push(label);
+                            });
+                            const firstCat = Object.keys(catMap)[0] || '生產製造加工';
+                            const catItems = catMap[firstCat] || [];
+                            setLaborForm(prev => ({
+                              ...prev,
+                              dispatch_order_id: orderId,
+                              project_id: order.project_id || prev.project_id,
+                              work_category: firstCat
+                            }));
+                            if (catItems.length > 0) {
+                              setWorkItems(catItems.map(name => ({ name, progress: '', worker_count: '', work_hours: '' })));
+                            } else {
+                              setWorkItems([{ name: '', progress: '', worker_count: '', work_hours: '' }]);
+                            }
+                            setDispatchWorkers(prev => prev.map(w => ({
+                              ...w,
+                              work_category: firstCat,
+                              work_item: catItems[0] || ''
+                            })));
+                          } else {
+                            setLaborForm(prev => ({ ...prev, dispatch_order_id: '' }));
+                          }
+                        }}
+                        className="w-full px-3 py-2 border border-amber-300 bg-white rounded-lg outline-none focus:ring-2 focus:ring-amber-500 font-medium text-slate-800"
+                      >
+                        <option value="">-- 請選擇派工單號 --</option>
+                        {dispatchOrders.map((o: any) => (
+                          <option key={o.id} value={o.id}>
+                            {o.dispatch_no} ({o.project?.project_code || ''} {o.project?.name || o.site_name || ''})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">專案代碼 *</label>
                     <select required value={laborForm.project_id} onChange={e => setLaborForm({...laborForm, project_id: e.target.value})} className="w-full px-3 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500">
@@ -1252,12 +1415,18 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                 </div>
 
                 <div className="border-t border-slate-200 pt-4 mt-4">
-                  <label className="block text-sm font-bold text-slate-700 mb-2">工作類別與工項進度</label>
+                  <label className="block text-sm font-bold text-slate-700 mb-2">工作類別與工項進度 {isManufacturing && <span className="text-xs font-normal text-amber-700 ml-1">(工項以所選派工單為主)</span>}</label>
                   <select value={laborForm.work_category} onChange={e => {
-                    setLaborForm({...laborForm, work_category: e.target.value});
-                    setWorkItems([{name: categoryToItems[e.target.value]?.[0] || '', progress: '', worker_count: '', work_hours: ''}]);
+                    const nextCat = e.target.value;
+                    setLaborForm({...laborForm, work_category: nextCat});
+                    const itemsForCat = categoryToItems[nextCat] || [];
+                    if (isManufacturing && itemsForCat.length > 0) {
+                      setWorkItems(itemsForCat.map(name => ({ name, progress: '', worker_count: '', work_hours: '' })));
+                    } else {
+                      setWorkItems([{name: itemsForCat[0] || '', progress: '', worker_count: '', work_hours: ''}]);
+                    }
                   }} className="w-full px-3 py-2 border rounded-lg outline-none mb-4 font-medium bg-slate-50">
-                    {Array.from(new Set([laborForm.work_category, ...WORK_CATEGORIES])).filter(Boolean).map(c => <option key={c} value={c}>{c}工程</option>)}
+                    {Array.from(new Set([laborForm.work_category, ...WORK_CATEGORIES])).filter(Boolean).map(c => <option key={c} value={c}>{isManufacturing ? c : `${c}工程`}</option>)}
                   </select>
 
                   <div className="space-y-3">
@@ -1699,6 +1868,11 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                     <h2 className="text-2xl font-bold mt-2 tracking-widest">勞工安全衛生工具箱會議紀錄表</h2>
                   </div>
                   <div className="grid grid-cols-2 gap-4 text-lg border-b border-slate-200 pb-6">
+                    {viewingRecord.data.dispatchOrder?.dispatch_no && (
+                      <div className="col-span-2 text-amber-800 bg-amber-50 px-3 py-1.5 rounded border border-amber-200">
+                        <strong>派工單號：</strong> {viewingRecord.data.dispatchOrder.dispatch_no}
+                      </div>
+                    )}
                     <div><strong>會議日期：</strong> {new Date(viewingRecord.data.record_date).toLocaleDateString()}</div>
                     <div><strong>工程名稱：</strong> {viewingRecord.data.work_category}工程</div>
                     <div><strong>工務經理：</strong> {viewingRecord.data.pm?.name || '無'}</div>
@@ -1806,6 +1980,11 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                     <h2 className="text-2xl font-bold mt-2 tracking-widest">施工日誌報表</h2>
                   </div>
                   <div className="grid grid-cols-2 gap-4 text-lg border-b border-slate-200 pb-6">
+                    {viewingRecord.data.dispatchOrder?.dispatch_no && (
+                      <div className="col-span-2 text-amber-800 bg-amber-50 px-3 py-1.5 rounded border border-amber-200">
+                        <strong>派工單號：</strong> {viewingRecord.data.dispatchOrder.dispatch_no}
+                      </div>
+                    )}
                     <div><strong>報工日期：</strong> {new Date(viewingRecord.data.report_date).toLocaleDateString()}</div>
                     <div><strong>天氣狀況：</strong> {viewingRecord.data.weather}</div>
                     <div><strong>工程類別：</strong> {viewingRecord.data.work_category}工程</div>

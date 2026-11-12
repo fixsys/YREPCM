@@ -4,6 +4,7 @@ import axios from 'axios';
 import { useAuthStore } from '../store/authStore';
 import RequirementForm from './crm/RequirementForm';
 import ProjectTimeline from '../components/ProjectTimeline';
+import DispatchOrdersTab from '../components/DispatchOrdersTab';
 import { ArrowLeft, Clock, Calendar, User, FileText, Plus, Edit2, Trash2, Paperclip, Building2, AlignLeft, CheckCircle2, UploadCloud, File as FileIcon, Download } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import ProjectWorkflowTab from '../components/ProjectWorkflowTab';
@@ -553,7 +554,7 @@ const ProjectDetails = () => {
             <button onClick={() => setActiveTab('requirements')} className={`px-4 py-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors flex-1 ${activeTab === 'requirements' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}>客戶需求單</button>
             <button onClick={() => setActiveTab('logs')} className={`px-4 py-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors flex-1 ${activeTab === 'logs' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}>施工日誌</button>
             <button onClick={() => setActiveTab('tasks')} className={`px-4 py-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors flex-1 ${activeTab === 'tasks' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}>任務與工時</button>
-            <button onClick={() => setActiveTab('performance')} className={`px-4 py-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors flex-1 ${activeTab === 'performance' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}>專案績效與貢獻</button>
+            <button onClick={() => setActiveTab('performance')} className={`px-4 py-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors flex-1 ${activeTab === 'performance' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}>生產派工</button>
             <button onClick={() => setActiveTab('files')} className={`px-4 py-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors flex-1 ${activeTab === 'files' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}>開案執行書</button>
             <button onClick={() => setActiveTab('work_items')} className={`px-4 py-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors flex-1 ${activeTab === 'work_items' ? 'bg-teal-50 text-teal-700' : 'text-slate-600 hover:bg-slate-50'}`}>施工細項設定</button>
             <button onClick={() => setActiveTab('timeline')} className={`px-4 py-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors flex-1 ${activeTab === 'timeline' ? 'bg-teal-50 text-teal-700' : 'text-slate-600 hover:bg-slate-50'}`}>專案時間軸</button>
@@ -814,69 +815,7 @@ const ProjectDetails = () => {
           )}
 
           {activeTab === 'performance' && (
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-6">
-              <h3 className="text-lg font-semibold text-slate-800 border-b pb-3">專案績效與資源視圖</h3>
-              {contributionData ? (
-                <div className="grid grid-cols-1 @md:grid-cols-2 gap-6">
-                  {/* Pie Chart */}
-                  <div className="border border-slate-100 rounded-lg p-4">
-                    <h4 className="text-sm font-bold text-slate-700 mb-4 text-center">成員工時佔比</h4>
-                    <div className="h-64">
-                      {contributionData.totalProjectHours > 0 ? (
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie
-                              data={contributionData.contributions.filter((c:any) => c.hours > 0)}
-                              dataKey="hours"
-                              nameKey="name"
-                              cx="50%"
-                              cy="50%"
-                              outerRadius={80}
-                              label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                            >
-                              {contributionData.contributions.map((entry:any, index:number) => (
-                                <Cell key={`cell-${index}`} fill={['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'][index % 5]} />
-                              ))}
-                            </Pie>
-                            <Tooltip formatter={(value) => `${value} 小時`} />
-                            <Legend />
-                          </PieChart>
-                        </ResponsiveContainer>
-                      ) : (
-                        <div className="h-full flex items-center justify-center text-sm text-slate-400">尚無工時資料</div>
-                      )}
-                    </div>
-                    <div className="text-center mt-2 text-sm text-slate-500">
-                      總投入工時: {contributionData.totalProjectHours} hr
-                    </div>
-                  </div>
-
-                  {/* Contribution Ranking */}
-                  <div className="border border-slate-100 rounded-lg p-4">
-                    <h4 className="text-sm font-bold text-slate-700 mb-4">成員貢獻度排名</h4>
-                    <div className="space-y-3">
-                      {contributionData.contributions.map((c: any, i: number) => (
-                        <div key={c.userId} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg border border-slate-100">
-                          <div className="flex items-center gap-3">
-                            <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold">{i + 1}</div>
-                            <span className="font-medium text-slate-700">{c.name}</span>
-                          </div>
-                          <div className="text-right">
-                            <div className="font-bold text-blue-600">{c.totalContribution.toFixed(1)}%</div>
-                            <div className="text-xs text-slate-400">工時 {c.hours}hr</div>
-                          </div>
-                        </div>
-                      ))}
-                      {contributionData.contributions.length === 0 && (
-                        <div className="text-center text-sm text-slate-400 py-4">尚無成員貢獻資料</div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-8 text-slate-500">無貢獻度資料</div>
-              )}
-            </div>
+            <DispatchOrdersTab project={project} />
           )}
 
           {activeTab === 'timeline' && (

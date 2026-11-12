@@ -40,6 +40,7 @@ router.get('/', authenticateToken, async (req: AuthRequest, res) => {
       where: whereClause,
       include: { 
         project: { select: { project_code: true, name: true } },
+        dispatchOrder: { select: { id: true, dispatch_no: true, items: true } },
         recorder: { select: { name: true } },
         pm: { select: { name: true } }
       },
@@ -56,7 +57,7 @@ router.get('/', authenticateToken, async (req: AuthRequest, res) => {
 router.post('/', authenticateToken, upload.any(), async (req: AuthRequest, res) => {
   if (!req.user) return res.status(401).json({ error: '未授權' });
 
-  const { project_id, module_type, report_date, weather, recorder_id, pm_id, engineers, dispatch_workers, equipments, work_category, work_items, drawing_number, drawing_revision, construction_location, drawing_check_result, drawing_check_confirmed, safety_check_1, safety_check_2, safety_check_3, tomorrow_plan, additional_notes } = req.body;
+  const { project_id, dispatch_order_id, module_type, report_date, weather, recorder_id, pm_id, engineers, dispatch_workers, equipments, work_category, work_items, drawing_number, drawing_revision, construction_location, drawing_check_result, drawing_check_confirmed, safety_check_1, safety_check_2, safety_check_3, tomorrow_plan, additional_notes } = req.body;
   if (!project_id) return res.status(400).json({ error: '必須選擇專案' });
 
   let parsedWorkItems = work_items ? JSON.parse(work_items) : null;
@@ -94,6 +95,7 @@ router.post('/', authenticateToken, upload.any(), async (req: AuthRequest, res) 
     const report = await prisma.dailyLaborReport.create({
       data: {
         project_id,
+        dispatch_order_id: dispatch_order_id || null,
         module_type: module_type || 'ONSITE',
         report_date: new Date(report_date),
         weather,
@@ -130,7 +132,7 @@ router.put('/:id', authenticateToken, upload.any(), async (req: AuthRequest, res
   if (!req.user) return res.status(401).json({ error: '未授權' });
 
   const { id } = req.params;
-  const { project_id, report_date, weather, recorder_id, pm_id, engineers, dispatch_workers, equipments, work_category, work_items, drawing_number, drawing_revision, construction_location, drawing_check_result, drawing_check_confirmed, safety_check_1, safety_check_2, safety_check_3, tomorrow_plan, additional_notes } = req.body;
+  const { project_id, dispatch_order_id, report_date, weather, recorder_id, pm_id, engineers, dispatch_workers, equipments, work_category, work_items, drawing_number, drawing_revision, construction_location, drawing_check_result, drawing_check_confirmed, safety_check_1, safety_check_2, safety_check_3, tomorrow_plan, additional_notes } = req.body;
 
   let parsedWorkItems = work_items ? JSON.parse(work_items) : null;
   
@@ -168,6 +170,7 @@ router.put('/:id', authenticateToken, upload.any(), async (req: AuthRequest, res
       where: { id: id as string },
       data: {
         project_id,
+        dispatch_order_id: dispatch_order_id || null,
         report_date: new Date(report_date),
         weather,
         recorder_id: recorder_id || req.user.id,

@@ -16,6 +16,7 @@ import leadsRoutes from './routes/leads';
 import budgetRoutes from './routes/budget';
 import toolboxMeetingsRoutes from './routes/toolboxMeetings';
 import laborReportsRoutes from './routes/laborReports';
+import dispatchOrdersRoutes from './routes/dispatchOrders';
 import path from 'path';
 
 dotenv.config();
@@ -45,6 +46,7 @@ app.use('/api/leads', leadsRoutes);
 app.use('/api/budget', budgetRoutes);
 app.use('/api/toolbox-meetings', toolboxMeetingsRoutes);
 app.use('/api/labor-reports', laborReportsRoutes);
+app.use('/api/dispatch-orders', dispatchOrdersRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });

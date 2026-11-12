@@ -105,6 +105,7 @@ model Project {
   files          ProjectFile[]
   toolboxMeetings ToolboxMeeting[]
   laborReports   DailyLaborReport[]
+  dispatchOrders DispatchOrder[]
   
   workflow       ProjectWorkflow?
   requirementTicket RequirementTicket?
@@ -450,44 +451,47 @@ model Quotation {
 // ==========================================
 
 model ToolboxMeeting {
-  id              String   @id @default(uuid())
-  project_id      String?  
-  module_type     String   @default("ONSITE") // ONSITE, MANUFACTURING
-  record_date     DateTime @db.Date
-  recorder_id     String
-  worker_count    Int
-  work_category   String
-  work_content    String   @db.Text
-  safety_check_1  Boolean  @default(false)
-  safety_check_2  Boolean  @default(false)
-  safety_check_3  Boolean  @default(false)
-  photos          Json?    
-  equipments      Json?    // 機具管理
-  work_area       String?
-  work_items      Json?
-  hazards         Json?
-  safety_measures Json?
-  other_risks     String?  @db.Text
-  signatures      Json?
-  created_at      DateTime @default(now())
-  updated_at      DateTime @updatedAt
+  id                String   @id @default(uuid())
+  project_id        String?  
+  dispatch_order_id String?
+  module_type       String   @default("ONSITE") // ONSITE, MANUFACTURING
+  record_date       DateTime @db.Date
+  recorder_id       String
+  worker_count      Int
+  work_category     String
+  work_content      String   @db.Text
+  safety_check_1    Boolean  @default(false)
+  safety_check_2    Boolean  @default(false)
+  safety_check_3    Boolean  @default(false)
+  photos            Json?    
+  equipments        Json?    // 機具管理
+  work_area         String?
+  work_items        Json?
+  hazards           Json?
+  safety_measures   Json?
+  other_risks       String?  @db.Text
+  signatures        Json?
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
 
-  project         Project? @relation(fields: [project_id], references: [id])
-  recorder        User     @relation("ToolboxRecorder", fields: [recorder_id], references: [id])
+  project           Project?       @relation(fields: [project_id], references: [id])
+  dispatchOrder     DispatchOrder? @relation(fields: [dispatch_order_id], references: [id])
+  recorder          User           @relation("ToolboxRecorder", fields: [recorder_id], references: [id])
 }
 
 model DailyLaborReport {
-  id              String   @id @default(uuid())
-  project_id      String?  
-  module_type     String   @default("ONSITE") // ONSITE, MANUFACTURING
-  report_date     DateTime @db.Date
-  weather         String
-  recorder_id     String
-  pm_id           String?
-  engineers       Json?    // Array of engineer IDs or names
-  dispatch_workers Json?   // Field dispatch workers
-  equipments      Json?    // Array of equipment usage
-  work_category   String
+  id                      String   @id @default(uuid())
+  project_id              String?  
+  dispatch_order_id       String?
+  module_type             String   @default("ONSITE") // ONSITE, MANUFACTURING
+  report_date             DateTime @db.Date
+  weather                 String
+  recorder_id             String
+  pm_id                   String?
+  engineers               Json?    // Array of engineer IDs or names
+  dispatch_workers        Json?    // Field dispatch workers
+  equipments              Json?    // Array of equipment usage
+  work_category           String
   work_items              Json?    // Specific work items progress
   drawing_number          String?
   drawing_revision        String?
@@ -503,8 +507,44 @@ model DailyLaborReport {
   created_at              DateTime @default(now())
   updated_at              DateTime @updatedAt
 
-  project         Project? @relation(fields: [project_id], references: [id])
-  recorder        User     @relation("LaborReportRecorder", fields: [recorder_id], references: [id])
-  pm              User?    @relation("LaborReportPM", fields: [pm_id], references: [id])
+  project                 Project?       @relation(fields: [project_id], references: [id])
+  dispatchOrder           DispatchOrder? @relation(fields: [dispatch_order_id], references: [id])
+  recorder                User           @relation("LaborReportRecorder", fields: [recorder_id], references: [id])
+  pm                      User?          @relation("LaborReportPM", fields: [pm_id], references: [id])
 }
+
+model DispatchOrder {
+  id                     String    @id @default(uuid())
+  dispatch_no            String    @unique // 派工單號
+  project_id             String
+  submit_date            DateTime  @db.Date // 送單時間(必填)
+  urgency                String    @default("一般(7日)") // 急單(3日), 一般(7日), 長期
+  request_dept           String    @default("工務部") // 需求單位(必填)
+  requester_name         String?   // 開單人
+  requester_phone        String?   // 電話
+  target_dept            String    @default("鋼構部") // 預計委託單位(必填)
+  category_type          String    @default("案場需求") // 案場需求, 工廠內部需求, 其他需求
+  site_name              String?   // 案場名稱
+  factory_area           String?   // 廠區: 新市廠, 安南廠, 安定廠
+  other_location         String?   // 位置
+  items                  Json?     // 生產製造加工需求(條列式): [{ category, description, drawing_no, spec, quantity, unit }]
+  description_note       String?   @db.Text // 補充說明
+  required_date          DateTime? @db.Date // 需求時間(必填)
+  req_manager_sign       String?   // 需求單位主管簽核
+  req_manager_comment    String?   @db.Text // 簽核意見
+  drawing_received_date  String?   // 收圖章日期
+  target_manager_sign    String?   // 受託單位主管簽名
+  approval_status        String    @default("待簽核") // 待簽核, 同意, 退回
+  target_manager_comment String?   @db.Text // 受託單位簽核意見
+  assigned_staff_sign    String?   // 交辦人員簽名
+  remarks                String?   @db.Text // 備註
+  creator_id             String?
+  created_at             DateTime  @default(now())
+  updated_at             DateTime  @updatedAt
+
+  project                Project   @relation(fields: [project_id], references: [id])
+  toolboxMeetings        ToolboxMeeting[]
+  laborReports           DailyLaborReport[]
+}
+
 
