@@ -1,9 +1,40 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
+import multer from 'multer';
+import * as XLSX from 'xlsx';
 import { authenticateToken, AuthRequest } from '../middleware/authMiddleware';
 
 const router = Router();
 const prisma = new PrismaClient();
+const memoryUpload = multer({ storage: multer.memoryStorage() });
+
+// Download Excel template for work items import
+router.get('/work-items-template', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const wb = XLSX.utils.book_new();
+    const sampleRows = [
+      ['類別', '工項名稱', '契約數量', '單位', '開始日期', '結束日期'],
+      ['土木', '基樁鑽掘與澆置', 120, '支', '2026-11-15', '2026-11-30'],
+      ['土木', '基礎模板組拆', 80, 'm2', '2026-12-01', '2026-12-10'],
+      ['鋼構', 'H型鋼立柱吊裝', 45, '噸', '2026-12-11', '2026-12-25'],
+      ['機電', '太陽能模組鋪設', 600, '片', '2027-01-05', '2027-01-20'],
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(sampleRows);
+    ws['!cols'] = [{ wch: 14 }, { wch: 24 }, { wch: 12 }, { wch: 10 }, { wch: 15 }, { wch: 15 }];
+    XLSX.utils.book_append_sheet(wb, ws, '工作細項匯入範本');
+    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename*=UTF-8''${encodeURIComponent('施工細項匯入範本.xlsx')}`
+    );
+    res.send(buf);
+  } catch (error) {
+    console.error('Template download error:', error);
+    res.status(500).json({ error: '下載範本失敗' });
+  }
+});
 
 // Get all projects
 router.get('/', authenticateToken, async (req: AuthRequest, res) => {
@@ -221,6 +252,191 @@ router.put('/:id/work-items', authenticateToken, async (req: AuthRequest, res) =
   } catch (error) {
     console.error('Update work items error:', error);
     res.status(500).json({ error: 'Failed to update work items' });
+  }
+});
+
+// Import project work items from Excel
+router.post('/:id/work-items/import', authenticateToken, memoryUpload.single('file'), async (req: AuthRequest, res) => {
+  try {
+    const projectId = req.params.id as string;
+    if (!req.file) {
+      return res.status(400).json({ error: '請選擇要匯入的 Excel 檔案' });
+    }
+
+    const project = await prisma.project.findUnique({ where: { id: projectId } });
+    if (!project) {
+      return res.status(404).json({ error: '找不到專案' });
+    }
+
+    // Merge with current config passed from frontend or DB
+    let currentConfig: Record<string, any[]> = {};
+    if (req.body.current_config) {
+      try {
+        currentConfig = JSON.parse(req.body.current_config);
+      } catch {}
+    } else if (project.work_items_config && typeof project.work_items_config === 'object' && !Array.isArray(project.work_items_config)) {
+      currentConfig = { ...(project.work_items_config as Record<string, any[]>) };
+    }
+
+    const defaultCategoryFromBody = (req.body.default_category || '').trim();
+    const workbook = XLSX.read(req.file.buffer, { type: 'buffer', cellDates: true });
+
+    if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+      return res.status(400).json({ error: '拒絕匯入：Excel 檔案內沒有任何工作表' });
+    }
+
+    const REQUIRED_HEADERS = ['工項名稱', '契約數量', '單位', '開始日期', '結束日期'];
+    const OPTIONAL_CATEGORY_HEADERS = ['類別', '工程類別'];
+    const ALLOWED_HEADERS = new Set([...REQUIRED_HEADERS, ...OPTIONAL_CATEGORY_HEADERS]);
+
+    const normalizeExcelDate = (val: any): string => {
+      if (val === undefined || val === null || val === '') return '';
+      if (val instanceof Date && !isNaN(val.getTime())) {
+        const y = val.getFullYear();
+        const m = String(val.getMonth() + 1).padStart(2, '0');
+        const d = String(val.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      }
+      if (typeof val === 'number') {
+        const parsed = XLSX.SSF.parse_date_code(val);
+        if (parsed && parsed.y && parsed.m && parsed.d) {
+          const y = parsed.y < 1911 ? parsed.y + 1911 : parsed.y;
+          return `${y}-${String(parsed.m).padStart(2, '0')}-${String(parsed.d).padStart(2, '0')}`;
+        }
+      }
+      const str = String(val).trim();
+      if (!str) return '';
+      // Match YYYY-MM-DD or YYYY/MM/DD or ROC YYY/MM/DD
+      const m = str.match(/^(\d{2,4})[\/\-.\年](\d{1,2})[\/\-.\月](\d{1,2})/);
+      if (m) {
+        let year = parseInt(m[1], 10);
+        if (year < 1911) year += 1911;
+        const month = String(parseInt(m[2], 10)).padStart(2, '0');
+        const day = String(parseInt(m[3], 10)).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      }
+      const dObj = new Date(str);
+      if (!isNaN(dObj.getTime())) {
+        return dObj.toISOString().slice(0, 10);
+      }
+      return '';
+    };
+
+    let totalImportedItems = 0;
+    const addedCategories = new Set<string>();
+    let hasValidSheet = false;
+
+    for (const sheetName of workbook.SheetNames) {
+      const sheet = workbook.Sheets[sheetName];
+      const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+      // Filter out completely empty trailing rows
+      const nonEmptyRows = rows.filter(r => Array.isArray(r) && r.some(cell => String(cell ?? '').trim() !== ''));
+      if (nonEmptyRows.length === 0) continue;
+
+      hasValidSheet = true;
+      const headerRow = nonEmptyRows[0].map(c => String(c ?? '').trim()).filter(Boolean);
+
+      // Verify all 5 required headers exist
+      const missingHeaders = REQUIRED_HEADERS.filter(reqH => !headerRow.includes(reqH));
+      const invalidHeaders = headerRow.filter(h => !ALLOWED_HEADERS.has(h));
+
+      if (missingHeaders.length > 0 || invalidHeaders.length > 0) {
+        return res.status(400).json({
+          error: `拒絕匯入：工作表「${sheetName}」格式不符合！必須包含欄位：工項名稱、契約數量、單位、開始日期、結束日期（可選填「類別」欄）${
+            missingHeaders.length > 0 ? `；缺少欄位：${missingHeaders.join('、')}` : ''
+          }${invalidHeaders.length > 0 ? `；包含不符規定之欄位：${invalidHeaders.join('、')}` : ''}`
+        });
+      }
+
+      const rawHeaderCells = nonEmptyRows[0].map(c => String(c ?? '').trim());
+      const colIdx = {
+        category: rawHeaderCells.findIndex(h => OPTIONAL_CATEGORY_HEADERS.includes(h)),
+        name: rawHeaderCells.indexOf('工項名稱'),
+        qty: rawHeaderCells.indexOf('契約數量'),
+        unit: rawHeaderCells.indexOf('單位'),
+        startDate: rawHeaderCells.indexOf('開始日期'),
+        endDate: rawHeaderCells.indexOf('結束日期'),
+      };
+
+      const isGenericSheetName = /^(Sheet\d*|工作表\s*\d*|工作細項匯入範本)$/i.test(sheetName.trim());
+      const fileBaseName = Buffer.from(req.file.originalname, 'latin1')
+        .toString('utf8')
+        .replace(/\.[^/.]+$/, '')
+        .trim();
+
+      for (let rIdx = 1; rIdx < nonEmptyRows.length; rIdx++) {
+        const row = nonEmptyRows[rIdx];
+        const itemName = String(row[colIdx.name] ?? '').trim();
+        const rawQty = row[colIdx.qty];
+        const unit = String(row[colIdx.unit] ?? '').trim() || '式';
+        const startDateRaw = row[colIdx.startDate];
+        const endDateRaw = row[colIdx.endDate];
+        const rowCat = colIdx.category >= 0 ? String(row[colIdx.category] ?? '').trim() : '';
+
+        if (!itemName) {
+          return res.status(400).json({
+            error: `拒絕匯入：工作表「${sheetName}」第 ${rIdx + 1} 列缺少「工項名稱」`
+          });
+        }
+
+        const parsedQty = rawQty === '' || rawQty === null || rawQty === undefined ? 0 : Number(String(rawQty).replace(/,/g, ''));
+        if (isNaN(parsedQty)) {
+          return res.status(400).json({
+            error: `拒絕匯入：工作表「${sheetName}」第 ${rIdx + 1} 列（「${itemName}」）的「契約數量」必須為數字`
+          });
+        }
+
+        const startDate = normalizeExcelDate(startDateRaw);
+        const endDate = normalizeExcelDate(endDateRaw);
+        if ((String(startDateRaw ?? '').trim() !== '' && !startDate) || (String(endDateRaw ?? '').trim() !== '' && !endDate)) {
+          return res.status(400).json({
+            error: `拒絕匯入：工作表「${sheetName}」第 ${rIdx + 1} 列（「${itemName}」）的開始或結束日期格式無效`
+          });
+        }
+
+        const categoryName =
+          rowCat ||
+          defaultCategoryFromBody ||
+          (!isGenericSheetName ? sheetName.trim() : '') ||
+          fileBaseName ||
+          '一般工程';
+
+        if (!currentConfig[categoryName]) {
+          currentConfig[categoryName] = [];
+          addedCategories.add(categoryName);
+        }
+
+        currentConfig[categoryName].push({
+          name: itemName,
+          contractQuantity: parsedQty,
+          unit,
+          startDate,
+          endDate,
+        });
+        totalImportedItems++;
+      }
+    }
+
+    if (!hasValidSheet || totalImportedItems === 0) {
+      return res.status(400).json({
+        error: '拒絕匯入：Excel 檔案內無任何有效的工作細項資料列'
+      });
+    }
+
+    const updatedProject = await prisma.project.update({
+      where: { id: projectId },
+      data: { work_items_config: currentConfig }
+    });
+
+    res.json({
+      project: updatedProject,
+      work_items_config: currentConfig,
+      importedCount: totalImportedItems,
+      newCategories: Array.from(addedCategories),
+    });
+  } catch (error) {
+    console.error('Import work items error:', error);
+    res.status(500).json({ error: '匯入 Excel 失敗，請確認檔案是否為有效的 Excel (.xlsx / .xls) 格式' });
   }
 });
 

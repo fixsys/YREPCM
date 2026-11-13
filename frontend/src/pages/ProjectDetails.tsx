@@ -142,6 +142,55 @@ const ProjectDetails = () => {
     }
   };
 
+  const handleDownloadWorkItemsTemplate = async () => {
+    try {
+      const res = await axios.get('/api/projects/work-items-template', {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: 'blob'
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', '施工細項匯入範本.xlsx');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      alert('下載範本失敗');
+    }
+  };
+
+  const handleImportWorkItemsExcel = async (file: File, targetCategory?: string) => {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('current_config', JSON.stringify(workItemsConfig));
+      if (targetCategory || newCategoryName.trim()) {
+        formData.append('default_category', targetCategory || newCategoryName.trim());
+      }
+
+      const res = await axios.post(`/api/projects/${id}/work-items/import`, formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      const updatedConfig = res.data.work_items_config;
+      setWorkItemsConfig(updatedConfig);
+      setProject((prev: any) => prev ? { ...prev, work_items_config: updatedConfig } : prev);
+      const newCats = res.data.newCategories || [];
+      alert(
+        `成功匯入 ${res.data.importedCount} 項工作細項！${
+          newCats.length > 0 ? `\n已自動新增類別：${newCats.join('、')}` : ''
+        }`
+      );
+    } catch (err: any) {
+      alert(err.response?.data?.error || '匯入失敗：請確認 Excel 格式是否符合規定（必須包含：工項名稱、契約數量、單位、開始日期、結束日期）');
+    }
+  };
+
   const [contributionData, setContributionData] = useState<any>(null);
   const [projectFiles, setProjectFiles] = useState<any[]>([]);
   const [templates, setTemplates] = useState<any[]>([]);
@@ -840,11 +889,37 @@ const ProjectDetails = () => {
     <div className="flex flex-wrap justify-between items-center gap-4 mb-4 border-b pb-4">
       <div>
         <h3 className="text-lg font-semibold text-slate-800">施工細項設定</h3>
-        <p className="text-sm text-slate-500">預先設定本專案各類別需要進行報工的工項、契約數量與單位。報工時，將自動帶入對應數值。</p>
+        <p className="text-sm text-slate-500">
+          預先設定本專案各類別需要進行報工的工項、契約數量與單位。支援 Excel 批次匯入（必填欄位：<span className="font-semibold text-slate-700">工項名稱、契約數量、單位、開始日期、結束日期</span>，可選填「類別」欄或以分頁名稱自動建立新類別）。
+        </p>
       </div>
-      <button onClick={handleSaveWorkItems} className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg font-bold shadow-sm">
-        儲存設定
-      </button>
+      <div className="flex flex-wrap items-center gap-2.5">
+        <button
+          type="button"
+          onClick={handleDownloadWorkItemsTemplate}
+          className="px-3.5 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-sm font-bold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+        >
+          <Download size={16} className="text-slate-600" /> 下載 Excel 範本
+        </button>
+        <label className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer">
+          <UploadCloud size={16} /> 從 Excel 匯入工作細項
+          <input
+            type="file"
+            accept=".xlsx,.xls"
+            className="hidden"
+            onChange={e => {
+              const file = e.target.files?.[0];
+              if (file) {
+                handleImportWorkItemsExcel(file);
+                e.target.value = '';
+              }
+            }}
+          />
+        </label>
+        <button onClick={handleSaveWorkItems} className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg font-bold shadow-sm text-sm cursor-pointer">
+          儲存設定
+        </button>
+      </div>
     </div>
 
     <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 flex flex-wrap items-center justify-between gap-4">
@@ -903,6 +978,21 @@ const ProjectDetails = () => {
           <div className="bg-slate-100 p-3 font-bold text-slate-700 flex justify-between items-center">
             <span>{category} 類別</span>
             <div className="flex items-center gap-4">
+              <label className="text-indigo-600 font-bold hover:underline text-sm cursor-pointer flex items-center gap-1">
+                <UploadCloud size={14} /> 匯入 Excel 至此類別
+                <input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  className="hidden"
+                  onChange={e => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      handleImportWorkItemsExcel(file, category);
+                      e.target.value = '';
+                    }
+                  }}
+                />
+              </label>
               <button onClick={() => {
                 const newConfig = { ...workItemsConfig };
                 newConfig[category] = [...(newConfig[category] || []), { name: '', contractQuantity: 0, unit: '式', startDate: '', endDate: '' }];
