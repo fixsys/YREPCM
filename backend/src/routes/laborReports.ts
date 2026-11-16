@@ -36,9 +36,9 @@ router.get('/', authenticateToken, async (req: AuthRequest, res) => {
     if (project_id) whereClause.project_id = String(project_id);
     if (module_type) whereClause.module_type = String(module_type);
 
-    // 記錄人權限控管：非最高管理員 (level < 100) 於現場報工 / 製造報工僅能看到自己建立的紀錄
+    // 記錄人權限控管：非最高管理員 (level < 100) 於現場報工 / 製造報工列表 (!project_id) 僅能看到自己建立的紀錄
     const isAdmin = Boolean(req.user?.level && req.user.level >= 100);
-    if (!isAdmin && req.user?.id) {
+    if (!isAdmin && !project_id && req.user?.id) {
       whereClause.recorder_id = req.user.id;
     }
     
@@ -244,6 +244,8 @@ router.get('/:id/export', authenticateToken, async (req: AuthRequest, res) => {
     const pastReports = await prisma.dailyLaborReport.findMany({
       where: {
         project_id: report.project_id,
+        module_type: report.module_type || 'ONSITE',
+        ...(report.dispatch_order_id ? { dispatch_order_id: report.dispatch_order_id } : {}),
         report_date: { lte: report.report_date }
       }
     });
@@ -806,6 +808,8 @@ router.get('/:id/export-pdf', authenticateToken, async (req: AuthRequest, res) =
     const pastReports = await prisma.dailyLaborReport.findMany({
       where: {
         project_id: report.project_id,
+        module_type: report.module_type || 'ONSITE',
+        ...(report.dispatch_order_id ? { dispatch_order_id: report.dispatch_order_id } : {}),
         report_date: { lte: report.report_date }
       }
     });

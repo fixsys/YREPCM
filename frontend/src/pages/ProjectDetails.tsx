@@ -94,6 +94,7 @@ const ProjectDetails = () => {
 
 
   const [activeTab, setActiveTab] = useState<'requirements' | 'logs' | 'tasks' | 'performance' | 'files' | 'work_items' | 'workflow'>('tasks');
+  const [logSubTab, setLogSubTab] = useState<'ONSITE' | 'MANUFACTURING'>('ONSITE');
   const [tasks, setTasks] = useState<any[]>([]);
   const [workItemsConfig, setWorkItemsConfig] = useState<any>({});
   const [newCategoryName, setNewCategoryName] = useState('');
@@ -629,24 +630,78 @@ const ProjectDetails = () => {
             </div>
           )}
 
-          {activeTab === 'logs' && (
+          {activeTab === 'logs' && (() => {
+            const onsiteLogs = logs.filter(l => (l.module_type || 'ONSITE') === 'ONSITE');
+            const manufacturingLogs = logs.filter(l => l.module_type === 'MANUFACTURING');
+            const displayedLogs = logSubTab === 'MANUFACTURING' ? manufacturingLogs : onsiteLogs;
+
+            return (
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-lg font-semibold text-slate-800">施工日誌</h3>
-                <button onClick={() => navigate('/onsite')} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors">
-                  <Plus size={16} /> 前往填寫
+              <div className="flex flex-wrap justify-between items-center gap-4 mb-5">
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-800">施工日誌</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">切換檢視「現場報工」與「製造報工」日誌，皆支援匯出標準格式 Excel 與 PDF</p>
+                </div>
+                <button
+                  onClick={() => navigate(logSubTab === 'MANUFACTURING' ? '/manufacturing' : '/onsite')}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2 rounded-lg flex items-center gap-2 text-sm font-bold transition-colors cursor-pointer shadow-sm"
+                >
+                  <Plus size={16} /> 前往填寫{logSubTab === 'MANUFACTURING' ? '製造報工' : '現場報工'}
+                </button>
+              </div>
+
+              {/* 現場報工 / 製造報工 子分頁切換 */}
+              <div className="flex gap-2 p-1.5 bg-slate-100 rounded-xl mb-6 w-full sm:w-fit">
+                <button
+                  type="button"
+                  onClick={() => setLogSubTab('ONSITE')}
+                  className={`flex-1 sm:flex-none px-5 py-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                    logSubTab === 'ONSITE'
+                      ? 'bg-white text-blue-700 shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <span>👷 現場報工</span>
+                  <span className={`px-2 py-0.5 rounded-full text-xs ${logSubTab === 'ONSITE' ? 'bg-blue-100 text-blue-700' : 'bg-slate-200 text-slate-600'}`}>
+                    {onsiteLogs.length}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLogSubTab('MANUFACTURING')}
+                  className={`flex-1 sm:flex-none px-5 py-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                    logSubTab === 'MANUFACTURING'
+                      ? 'bg-white text-indigo-700 shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <span>🏭 製造報工</span>
+                  <span className={`px-2 py-0.5 rounded-full text-xs ${logSubTab === 'MANUFACTURING' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-200 text-slate-600'}`}>
+                    {manufacturingLogs.length}
+                  </span>
                 </button>
               </div>
 
               <div className="space-y-4">
-                {logs.map((log) => (
+                {displayedLogs.map((log) => (
                   <div key={`${log._logType}-${log.id}`} className="border border-slate-200 rounded-lg p-4 hover:border-blue-300 transition-colors bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
-                      <div className="flex items-center gap-2 mb-2">
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
                         <span className={`px-2 py-1 text-xs font-bold rounded ${log._logType === 'toolbox' ? 'bg-indigo-100 text-indigo-700' : 'bg-teal-100 text-teal-700'}`}>
-                          {log._logType === 'toolbox' ? '工具箱會議' : '報工日誌'}
+                          {log._logType === 'toolbox'
+                            ? '工具箱會議'
+                            : log.module_type === 'MANUFACTURING'
+                            ? '製造報工日誌'
+                            : '現場報工日誌'}
                         </span>
-                        <h4 className="font-bold text-slate-800">{log.work_category}工程</h4>
+                        {log.dispatchOrder?.dispatch_no && (
+                          <span className="px-2 py-0.5 text-xs font-bold font-mono bg-amber-50 text-amber-800 border border-amber-200 rounded">
+                            派工單: {log.dispatchOrder.dispatch_no}
+                          </span>
+                        )}
+                        <h4 className="font-bold text-slate-800">
+                          {log.work_category}{log.module_type === 'MANUFACTURING' ? '' : '工程'}
+                        </h4>
                       </div>
                       <div className="text-sm text-slate-600 space-y-1">
                         <p><strong className="text-slate-700">日期：</strong> {new Date(log._date).toLocaleDateString()}</p>
@@ -659,7 +714,7 @@ const ProjectDetails = () => {
                       </div>
                     </div>
                     
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                                             {log._logType === 'toolbox' && (
                         <button 
                           onClick={async () => {
@@ -752,7 +807,7 @@ const ProjectDetails = () => {
                         );
                       })()}
                       <button 
-                        onClick={() => navigate(`/onsite?viewType=${log._logType}&viewId=${log.id}`)}
+                        onClick={() => navigate(`/${log.module_type === 'MANUFACTURING' ? 'manufacturing' : 'onsite'}?viewType=${log._logType}&viewId=${log.id}`)}
                         className="whitespace-nowrap px-4 py-2 bg-white border border-slate-300 rounded-lg text-slate-700 font-bold hover:bg-slate-50 hover:text-blue-600 hover:border-blue-300 transition-colors shadow-sm flex items-center gap-2 text-sm"
                       >
                         <FileText size={16} /> 檢視報表
@@ -770,14 +825,15 @@ const ProjectDetails = () => {
                   </div>
                 ))}
                 
-                {logs.length === 0 && (
+                {displayedLogs.length === 0 && (
                   <div className="text-center py-8 text-slate-500 bg-slate-50 rounded-lg border border-dashed border-slate-300">
-                    目前尚無施工日誌記錄
+                    目前尚無{logSubTab === 'MANUFACTURING' ? '製造報工' : '現場報工'}日誌記錄
                   </div>
                 )}
               </div>
             </div>
-          )}
+            );
+          })()}
 
           {activeTab === 'tasks' && (
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">

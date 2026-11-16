@@ -2432,8 +2432,70 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
               <h2 className="text-xl font-bold text-slate-800">
                 {viewingRecord.type === 'toolbox' ? '工具箱會議報表' : '施工日誌報表'}
               </h2>
-              <div className="flex gap-2">
+              <div className="flex items-center gap-2">
+                {viewingRecord.type === 'labor' && (() => {
+                  const rec = viewingRecord.data;
+                  const d = new Date(rec.report_date);
+                  const rocDate = `${d.getFullYear() - 1911}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+                  const siteName = (rec.project?.name || '').trim();
+                  const parsedItems = safeParseJSON(rec.work_items, []);
+                  const itemNames = Array.from(new Set(parsedItems.map((w: any) => normalizeItemKey(w?.name || '')).filter(Boolean))).join('、');
+                  const workPart = itemNames || (rec.work_category ? `${rec.work_category}` : '施工日誌');
+                  const baseFileName = `${rocDate}${siteName}${workPart}`.replace(/[\\/:*?"<>|]/g, '_');
 
+                  return (
+                    <>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            const res = await axios.get(`/api/labor-reports/${rec.id}/export`, {
+                              headers: { Authorization: `Bearer ${token}` },
+                              responseType: 'blob'
+                            });
+                            const url = window.URL.createObjectURL(new Blob([res.data]));
+                            const link = document.createElement('a');
+                            link.href = url;
+                            link.setAttribute('download', `${baseFileName}.xlsx`);
+                            document.body.appendChild(link);
+                            link.click();
+                            link.remove();
+                            window.URL.revokeObjectURL(url);
+                          } catch {
+                            alert('匯出 Excel 失敗');
+                          }
+                        }}
+                        className="px-3.5 py-1.5 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-700 font-bold hover:bg-emerald-100 text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        匯出 Excel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            const res = await axios.get(`/api/labor-reports/${rec.id}/export-pdf`, {
+                              headers: { Authorization: `Bearer ${token}` },
+                              responseType: 'blob'
+                            });
+                            const url = window.URL.createObjectURL(new Blob([res.data]));
+                            const link = document.createElement('a');
+                            link.href = url;
+                            link.setAttribute('download', `${baseFileName}.pdf`);
+                            document.body.appendChild(link);
+                            link.click();
+                            link.remove();
+                            window.URL.revokeObjectURL(url);
+                          } catch {
+                            alert('匯出 PDF 失敗');
+                          }
+                        }}
+                        className="px-3.5 py-1.5 bg-red-50 border border-red-200 rounded-lg text-red-700 font-bold hover:bg-red-100 text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        匯出 PDF
+                      </button>
+                    </>
+                  );
+                })()}
                 <button onClick={() => setViewingRecord(null)} className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors">
                   <X size={24} />
                 </button>
