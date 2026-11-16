@@ -217,6 +217,9 @@ router.get('/', authenticateToken, async (req: AuthRequest, res) => {
       include: {
         project: {
           select: { id: true, project_code: true, name: true }
+        },
+        dailyLaborReports: {
+          select: { id: true, report_date: true, work_items: true }
         }
       },
       orderBy: { created_at: 'desc' }
@@ -236,6 +239,9 @@ router.get('/:id', authenticateToken, async (req: AuthRequest, res) => {
       include: {
         project: {
           select: { id: true, project_code: true, name: true }
+        },
+        dailyLaborReports: {
+          select: { id: true, report_date: true, work_items: true }
         }
       }
     });

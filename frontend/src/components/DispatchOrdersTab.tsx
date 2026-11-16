@@ -292,6 +292,39 @@ const DispatchOrdersTab: React.FC<DispatchOrdersTabProps> = ({ project }) => {
     };
   };
 
+  // 計算派工單單一構件在「製造報工 (dailyLaborReports)」中累計已回報之生產數量與進度 %
+  const getItemProductionProgress = (order: any, it: DispatchOrderItem) => {
+    const targetNum = parseFloat(String(it.quantity || '').replace(/,/g, ''));
+    const targetQty = Number.isNaN(targetNum) ? 0 : targetNum;
+    const memberKey = (it.member_no || '').trim();
+    const reports: any[] = Array.isArray(order?.dailyLaborReports) ? order.dailyLaborReports : [];
+
+    let completedQty = 0;
+    reports.forEach(rep => {
+      let rItems: any[] = [];
+      try {
+        rItems = typeof rep.work_items === 'string' ? JSON.parse(rep.work_items) : (rep.work_items || []);
+      } catch {}
+      if (Array.isArray(rItems)) {
+        rItems.forEach((wi: any) => {
+          const wName = String(wi?.name || '').trim();
+          if (!wName) return;
+          const isMatch =
+            (memberKey && (wName === memberKey || wName.startsWith(`${memberKey} (`) || wName.startsWith(`${memberKey}(`))) ||
+            (!memberKey && it.spec && wName.includes(it.spec));
+          if (isMatch) {
+            const val = parseFloat(String(wi.progress || '').replace(/,/g, ''));
+            if (!Number.isNaN(val)) completedQty += val;
+          }
+        });
+      }
+    });
+
+    completedQty = Math.round(completedQty * 100) / 100;
+    const pct = targetQty > 0 ? Math.min(100, Math.round((completedQty / targetQty) * 1000) / 10) : 0;
+    return { targetQty, completedQty, pct };
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitError('');
@@ -397,6 +430,10 @@ const DispatchOrdersTab: React.FC<DispatchOrdersTabProps> = ({ project }) => {
               ? order.items.map(normalizeItem)
               : [];
             const totals = computeTotals(orderItems);
+            const itemProgressList = orderItems.map(it => getItemProductionProgress(order, it));
+            const totalCompletedQty = Math.round(itemProgressList.reduce((acc, p) => acc + p.completedQty, 0) * 100) / 100;
+            const overallPct = totals.totalQty > 0 ? Math.min(100, Math.round((totalCompletedQty / totals.totalQty) * 1000) / 10) : 0;
+
             return (
               <div
                 key={order.id}
@@ -429,6 +466,17 @@ const DispatchOrdersTab: React.FC<DispatchOrdersTabProps> = ({ project }) => {
                         }`}
                       >
                         簽核：{order.approval_status || '待簽核'}
+                      </span>
+                      <span
+                        className={`px-2.5 py-0.5 text-xs font-extrabold rounded-md border ${
+                          overallPct >= 100
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                            : overallPct > 0
+                            ? 'bg-sky-50 text-sky-700 border-sky-300'
+                            : 'bg-slate-100 text-slate-600 border-slate-200'
+                        }`}
+                      >
+                        生產回報進度：{totalCompletedQty} / {totals.totalQty} ({overallPct}%)
                       </span>
                     </div>
                     <div className="text-xs text-slate-600 flex flex-wrap gap-x-4 gap-y-1 pt-1">
@@ -475,40 +523,83 @@ const DispatchOrdersTab: React.FC<DispatchOrdersTabProps> = ({ project }) => {
                       <thead className="sticky top-0 z-10">
                         <tr className="bg-slate-100 text-slate-700 border-b border-slate-200">
                           <th className="py-2 px-2.5 w-24">項目</th>
-                          <th className="py-2 px-2.5 w-28">構件編號</th>
-                          <th className="py-2 px-2.5 w-20 text-right">數量</th>
+                          <th className="py-2 px-2.5 w-24">構件編號</th>
+                          <th className="py-2 px-2.5 w-16 text-right">數量</th>
+                          <th className="py-2 px-2.5 w-24 text-right">已生產回報</th>
+                          <th className="py-2 px-2.5 w-36">目前生產進度</th>
                           <th className="py-2 px-2.5">規格尺寸</th>
-                          <th className="py-2 px-2.5 w-24 text-right">長度</th>
-                          <th className="py-2 px-2.5 w-24">材質</th>
+                          <th className="py-2 px-2.5 w-20 text-right">長度</th>
+                          <th className="py-2 px-2.5 w-20">材質</th>
                           <th className="py-2 px-2.5 w-24 text-right">單重(Kg)</th>
-                          <th className="py-2 px-2.5 w-28 text-right">總量(Kgs)</th>
+                          <th className="py-2 px-2.5 w-24 text-right">總量(Kgs)</th>
                           <th className="py-2 px-2.5">備註</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {orderItems.map((it, idx) => (
-                          <tr key={idx} className="hover:bg-slate-50">
-                            <td className="py-1.5 px-2.5">
-                              <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded font-semibold">
-                                {it.category || '-'}
-                              </span>
-                            </td>
-                            <td className="py-1.5 px-2.5 font-mono font-bold text-slate-800">{it.member_no || '-'}</td>
-                            <td className="py-1.5 px-2.5 text-right font-bold text-blue-700">{it.quantity || '-'}</td>
-                            <td className="py-1.5 px-2.5 font-mono text-slate-700">{it.spec || '-'}</td>
-                            <td className="py-1.5 px-2.5 text-right font-mono text-slate-600">{it.length || '-'}</td>
-                            <td className="py-1.5 px-2.5 text-slate-700">{it.material || '-'}</td>
-                            <td className="py-1.5 px-2.5 text-right font-mono text-slate-600">{it.unit_weight || '-'}</td>
-                            <td className="py-1.5 px-2.5 text-right font-mono font-bold text-emerald-700">{it.total_weight || '-'}</td>
-                            <td className="py-1.5 px-2.5 text-slate-600">{it.note || '-'}</td>
-                          </tr>
-                        ))}
+                        {orderItems.map((it, idx) => {
+                          const prog = itemProgressList[idx] || { targetQty: 0, completedQty: 0, pct: 0 };
+                          return (
+                            <tr key={idx} className="hover:bg-slate-50">
+                              <td className="py-1.5 px-2.5">
+                                <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded font-semibold">
+                                  {it.category || '-'}
+                                </span>
+                              </td>
+                              <td className="py-1.5 px-2.5 font-mono font-bold text-slate-800">{it.member_no || '-'}</td>
+                              <td className="py-1.5 px-2.5 text-right font-bold text-blue-700">{it.quantity || '-'}</td>
+                              <td className="py-1.5 px-2.5 text-right font-mono font-bold text-indigo-700">
+                                {prog.completedQty} <span className="text-slate-400 font-normal">/ {prog.targetQty || '-'}</span>
+                              </td>
+                              <td className="py-1.5 px-2.5">
+                                <div className="flex items-center gap-2">
+                                  <div className="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden min-w-[56px]">
+                                    <div
+                                      className={`h-full rounded-full transition-all ${
+                                        prog.pct >= 100
+                                          ? 'bg-emerald-500'
+                                          : prog.pct > 0
+                                          ? 'bg-blue-600'
+                                          : 'bg-slate-300'
+                                      }`}
+                                      style={{ width: `${Math.min(100, prog.pct)}%` }}
+                                    />
+                                  </div>
+                                  <span
+                                    className={`font-mono font-extrabold text-[11px] w-11 text-right ${
+                                      prog.pct >= 100
+                                        ? 'text-emerald-700'
+                                        : prog.pct > 0
+                                        ? 'text-blue-700'
+                                        : 'text-slate-400'
+                                    }`}
+                                  >
+                                    {prog.pct}%
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="py-1.5 px-2.5 font-mono text-slate-700">{it.spec || '-'}</td>
+                              <td className="py-1.5 px-2.5 text-right font-mono text-slate-600">{it.length || '-'}</td>
+                              <td className="py-1.5 px-2.5 text-slate-700">{it.material || '-'}</td>
+                              <td className="py-1.5 px-2.5 text-right font-mono text-slate-600">{it.unit_weight || '-'}</td>
+                              <td className="py-1.5 px-2.5 text-right font-mono font-bold text-emerald-700">{it.total_weight || '-'}</td>
+                              <td className="py-1.5 px-2.5 text-slate-600">{it.note || '-'}</td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                       <tfoot>
                         <tr className="bg-slate-100 font-bold text-slate-800 border-t border-slate-200">
                           <td className="py-2 px-2.5">總計 ({orderItems.length} 項)</td>
                           <td className="py-2 px-2.5"></td>
                           <td className="py-2 px-2.5 text-right text-blue-700">{totals.totalQty.toLocaleString()}</td>
+                          <td className="py-2 px-2.5 text-right font-mono text-indigo-700">
+                            {totalCompletedQty.toLocaleString()} / {totals.totalQty.toLocaleString()}
+                          </td>
+                          <td className="py-2 px-2.5">
+                            <span className={`font-mono font-extrabold ${overallPct >= 100 ? 'text-emerald-700' : 'text-blue-700'}`}>
+                              總進度：{overallPct}%
+                            </span>
+                          </td>
                           <td colSpan={3} className="py-2 px-2.5"></td>
                           <td className="py-2 px-2.5 text-right font-mono">{totals.totalUnitW.toLocaleString()}</td>
                           <td className="py-2 px-2.5 text-right font-mono text-emerald-700">{totals.totalWeight.toLocaleString()}</td>
@@ -1212,6 +1303,8 @@ const DispatchOrdersTab: React.FC<DispatchOrdersTabProps> = ({ project }) => {
                               <th className="border border-black p-1">項目</th>
                               <th className="border border-black p-1">構件編號</th>
                               <th className="border border-black p-1 text-right">數量</th>
+                              <th className="border border-black p-1 text-right">已生產</th>
+                              <th className="border border-black p-1 text-right">進度</th>
                               <th className="border border-black p-1">規格尺寸</th>
                               <th className="border border-black p-1 text-right">長度</th>
                               <th className="border border-black p-1">材質</th>
@@ -1221,26 +1314,31 @@ const DispatchOrdersTab: React.FC<DispatchOrdersTabProps> = ({ project }) => {
                             </tr>
                           </thead>
                           <tbody>
-                            {viewItems.map((it, i) => (
-                              <tr key={i}>
-                                <td className="border border-black p-1 font-bold">{it.category}</td>
-                                <td className="border border-black p-1 font-mono">{it.member_no}</td>
-                                <td className="border border-black p-1 text-right font-bold">{it.quantity}</td>
-                                <td className="border border-black p-1 font-mono">{it.spec}</td>
-                                <td className="border border-black p-1 text-right font-mono">{it.length}</td>
-                                <td className="border border-black p-1">{it.material}</td>
-                                <td className="border border-black p-1 text-right font-mono">{it.unit_weight}</td>
-                                <td className="border border-black p-1 text-right font-mono font-bold">{it.total_weight}</td>
-                                <td className="border border-black p-1">{it.note}</td>
-                              </tr>
-                            ))}
+                            {viewItems.map((it, i) => {
+                              const prog = getItemProductionProgress(viewingOrder, it);
+                              return (
+                                <tr key={i}>
+                                  <td className="border border-black p-1 font-bold">{it.category}</td>
+                                  <td className="border border-black p-1 font-mono">{it.member_no}</td>
+                                  <td className="border border-black p-1 text-right font-bold">{it.quantity}</td>
+                                  <td className="border border-black p-1 text-right font-mono">{prog.completedQty}</td>
+                                  <td className="border border-black p-1 text-right font-mono font-bold">{prog.pct}%</td>
+                                  <td className="border border-black p-1 font-mono">{it.spec}</td>
+                                  <td className="border border-black p-1 text-right font-mono">{it.length}</td>
+                                  <td className="border border-black p-1">{it.material}</td>
+                                  <td className="border border-black p-1 text-right font-mono">{it.unit_weight}</td>
+                                  <td className="border border-black p-1 text-right font-mono font-bold">{it.total_weight}</td>
+                                  <td className="border border-black p-1">{it.note}</td>
+                                </tr>
+                              );
+                            })}
                           </tbody>
                           <tfoot>
                             <tr className="bg-slate-100 font-bold">
                               <td className="border border-black p-1">總計</td>
                               <td className="border border-black p-1"></td>
                               <td className="border border-black p-1 text-right">{viewTotals.totalQty.toLocaleString()}</td>
-                              <td colSpan={3} className="border border-black p-1"></td>
+                              <td colSpan={5} className="border border-black p-1"></td>
                               <td className="border border-black p-1 text-right font-mono">{viewTotals.totalUnitW.toLocaleString()}</td>
                               <td className="border border-black p-1 text-right font-mono">{viewTotals.totalWeight.toLocaleString()}</td>
                               <td className="border border-black p-1"></td>

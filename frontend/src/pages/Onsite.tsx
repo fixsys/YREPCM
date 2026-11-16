@@ -313,12 +313,33 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
     (itemName: string, projectId: string, dispatchOrderId: string, excludeReportId?: string | null, upToDate?: string) => {
       if (!itemName) return 0;
       const normTarget = normalizeItemKey(itemName);
-      let sum = 0;
+      const seenReportIds = new Set<string>();
+      const candidateReports: any[] = [];
+
+      if (dispatchOrderId) {
+        const ord = dispatchOrders.find(o => o.id === dispatchOrderId);
+        if (ord && Array.isArray(ord.dailyLaborReports)) {
+          ord.dailyLaborReports.forEach((r: any) => {
+            if (r?.id && !seenReportIds.has(r.id)) {
+              seenReportIds.add(r.id);
+              candidateReports.push({ ...r, project_id: ord.project_id, dispatch_order_id: ord.id });
+            }
+          });
+        }
+      }
       laborReports.forEach(r => {
+        if (r?.id && !seenReportIds.has(r.id)) {
+          seenReportIds.add(r.id);
+          candidateReports.push(r);
+        }
+      });
+
+      let sum = 0;
+      candidateReports.forEach(r => {
         if (excludeReportId && r.id === excludeReportId) return;
         if (dispatchOrderId && r.dispatch_order_id && r.dispatch_order_id !== dispatchOrderId) return;
-        if (projectId && r.project_id !== projectId) return;
-        if (upToDate && new Date(r.report_date).getTime() > new Date(upToDate).getTime()) return;
+        if (projectId && r.project_id && r.project_id !== projectId) return;
+        if (upToDate && r.report_date && new Date(r.report_date).getTime() > new Date(upToDate).getTime()) return;
         const rItems = safeParseJSON(r.work_items, []);
         if (Array.isArray(rItems)) {
           rItems.forEach((wi: any) => {
@@ -331,7 +352,7 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
       });
       return Math.round(sum * 100) / 100;
     },
-    [laborReports]
+    [laborReports, dispatchOrders]
   );
 
   const WORK_CATEGORIES = useMemo(() => {
