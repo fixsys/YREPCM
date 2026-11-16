@@ -564,6 +564,30 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
     if ((laborPhotosClose.length < 2 || laborPhotosMid.length < 2 || laborPhotosFar.length < 2) && !editingLaborId) {
       return alert('近照、中距離照、遠距照皆須至少上傳 2 張');
     }
+
+    // 檢查是否有任何工項累計完成數量超過目標數量
+    for (const w of workItems) {
+      if (!w.name || !w.progress) continue;
+      const cat = w.category || laborForm.work_category || WORK_CATEGORIES[0] || '土木';
+      const targetStr = getTargetQuantityForItem(cat, w.name) || w.target_quantity || '';
+      const targetNum = parseFloat(String(targetStr).replace(/,/g, ''));
+      const todayNum = parseFloat(String(w.progress || '').replace(/,/g, ''));
+      if (!Number.isNaN(targetNum) && targetNum > 0 && !Number.isNaN(todayNum)) {
+        const pastQty = getPastAccumulatedQty(
+          w.name,
+          laborForm.project_id,
+          laborForm.dispatch_order_id,
+          editingLaborId,
+          laborForm.report_date
+        );
+        const totalAcc = Math.round((pastQty + todayNum) * 100) / 100;
+        if (totalAcc > targetNum) {
+          return alert(
+            `⚠️ 數量超過目標數量警示：\n工項「${normalizeItemKey(w.name)}」目標數量為 ${targetNum}（先前已累計：${pastQty}，今日填寫：${todayNum}，合計：${totalAcc}），已超過目標數量，請修正今日數量後再送出！`
+          );
+        }
+      }
+    }
     
     setIsSubmitting(true);
     try {
@@ -1620,10 +1644,7 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                       const rowCat = item.category || (laborForm.work_category || '').split('、')[0] || WORK_CATEGORIES[0] || (isManufacturing ? 'RH鋼/柱' : '土木');
                       const rowCategoryOptions = Array.from(new Set([rowCat, ...WORK_CATEGORIES])).filter(Boolean);
                       const itemsForRowCat = categoryToItems[rowCat] || [];
-                      const resolvedTargetQtyStr =
-                        item.target_quantity !== undefined && item.target_quantity !== ''
-                          ? item.target_quantity
-                          : getTargetQuantityForItem(rowCat, item.name);
+                      const resolvedTargetQtyStr = getTargetQuantityForItem(rowCat, item.name) || item.target_quantity || '';
                       const targetNum = parseFloat(String(resolvedTargetQtyStr).replace(/,/g, ''));
                       const todayNum = parseFloat(String(item.progress || '').replace(/,/g, ''));
                       const pastQty = getPastAccumulatedQty(
@@ -1634,9 +1655,10 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                         laborForm.report_date
                       );
                       const totalAccumulatedQty = Math.round(((Number.isNaN(todayNum) ? 0 : todayNum) + pastQty) * 100) / 100;
+                      const isOverTarget = !Number.isNaN(targetNum) && targetNum > 0 && totalAccumulatedQty > targetNum;
                       const completionPct =
                         !Number.isNaN(targetNum) && targetNum > 0
-                          ? Math.min(100, Math.round((totalAccumulatedQty / targetNum) * 1000) / 10)
+                          ? Math.round((totalAccumulatedQty / targetNum) * 1000) / 10
                           : null;
 
                       return (
@@ -1747,56 +1769,75 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                             </button>
                           </div>
 
-                          {/* 目標數量 (獨立欄位) + 今日生產/完成數量 + 即時進度計算 */}
+                          {/* 目標數量 (唯讀不可由記錄人修改) + 今日生產/完成數量 + 即時進度計算 */}
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 items-center pt-1">
-                            <div className="flex items-center bg-white border border-slate-300 rounded-lg px-3 py-1.5">
+                            <div className="flex items-center bg-slate-100 border border-slate-300 rounded-lg px-3 py-1.5 cursor-not-allowed" title="目標數量由派工單或專案設定帶入，記錄人不可更改">
                               <span className="text-xs font-bold text-slate-500 mr-2 shrink-0">目標數量：</span>
                               <input
-                                type="number"
-                                step="any"
-                                value={resolvedTargetQtyStr}
-                                onChange={e => {
-                                  const newItems = [...workItems];
-                                  newItems[idx].category = rowCat;
-                                  newItems[idx].target_quantity = e.target.value;
-                                  setWorkItems(newItems);
-                                }}
-                                placeholder="自動帶入或輸入"
-                                className="w-full text-sm font-bold text-slate-800 outline-none bg-transparent text-right"
+                                type="text"
+                                readOnly
+                                tabIndex={-1}
+                                value={resolvedTargetQtyStr || '-'}
+                                className="w-full text-sm font-bold text-slate-600 outline-none bg-transparent text-right cursor-not-allowed select-none"
                               />
                             </div>
 
-                            <div className="flex items-center bg-white border-2 border-indigo-300 rounded-lg px-3 py-1.5 focus-within:ring-2 focus-within:ring-indigo-500">
-                              <span className="text-xs font-bold text-indigo-700 mr-2 shrink-0">
+                            <div className={`flex items-center bg-white border-2 rounded-lg px-3 py-1.5 focus-within:ring-2 ${
+                              isOverTarget
+                                ? 'border-red-500 focus-within:ring-red-500 bg-red-50/30'
+                                : 'border-indigo-300 focus-within:ring-indigo-500'
+                            }`}>
+                              <span className={`text-xs font-bold mr-2 shrink-0 ${isOverTarget ? 'text-red-700' : 'text-indigo-700'}`}>
                                 {isManufacturing ? '今日生產數量 *：' : '今日完成數量 *：'}
                               </span>
                               <input
                                 type="number"
                                 step="any"
+                                min="0"
                                 value={item.progress}
                                 onChange={e => {
+                                  const nextValStr = e.target.value;
+                                  const nextValNum = parseFloat(nextValStr);
+                                  const nextTotal = Math.round(((Number.isNaN(nextValNum) ? 0 : nextValNum) + pastQty) * 100) / 100;
+                                  if (!Number.isNaN(targetNum) && targetNum > 0 && nextTotal > targetNum) {
+                                    alert(
+                                      `⚠️ 超過目標數量警示：\n工項「${normalizeItemKey(item.name)}」目標數量為 ${targetNum}（先前已累計完成：${pastQty}），今日輸入 ${nextValNum} 後總計達 ${nextTotal}，已超過目標數量！`
+                                    );
+                                  }
                                   const newItems = [...workItems];
                                   newItems[idx].category = rowCat;
                                   newItems[idx].target_quantity = resolvedTargetQtyStr;
-                                  newItems[idx].progress = e.target.value;
+                                  newItems[idx].progress = nextValStr;
                                   setWorkItems(newItems);
                                 }}
                                 placeholder="請輸入數量"
                                 required
-                                className="w-full text-sm font-extrabold text-indigo-700 outline-none bg-transparent text-right"
+                                className={`w-full text-sm font-extrabold outline-none bg-transparent text-right ${
+                                  isOverTarget ? 'text-red-700' : 'text-indigo-700'
+                                }`}
                               />
                             </div>
 
-                            <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5 text-xs">
-                              <span className="text-slate-600">
-                                累計完成：<strong className="text-slate-800">{totalAccumulatedQty}</strong>
+                            <div className={`flex items-center justify-between border rounded-lg px-3 py-1.5 text-xs ${
+                              isOverTarget
+                                ? 'bg-red-50 border-red-300 text-red-800'
+                                : 'bg-emerald-50 border-emerald-200 text-slate-600'
+                            }`}>
+                              <span>
+                                累計完成：<strong className={isOverTarget ? 'text-red-700' : 'text-slate-800'}>{totalAccumulatedQty}</strong>
                                 {!Number.isNaN(targetNum) && targetNum > 0 ? ` / ${targetNum}` : ''}
                               </span>
-                              <span className="font-extrabold text-emerald-700 text-sm">
+                              <span className={`font-extrabold text-sm ${isOverTarget ? 'text-red-700' : 'text-emerald-700'}`}>
                                 進度：{completionPct !== null ? `${completionPct}%` : '-'}
                               </span>
                             </div>
                           </div>
+
+                          {isOverTarget && (
+                            <div className="text-xs font-bold text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-1.5 flex items-center gap-1.5">
+                              <span>⚠️ 警示：累計完成數量 ({totalAccumulatedQty}) 已超過目標數量 ({targetNum})！剩餘可填報上限為 {Math.max(0, Math.round((targetNum - pastQty) * 100) / 100)}。</span>
+                            </div>
+                          )}
 
                           {item.inspection && rowCat === '土木' && INSPECTION_TEMPLATES[item.name] && (
                             <div className="mt-3 border-l-4 border-indigo-500 pl-4 py-2 bg-white rounded-r-xl">
