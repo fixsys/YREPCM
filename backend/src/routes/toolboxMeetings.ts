@@ -35,6 +35,12 @@ router.get('/', authenticateToken, async (req: AuthRequest, res) => {
     if (project_id) whereClause.project_id = String(project_id);
     if (module_type) whereClause.module_type = String(module_type);
 
+    // 記錄人權限控管：非最高管理員 (level < 100) 於現場報工 / 製造報工僅能看到自己建立的紀錄
+    const isAdmin = Boolean(req.user?.level && req.user.level >= 100);
+    if (!isAdmin && req.user?.id) {
+      whereClause.recorder_id = req.user.id;
+    }
+
     const meetings = await prisma.toolboxMeeting.findMany({
       where: whereClause,
       include: {
@@ -65,6 +71,8 @@ router.post('/', authenticateToken, upload.array('photos', 5), async (req: AuthR
 
   const photoPaths = files.map(file => `/uploads/toolbox/${file.filename}`);
 
+  const isAdmin = Boolean(req.user.level && req.user.level >= 100);
+
   try {
     const meeting = await prisma.toolboxMeeting.create({
       data: {
@@ -72,7 +80,7 @@ router.post('/', authenticateToken, upload.array('photos', 5), async (req: AuthR
           dispatch_order_id: dispatch_order_id || null,
           module_type: module_type || 'ONSITE',
           record_date: new Date(record_date),
-          recorder_id: recorder_id || req.user.id,
+          recorder_id: isAdmin && recorder_id ? recorder_id : req.user.id,
           worker_count: parseInt(worker_count) || 0,
           work_category,
           work_content,
@@ -103,13 +111,20 @@ router.put('/:id', authenticateToken, upload.array('photos', 5), async (req: Aut
 
   const { id } = req.params;
   const { project_id, dispatch_order_id, record_date, recorder_id, worker_count, work_category, work_content, safety_check_1, safety_check_2, safety_check_3, work_area, work_items, hazards, safety_measures, other_risks, signatures, equipments } = req.body;
+  const isAdmin = Boolean(req.user.level && req.user.level >= 100);
 
   try {
+    const existing = await prisma.toolboxMeeting.findUnique({ where: { id: id as string } });
+    if (!existing) return res.status(404).json({ error: '找不到會議紀錄' });
+    if (!isAdmin && existing.recorder_id !== req.user.id) {
+      return res.status(403).json({ error: '權限不足，僅能編輯本人建立之紀錄' });
+    }
+
     const dataToUpdate: any = {
         project_id,
         dispatch_order_id: dispatch_order_id || null,
         record_date: new Date(record_date),
-        recorder_id: recorder_id || req.user.id,
+        recorder_id: isAdmin && recorder_id ? recorder_id : existing.recorder_id,
         worker_count: parseInt(worker_count) || 0,
         work_category,
         work_content,

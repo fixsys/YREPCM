@@ -35,6 +35,12 @@ router.get('/', authenticateToken, async (req: AuthRequest, res) => {
     const whereClause: any = {};
     if (project_id) whereClause.project_id = String(project_id);
     if (module_type) whereClause.module_type = String(module_type);
+
+    // 記錄人權限控管：非最高管理員 (level < 100) 於現場報工 / 製造報工僅能看到自己建立的紀錄
+    const isAdmin = Boolean(req.user?.level && req.user.level >= 100);
+    if (!isAdmin && req.user?.id) {
+      whereClause.recorder_id = req.user.id;
+    }
     
     const reports = await prisma.dailyLaborReport.findMany({
       where: whereClause,
@@ -91,6 +97,8 @@ router.post('/', authenticateToken, upload.any(), async (req: AuthRequest, res) 
     });
   }
 
+  const isAdmin = Boolean(req.user.level && req.user.level >= 100);
+
   try {
     const report = await prisma.dailyLaborReport.create({
       data: {
@@ -99,7 +107,7 @@ router.post('/', authenticateToken, upload.any(), async (req: AuthRequest, res) 
         module_type: module_type || 'ONSITE',
         report_date: new Date(report_date),
         weather,
-        recorder_id: recorder_id || req.user.id,
+        recorder_id: isAdmin && recorder_id ? recorder_id : req.user.id,
         pm_id,
         engineers: engineers ? JSON.parse(engineers) : null,
         dispatch_workers: dispatch_workers ? JSON.parse(dispatch_workers) : null,
@@ -165,7 +173,15 @@ router.put('/:id', authenticateToken, upload.any(), async (req: AuthRequest, res
     });
   }
 
+  const isAdmin = Boolean(req.user.level && req.user.level >= 100);
+
   try {
+    const existing = await prisma.dailyLaborReport.findUnique({ where: { id: id as string } });
+    if (!existing) return res.status(404).json({ error: '找不到報工紀錄' });
+    if (!isAdmin && existing.recorder_id !== req.user.id) {
+      return res.status(403).json({ error: '權限不足，僅能編輯本人建立之紀錄' });
+    }
+
     const report = await prisma.dailyLaborReport.update({
       where: { id: id as string },
       data: {
@@ -173,7 +189,7 @@ router.put('/:id', authenticateToken, upload.any(), async (req: AuthRequest, res
         dispatch_order_id: dispatch_order_id || null,
         report_date: new Date(report_date),
         weather,
-        recorder_id: recorder_id || req.user.id,
+        recorder_id: isAdmin && recorder_id ? recorder_id : existing.recorder_id,
         pm_id,
         engineers: engineers ? JSON.parse(engineers) : null,
         dispatch_workers: dispatch_workers ? JSON.parse(dispatch_workers) : null,

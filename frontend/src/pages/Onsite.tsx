@@ -599,17 +599,25 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
     }
   };
 
-  const filteredToolbox = toolboxMeetings.filter(t => 
-    t.work_content.includes(searchQuery) || 
-    (t.recorder?.name || '').includes(searchQuery) ||
-    t.work_category.includes(searchQuery)
-  );
+  const isAdmin = Boolean(user?.level && user.level >= 100);
 
-  const filteredLabor = laborReports.filter(l => 
-    (l.recorder?.name || '').includes(searchQuery) ||
-    l.work_category.includes(searchQuery) ||
-    l.weather.includes(searchQuery)
-  );
+  const filteredToolbox = toolboxMeetings.filter(t => {
+    if (!isAdmin && t.recorder_id !== user?.id) return false;
+    return (
+      (t.work_content || '').includes(searchQuery) ||
+      (t.recorder?.name || '').includes(searchQuery) ||
+      (t.work_category || '').includes(searchQuery)
+    );
+  });
+
+  const filteredLabor = laborReports.filter(l => {
+    if (!isAdmin && l.recorder_id !== user?.id) return false;
+    return (
+      (l.recorder?.name || '').includes(searchQuery) ||
+      (l.work_category || '').includes(searchQuery) ||
+      (l.weather || '').includes(searchQuery)
+    );
+  });
 
   if (loading) return <div className="text-center py-12 text-slate-500">載入中...</div>;
 
@@ -938,9 +946,13 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">紀錄者</label>
-                    <select value={toolboxForm.recorder_id} onChange={e => setToolboxForm({...toolboxForm, recorder_id: e.target.value})} className="w-full px-3 py-2 border rounded-lg outline-none">
-                      {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-                    </select>
+                    {isAdmin ? (
+                      <select value={toolboxForm.recorder_id} onChange={e => setToolboxForm({...toolboxForm, recorder_id: e.target.value})} className="w-full px-3 py-2 border rounded-lg outline-none">
+                        {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                      </select>
+                    ) : (
+                      <input type="text" readOnly value={user?.name || ''} className="w-full px-3 py-2 border rounded-lg bg-slate-100 text-slate-600 cursor-not-allowed outline-none" />
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">上工人數 *</label>
@@ -1347,9 +1359,13 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">紀錄者</label>
-                    <select value={laborForm.recorder_id} onChange={e => setLaborForm({...laborForm, recorder_id: e.target.value})} className="w-full px-3 py-2 border rounded-lg outline-none">
-                      {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-                    </select>
+                    {isAdmin ? (
+                      <select value={laborForm.recorder_id} onChange={e => setLaborForm({...laborForm, recorder_id: e.target.value})} className="w-full px-3 py-2 border rounded-lg outline-none">
+                        {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                      </select>
+                    ) : (
+                      <input type="text" readOnly value={user?.name || ''} className="w-full px-3 py-2 border rounded-lg bg-slate-100 text-slate-600 cursor-not-allowed outline-none" />
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">工務經理 (PM)</label>
