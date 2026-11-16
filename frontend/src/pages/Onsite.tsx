@@ -318,8 +318,8 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
 
       if (dispatchOrderId) {
         const ord = dispatchOrders.find(o => o.id === dispatchOrderId);
-        if (ord && Array.isArray(ord.dailyLaborReports)) {
-          ord.dailyLaborReports.forEach((r: any) => {
+        if (ord && Array.isArray(ord.laborReports)) {
+          ord.laborReports.forEach((r: any) => {
             if (r?.id && !seenReportIds.has(r.id)) {
               seenReportIds.add(r.id);
               candidateReports.push({ ...r, project_id: ord.project_id, dispatch_order_id: ord.id });

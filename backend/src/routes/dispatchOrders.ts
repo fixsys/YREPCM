@@ -218,7 +218,7 @@ router.get('/', authenticateToken, async (req: AuthRequest, res) => {
         project: {
           select: { id: true, project_code: true, name: true }
         },
-        dailyLaborReports: {
+        laborReports: {
           select: { id: true, report_date: true, work_items: true }
         }
       },
@@ -240,7 +240,7 @@ router.get('/:id', authenticateToken, async (req: AuthRequest, res) => {
         project: {
           select: { id: true, project_code: true, name: true }
         },
-        dailyLaborReports: {
+        laborReports: {
           select: { id: true, report_date: true, work_items: true }
         }
       }

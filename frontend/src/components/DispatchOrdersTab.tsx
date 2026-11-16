@@ -292,12 +292,12 @@ const DispatchOrdersTab: React.FC<DispatchOrdersTabProps> = ({ project }) => {
     };
   };
 
-  // 計算派工單單一構件在「製造報工 (dailyLaborReports)」中累計已回報之生產數量與進度 %
+  // 計算派工單單一構件在「製造報工 (laborReports)」中累計已回報之生產數量與進度 %
   const getItemProductionProgress = (order: any, it: DispatchOrderItem) => {
     const targetNum = parseFloat(String(it.quantity || '').replace(/,/g, ''));
     const targetQty = Number.isNaN(targetNum) ? 0 : targetNum;
     const memberKey = (it.member_no || '').trim();
-    const reports: any[] = Array.isArray(order?.dailyLaborReports) ? order.dailyLaborReports : [];
+    const reports: any[] = Array.isArray(order?.laborReports) ? order.laborReports : [];
 
     let completedQty = 0;
     reports.forEach(rep => {
