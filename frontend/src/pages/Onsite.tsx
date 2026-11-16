@@ -149,6 +149,7 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
   };
   const [viewingRecord, setViewingRecord] = useState<{type: 'toolbox' | 'labor', data: any} | null>(null);
   type WorkItem = {
+    category?: string;
     name: string;
     progress: string;
     worker_count?: string;
@@ -161,7 +162,7 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
       photo?: string | File;
     }
   };
-  const [workItems, setWorkItems] = useState<WorkItem[]>([{name: '', progress: '', worker_count: '', work_hours: ''}]);
+  const [workItems, setWorkItems] = useState<WorkItem[]>([{category: '', name: '', progress: '', worker_count: '', work_hours: ''}]);
 
   const INSPECTION_TEMPLATES: Record<string, { fields: string[], checks: string[], results: string[], photoLabel: string }> = {
     'PC': {
@@ -267,18 +268,11 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
   }, [isManufacturing, toolboxForm.dispatch_order_id, toolboxForm.project_id, dispatchOrders, projects]);
 
   useEffect(() => {
-    if (isLaborModalOpen && WORK_CATEGORIES.length > 0 && !WORK_CATEGORIES.includes(laborForm.work_category)) {
-      const firstCat = WORK_CATEGORIES[0];
-      setLaborForm(prev => ({ ...prev, work_category: firstCat }));
-      setWorkItems([{ name: categoryToItems[firstCat]?.[0] || '', progress: '', worker_count: '', work_hours: '' }]);
-    }
-  }, [isLaborModalOpen, WORK_CATEGORIES, laborForm.work_category, categoryToItems]);
-
-  useEffect(() => {
     if (isLaborModalOpen && workItems.length === 0) {
-      const defaultName = categoryToItems[laborForm.work_category]?.[0] || '';
-      const newItem: WorkItem = { name: defaultName, progress: '' };
-      if (laborForm.work_category === '土木' && INSPECTION_TEMPLATES[defaultName]) {
+      const defaultCat = WORK_CATEGORIES[0] || laborForm.work_category || (isManufacturing ? 'RH鋼/柱' : '土木');
+      const defaultName = categoryToItems[defaultCat]?.[0] || '';
+      const newItem: WorkItem = { category: defaultCat, name: defaultName, progress: '' };
+      if (defaultCat === '土木' && INSPECTION_TEMPLATES[defaultName]) {
         const tpl = INSPECTION_TEMPLATES[defaultName];
         newItem.inspection = {
           fields: tpl.fields.reduce((acc, f) => ({...acc, [f]: ''}), {}),
@@ -289,53 +283,58 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
       }
       setWorkItems([newItem]);
     }
-  }, [isLaborModalOpen, laborForm.work_category]);
+  }, [isLaborModalOpen, WORK_CATEGORIES, categoryToItems]);
 
   useEffect(() => {
     if (!isLaborModalOpen) return;
     
     const aggregated = dispatchWorkers
-      .filter(w => w.work_category === laborForm.work_category && w.name.trim() !== '')
+      .filter(w => w.name.trim() !== '' && w.work_item)
       .reduce((acc, w) => {
-        if (!w.work_item) return acc;
-        if (!acc[w.work_item]) {
-          acc[w.work_item] = { count: 0, hours: 0 };
+        const cat = w.work_category || WORK_CATEGORIES[0] || '土木';
+        const key = `${cat}:::${w.work_item}`;
+        if (!acc[key]) {
+          acc[key] = { category: cat, itemName: w.work_item, count: 0, hours: 0 };
         }
-        acc[w.work_item].count += 1;
-        acc[w.work_item].hours += Number(w.work_hours) || 0;
+        acc[key].count += 1;
+        acc[key].hours += Number(w.work_hours) || 0;
         return acc;
-      }, {} as Record<string, {count: number, hours: number}>);
+      }, {} as Record<string, {category: string, itemName: string, count: number, hours: number}>);
 
-    const hasCategoryDispatch = dispatchWorkers.some(w => w.work_category === laborForm.work_category && w.name.trim() !== '');
-    if (!hasCategoryDispatch) return;
+    const hasAnyDispatch = dispatchWorkers.some(w => w.name.trim() !== '');
+    if (!hasAnyDispatch) return;
 
     setWorkItems(prevItems => {
       let newItems = [...prevItems];
       let changed = false;
 
       newItems = newItems.map(item => {
-        const agg = aggregated[item.name];
+        const itemCat = item.category || laborForm.work_category || WORK_CATEGORIES[0] || '土木';
+        const key = `${itemCat}:::${item.name}`;
+        const agg = aggregated[key] || Object.values(aggregated).find(a => a.itemName === item.name);
         const newCount = agg ? agg.count.toString() : '';
         const newHours = agg ? agg.hours.toString() : '';
-        if (item.worker_count !== newCount || item.work_hours !== newHours) {
+        if (item.worker_count !== newCount || item.work_hours !== newHours || !item.category) {
           changed = true;
-          return { ...item, worker_count: newCount, work_hours: newHours };
+          return { ...item, category: itemCat, worker_count: newCount, work_hours: newHours };
         }
         return item;
       });
 
-      const existingNames = new Set(newItems.map(i => i.name));
-      for (const [itemName, data] of Object.entries(aggregated)) {
-        if (!existingNames.has(itemName)) {
+      const existingKeys = new Set(newItems.map(i => `${i.category || laborForm.work_category || WORK_CATEGORIES[0]}:::${i.name}`));
+      for (const [key, data] of Object.entries(aggregated)) {
+        if (!existingKeys.has(key)) {
           changed = true;
+          // If the only existing row is an empty placeholder, replace it
           const newItem: WorkItem = {
-            name: itemName,
+            category: data.category,
+            name: data.itemName,
             progress: '',
             worker_count: data.count.toString(),
             work_hours: data.hours.toString()
           };
-          if (laborForm.work_category === '土木' && INSPECTION_TEMPLATES[itemName]) {
-            const tpl = INSPECTION_TEMPLATES[itemName];
+          if (data.category === '土木' && INSPECTION_TEMPLATES[data.itemName]) {
+            const tpl = INSPECTION_TEMPLATES[data.itemName];
             newItem.inspection = {
               fields: tpl.fields.reduce((acc, f) => ({...acc, [f]: ''}), {}),
               checks: new Array(tpl.checks.length).fill(false),
@@ -343,13 +342,17 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
               note: ''
             };
           }
-          newItems.push(newItem);
+          if (newItems.length === 1 && !newItems[0].progress && (!newItems[0].name || !newItems[0].worker_count)) {
+            newItems = [newItem];
+          } else {
+            newItems.push(newItem);
+          }
         }
       }
 
       return changed ? newItems : prevItems;
     });
-  }, [dispatchWorkers, laborForm.work_category, isLaborModalOpen]);
+  }, [dispatchWorkers, WORK_CATEGORIES, laborForm.work_category, isLaborModalOpen]);
 
   useEffect(() => {
     const urls = toolboxPhotos.map(file => URL.createObjectURL(file));
@@ -490,7 +493,10 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
       laborPhotosOther.forEach(file => formData.append('photos_other', file));
       
       const workItemsToSave = workItems.filter(w => w.name && w.progress).map((w, idx) => {
-        const itemCopy = { ...w };
+        const itemCopy = {
+          ...w,
+          category: w.category || laborForm.work_category || WORK_CATEGORIES[0] || '土木'
+        };
         if (itemCopy.inspection && itemCopy.inspection.photo instanceof File) {
           formData.append(`inspection_photo_${idx}`, itemCopy.inspection.photo);
           const { photo, ...restInspection } = itemCopy.inspection;
@@ -498,6 +504,12 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
         }
         return itemCopy;
       });
+      const distinctCategories = Array.from(
+        new Set(workItemsToSave.map(w => w.category).filter(Boolean))
+      );
+      if (distinctCategories.length > 0) {
+        formData.set('work_category', distinctCategories.join('、'));
+      }
       formData.append('work_items', JSON.stringify(workItemsToSave));
 
       const url = editingLaborId ? `/api/labor-reports/${editingLaborId}` : '/api/labor-reports';
@@ -520,7 +532,7 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
 
   const handleAddLabor = () => {
     setEditingLaborId(null);
-    const defaultCat = WORK_CATEGORIES[0] || (isManufacturing ? '鋼構加工' : '土木');
+    const defaultCat = WORK_CATEGORIES[0] || (isManufacturing ? 'RH鋼/柱' : '土木');
     setLaborForm({ project_id: '', dispatch_order_id: '', report_date: new Date().toISOString().slice(0, 10), weather: '晴', recorder_id: user?.id || '', pm_id: '', work_category: defaultCat, drawing_number: '', drawing_revision: '', construction_location: '', drawing_check_result: '符合圖說', drawing_check_confirmed: false, safety_check_1: false, safety_check_2: false, safety_check_3: false, tomorrow_plan: '', additional_notes: '' });
     setLaborPhotosClose([]);
     setLaborPhotosMid([]);
@@ -529,11 +541,12 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
     setEngineers(['']);
     setDispatchWorkers([{ name: '', start_time: '08:00', end_time: '17:00', work_category: defaultCat, work_item: categoryToItems[defaultCat]?.[0] || '', work_hours: 8 }]);
     setEquipments([]);
-    setWorkItems([{name: categoryToItems[defaultCat]?.[0] || '', progress: '', worker_count: '', work_hours: ''}]);
+    setWorkItems([{ category: defaultCat, name: categoryToItems[defaultCat]?.[0] || '', progress: '', worker_count: '', work_hours: '' }]);
     setIsLaborModalOpen(true);
   };
 
   const handleEditLabor = (l: any) => {
+    const fallbackCat = (l.work_category || '').split('、')[0] || WORK_CATEGORIES[0] || '土木';
     setEditingLaborId(l.id);
     setLaborForm({
       project_id: l.project_id,
@@ -561,11 +574,15 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
     if (l.engineers) setEngineers(safeParseJSON(l.engineers, ['']));
     else setEngineers(['']);
     if (l.dispatch_workers) setDispatchWorkers(safeParseJSON(l.dispatch_workers, []));
-    else setDispatchWorkers([{ name: '', start_time: '08:00', end_time: '17:00', work_category: l.work_category || '土木', work_item: categoryToItems[l.work_category || '土木']?.[0] || '', work_hours: 8 }]);
+    else setDispatchWorkers([{ name: '', start_time: '08:00', end_time: '17:00', work_category: fallbackCat, work_item: categoryToItems[fallbackCat]?.[0] || '', work_hours: 8 }]);
     if (l.equipments) setEquipments(safeParseJSON(l.equipments, []));
     else setEquipments([]);
-    if (l.work_items) setWorkItems(safeParseJSON(l.work_items, [{name: categoryToItems[l.work_category]?.[0] || '', progress: '', worker_count: '', work_hours: ''}]));
-    else setWorkItems([{name: categoryToItems[l.work_category]?.[0] || '', progress: '', worker_count: '', work_hours: ''}]);
+    const parsedItems = safeParseJSON(l.work_items, []);
+    if (Array.isArray(parsedItems) && parsedItems.length > 0) {
+      setWorkItems(parsedItems.map((it: any) => ({ ...it, category: it.category || fallbackCat })));
+    } else {
+      setWorkItems([{ category: fallbackCat, name: categoryToItems[fallbackCat]?.[0] || '', progress: '', worker_count: '', work_hours: '' }]);
+    }
     setIsLaborModalOpen(true);
   };
 
@@ -756,6 +773,11 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                       {l.work_items && safeParseJSON(l.work_items, []).map((w: any, i: number) => (
                         <li key={i} className="mb-2 last:mb-0">
                           <div>
+                            {w.category && (
+                              <span className="text-xs font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded mr-1.5">
+                                {w.category}
+                              </span>
+                            )}
                             <span className="font-medium">{w.name}</span>
                             {(w.worker_count || w.work_hours) && (
                               <span className="text-xs text-slate-500 ml-2">({w.worker_count || 0}人 / {w.work_hours || 0}小時)</span>
@@ -925,10 +947,45 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                     <input type="number" required min="1" value={toolboxForm.worker_count} onChange={e => setToolboxForm({...toolboxForm, worker_count: e.target.value})} className="w-full px-3 py-2 border rounded-lg outline-none focus:ring-2" placeholder="輸入人數" />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">今日工作類別</label>
-                    <select value={toolboxForm.work_category} onChange={e => setToolboxForm({...toolboxForm, work_category: e.target.value})} className="w-full px-3 py-2 border rounded-lg outline-none">
-                      {Array.from(new Set([toolboxForm.work_category, ...toolboxCategories])).filter(Boolean).map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">今日工作類別 (可複選)</label>
+                    <div className="flex flex-wrap gap-2 p-2.5 border border-slate-300 rounded-lg bg-slate-50">
+                      {(() => {
+                        const selectedCats = (toolboxForm.work_category || '')
+                          .split('、')
+                          .map(s => s.trim())
+                          .filter(Boolean);
+                        const allOpts = Array.from(new Set([...toolboxCategories, ...selectedCats])).filter(Boolean);
+                        return allOpts.map(c => {
+                          const isChecked = selectedCats.includes(c);
+                          return (
+                            <label
+                              key={c}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-bold border cursor-pointer flex items-center gap-1.5 transition-colors ${
+                                isChecked
+                                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                                  : 'bg-white text-slate-700 border-slate-300 hover:border-indigo-400'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={e => {
+                                  const next = e.target.checked
+                                    ? [...selectedCats, c]
+                                    : selectedCats.filter(sc => sc !== c);
+                                  setToolboxForm({
+                                    ...toolboxForm,
+                                    work_category: next.length > 0 ? next.join('、') : c
+                                  });
+                                }}
+                                className="hidden"
+                              />
+                              {isChecked ? '✓ ' : '+ '}{c}
+                            </label>
+                          );
+                        });
+                      })()}
+                    </div>
                   </div>
                 </div>
                 
@@ -1238,23 +1295,23 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                               if (!catMap[cat]) catMap[cat] = [];
                               if (label && !catMap[cat].includes(label)) catMap[cat].push(label);
                             });
-                            const firstCat = Object.keys(catMap)[0] || '生產製造加工';
-                            const catItems = catMap[firstCat] || [];
+                            const allCats = Object.keys(catMap);
+                            const firstCat = allCats[0] || '生產製造加工';
                             setLaborForm(prev => ({
                               ...prev,
                               dispatch_order_id: orderId,
                               project_id: order.project_id || prev.project_id,
-                              work_category: firstCat
+                              work_category: allCats.join('、') || firstCat
                             }));
-                            if (catItems.length > 0) {
-                              setWorkItems(catItems.map(name => ({ name, progress: '', worker_count: '', work_hours: '' })));
-                            } else {
-                              setWorkItems([{ name: '', progress: '', worker_count: '', work_hours: '' }]);
-                            }
+                            // 預設先帶入第一個類別的第一項，使用者可自由新增多個不同類別與工項
+                            const initialItems: WorkItem[] = allCats.length > 0
+                              ? [{ category: firstCat, name: catMap[firstCat]?.[0] || '', progress: '', worker_count: '', work_hours: '' }]
+                              : [{ category: firstCat, name: '', progress: '', worker_count: '', work_hours: '' }];
+                            setWorkItems(initialItems);
                             setDispatchWorkers(prev => prev.map(w => ({
                               ...w,
                               work_category: firstCat,
-                              work_item: catItems[0] || ''
+                              work_item: catMap[firstCat]?.[0] || ''
                             })));
                           } else {
                             setLaborForm(prev => ({ ...prev, dispatch_order_id: '' }));
@@ -1419,161 +1476,276 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                 </div>
 
                 <div className="border-t border-slate-200 pt-4 mt-4">
-                  <label className="block text-sm font-bold text-slate-700 mb-2">工作類別與工項進度 {isManufacturing && <span className="text-xs font-normal text-amber-700 ml-1">(工項以所選派工單為主)</span>}</label>
-                  <select value={laborForm.work_category} onChange={e => {
-                    const nextCat = e.target.value;
-                    setLaborForm({...laborForm, work_category: nextCat});
-                    const itemsForCat = categoryToItems[nextCat] || [];
-                    if (isManufacturing && itemsForCat.length > 0) {
-                      setWorkItems(itemsForCat.map(name => ({ name, progress: '', worker_count: '', work_hours: '' })));
-                    } else {
-                      setWorkItems([{name: itemsForCat[0] || '', progress: '', worker_count: '', work_hours: ''}]);
-                    }
-                  }} className="w-full px-3 py-2 border rounded-lg outline-none mb-4 font-medium bg-slate-50">
-                    {Array.from(new Set([laborForm.work_category, ...WORK_CATEGORIES])).filter(Boolean).map(c => <option key={c} value={c}>{isManufacturing ? c : `${c}工程`}</option>)}
-                  </select>
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                    <label className="block text-sm font-bold text-slate-700">
+                      工作類別與工項進度
+                      <span className="text-xs font-normal text-indigo-600 ml-1.5">
+                        (可同時新增多個不同工作類別與工項)
+                      </span>
+                    </label>
+                  </div>
 
                   <div className="space-y-3">
-                    {workItems.map((item, idx) => (
-                      <div key={idx} className="mb-3">
-                        <div className="flex gap-2">
-                          {(categoryToItems[laborForm.work_category] || []).length > 0 ? (
-                            <select value={item.name} onChange={e => {
-                              const newItems = [...workItems];
-                              newItems[idx].name = e.target.value;
-                              if (laborForm.work_category === '土木' && INSPECTION_TEMPLATES[e.target.value]) {
-                                const tpl = INSPECTION_TEMPLATES[e.target.value];
-                                newItems[idx].inspection = {
-                                  fields: tpl.fields.reduce((acc, f) => ({...acc, [f]: ''}), {}),
-                                  checks: new Array(tpl.checks.length).fill(false),
-                                  result: tpl.results[0],
-                                  note: ''
+                    {workItems.map((item, idx) => {
+                      const rowCat = item.category || (laborForm.work_category || '').split('、')[0] || WORK_CATEGORIES[0] || (isManufacturing ? 'RH鋼/柱' : '土木');
+                      const rowCategoryOptions = Array.from(new Set([rowCat, ...WORK_CATEGORIES])).filter(Boolean);
+                      const itemsForRowCat = categoryToItems[rowCat] || [];
+
+                      return (
+                        <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5">
+                          <div className="flex flex-wrap md:flex-nowrap gap-2 items-center">
+                            {/* 每列獨立的工作類別選單 */}
+                            <select
+                              value={rowCat}
+                              onChange={e => {
+                                const nextCat = e.target.value;
+                                const nextDefaultItem = categoryToItems[nextCat]?.[0] || '';
+                                const newItems = [...workItems];
+                                newItems[idx] = {
+                                  ...newItems[idx],
+                                  category: nextCat,
+                                  name: nextDefaultItem,
                                 };
-                              } else {
-                                delete newItems[idx].inspection;
-                              }
-                              setWorkItems(newItems);
-                            }} className="flex-1 px-3 py-2 border rounded-lg outline-none">
-                              {Array.from(new Set([item.name, ...(categoryToItems[laborForm.work_category] || [])])).filter(Boolean).map(opts => <option key={opts} value={opts}>{opts}</option>)}
+                                if (nextCat === '土木' && INSPECTION_TEMPLATES[nextDefaultItem]) {
+                                  const tpl = INSPECTION_TEMPLATES[nextDefaultItem];
+                                  newItems[idx].inspection = {
+                                    fields: tpl.fields.reduce((acc, f) => ({ ...acc, [f]: '' }), {}),
+                                    checks: new Array(tpl.checks.length).fill(false),
+                                    result: tpl.results[0],
+                                    note: ''
+                                  };
+                                } else {
+                                  delete newItems[idx].inspection;
+                                }
+                                setWorkItems(newItems);
+                              }}
+                              className="w-full md:w-36 px-3 py-2 border border-slate-300 rounded-lg outline-none bg-white font-bold text-slate-800 text-sm shrink-0"
+                            >
+                              {rowCategoryOptions.map(c => (
+                                <option key={c} value={c}>
+                                  {isManufacturing ? c : (c.endsWith('工程') ? c : `${c}工程`)}
+                                </option>
+                              ))}
                             </select>
-                          ) : (
-                            <input type="text" value={item.name} placeholder="請輸入工項名稱" onChange={e => {
-                              const newItems = [...workItems];
-                              newItems[idx].name = e.target.value;
-                              setWorkItems(newItems);
-                            }} className="flex-1 px-3 py-2 border rounded-lg outline-none" />
-                          )}
-                          <input type="text" readOnly value={item.worker_count ? `${item.worker_count} 人` : ''} placeholder="人數" className="w-24 px-3 py-2 border rounded-lg outline-none bg-slate-100 text-slate-500 cursor-not-allowed text-center font-medium" />
-                          <input type="text" readOnly value={item.work_hours ? `${item.work_hours} hr` : ''} placeholder="工時" className="w-24 px-3 py-2 border rounded-lg outline-none bg-slate-100 text-slate-500 cursor-not-allowed text-center font-medium" />
-                          <button type="button" onClick={() => setWorkItems(workItems.filter((_, i) => i !== idx))} className="p-2 text-red-500 hover:bg-red-50 rounded-lg shrink-0"><Trash2 size={20}/></button>
-                        </div>
-                        <div className="mt-2">
-                          <input type="text" value={item.progress} onChange={e => {
-                            const newItems = [...workItems];
-                            newItems[idx].progress = e.target.value;
-                            setWorkItems(newItems);
-                          }} placeholder="填寫進度說明 (例: 已完成50%)" required className="w-full px-3 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500" />
-                        </div>
-                        {item.inspection && laborForm.work_category === '土木' && INSPECTION_TEMPLATES[item.name] && (
-                          <div className="mt-3 border-l-4 border-indigo-500 pl-4 py-2 bg-slate-50 rounded-r-xl">
-                            <h5 className="font-bold text-slate-800 mb-3">{item.name}自主檢查</h5>
-                            
-                            {INSPECTION_TEMPLATES[item.name].fields.length > 0 && (
-                              <div className="grid grid-cols-2 gap-3 mb-4">
-                                {INSPECTION_TEMPLATES[item.name].fields.map(f => (
-                                  <div key={f}>
-                                    <label className="block text-xs font-medium text-slate-600 mb-1">{f}</label>
-                                    <input type="text" value={item.inspection!.fields[f] || ''} onChange={e => {
-                                      const newItems = [...workItems];
-                                      newItems[idx].inspection!.fields[f] = e.target.value;
-                                      setWorkItems(newItems);
-                                    }} className="w-full px-2 py-1 text-sm border rounded outline-none focus:ring-1" />
-                                  </div>
+
+                            {/* 對應類別的工項選單 */}
+                            {itemsForRowCat.length > 0 ? (
+                              <select
+                                value={item.name}
+                                onChange={e => {
+                                  const newItems = [...workItems];
+                                  newItems[idx].category = rowCat;
+                                  newItems[idx].name = e.target.value;
+                                  if (rowCat === '土木' && INSPECTION_TEMPLATES[e.target.value]) {
+                                    const tpl = INSPECTION_TEMPLATES[e.target.value];
+                                    newItems[idx].inspection = {
+                                      fields: tpl.fields.reduce((acc, f) => ({ ...acc, [f]: '' }), {}),
+                                      checks: new Array(tpl.checks.length).fill(false),
+                                      result: tpl.results[0],
+                                      note: ''
+                                    };
+                                  } else {
+                                    delete newItems[idx].inspection;
+                                  }
+                                  setWorkItems(newItems);
+                                }}
+                                className="flex-1 min-w-[160px] px-3 py-2 border border-slate-300 rounded-lg outline-none bg-white text-sm"
+                              >
+                                {Array.from(new Set([item.name, ...itemsForRowCat])).filter(Boolean).map(opts => (
+                                  <option key={opts} value={opts}>{opts}</option>
                                 ))}
-                              </div>
+                              </select>
+                            ) : (
+                              <input
+                                type="text"
+                                value={item.name}
+                                placeholder="請輸入工項名稱"
+                                onChange={e => {
+                                  const newItems = [...workItems];
+                                  newItems[idx].category = rowCat;
+                                  newItems[idx].name = e.target.value;
+                                  setWorkItems(newItems);
+                                }}
+                                className="flex-1 min-w-[160px] px-3 py-2 border border-slate-300 rounded-lg outline-none bg-white text-sm"
+                              />
                             )}
 
-                            <div className="space-y-2 mb-4">
-                              {INSPECTION_TEMPLATES[item.name].checks.map((checkText, cIdx) => (
-                                <label key={cIdx} className="flex items-start gap-2 cursor-pointer bg-white p-2 border rounded shadow-sm">
-                                  <input type="checkbox" checked={item.inspection!.checks[cIdx]} onChange={e => {
-                                    const newItems = [...workItems];
-                                    newItems[idx].inspection!.checks[cIdx] = e.target.checked;
-                                    setWorkItems(newItems);
-                                  }} className="mt-0.5 rounded text-indigo-600" />
-                                  <span className="text-sm text-slate-700">{checkText}</span>
-                                </label>
-                              ))}
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-3 mb-4">
-                              <div>
-                                <label className="block text-xs font-medium text-slate-600 mb-1">檢查結果</label>
-                                <select value={item.inspection!.result} onChange={e => {
-                                  const newItems = [...workItems];
-                                  newItems[idx].inspection!.result = e.target.value;
-                                  setWorkItems(newItems);
-                                }} className="w-full px-2 py-1.5 text-sm border rounded outline-none font-bold">
-                                  {INSPECTION_TEMPLATES[item.name].results.map(r => <option key={r} value={r}>{r}</option>)}
-                                </select>
-                              </div>
-                              <div>
-                                <label className="block text-xs font-medium text-slate-600 mb-1">異常/改善說明</label>
-                                <input type="text" value={item.inspection!.note} onChange={e => {
-                                  const newItems = [...workItems];
-                                  newItems[idx].inspection!.note = e.target.value;
-                                  setWorkItems(newItems);
-                                }} placeholder="無異常或填寫改善內容" className="w-full px-2 py-1 text-sm border rounded outline-none" />
-                              </div>
-                            </div>
-
-                            <div className="bg-teal-50/50 border border-teal-200 border-dashed rounded p-3">
-                              <label className="block text-xs font-bold text-teal-700 mb-2">{INSPECTION_TEMPLATES[item.name].photoLabel} (必填)</label>
-                              <div className="flex gap-2">
-                                <label className="flex-1 cursor-pointer bg-white hover:bg-teal-50 text-teal-700 font-bold py-1.5 px-2 rounded border border-teal-200 text-center text-xs flex items-center justify-center gap-1">
-                                  <span>📸</span> 拍照
-                                  <input type="file" accept="image/*" capture="environment" onChange={e => {
-                                    if (e.target.files && e.target.files[0]) {
-                                      const newItems = [...workItems];
-                                      newItems[idx].inspection!.photo = e.target.files[0];
-                                      setWorkItems(newItems);
-                                    }
-                                  }} className="hidden" />
-                                </label>
-                                <label className="flex-1 cursor-pointer bg-white hover:bg-teal-50 text-teal-700 font-bold py-1.5 px-2 rounded border border-teal-200 text-center text-xs flex items-center justify-center gap-1">
-                                  <span>🖼️</span> 相簿
-                                  <input type="file" accept="image/*" onChange={e => {
-                                    if (e.target.files && e.target.files[0]) {
-                                      const newItems = [...workItems];
-                                      newItems[idx].inspection!.photo = e.target.files[0];
-                                      setWorkItems(newItems);
-                                    }
-                                  }} className="hidden" />
-                                </label>
-                              </div>
-                              {typeof item.inspection!.photo === 'string' && (
-                                <img src={`${item.inspection!.photo}`} alt="已上傳" className="mt-2 h-16 w-16 object-cover rounded shadow" />
-                              )}
-                            </div>
+                            <input
+                              type="text"
+                              readOnly
+                              value={item.worker_count ? `${item.worker_count} 人` : ''}
+                              placeholder="人數"
+                              className="w-20 px-2 py-2 border rounded-lg outline-none bg-slate-100 text-slate-500 cursor-not-allowed text-center text-sm font-medium shrink-0"
+                            />
+                            <input
+                              type="text"
+                              readOnly
+                              value={item.work_hours ? `${item.work_hours} hr` : ''}
+                              placeholder="工時"
+                              className="w-20 px-2 py-2 border rounded-lg outline-none bg-slate-100 text-slate-500 cursor-not-allowed text-center text-sm font-medium shrink-0"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setWorkItems(workItems.filter((_, i) => i !== idx))}
+                              className="p-2 text-red-500 hover:bg-red-50 rounded-lg shrink-0"
+                              title="刪除此工項"
+                            >
+                              <Trash2 size={18} />
+                            </button>
                           </div>
-                        )}
-                      </div>
+
+                          <div>
+                            <input
+                              type="text"
+                              value={item.progress}
+                              onChange={e => {
+                                const newItems = [...workItems];
+                                newItems[idx].category = rowCat;
+                                newItems[idx].progress = e.target.value;
+                                setWorkItems(newItems);
+                              }}
+                              placeholder="填寫進度說明 (例: 已完成50%)"
+                              required
+                              className="w-full px-3 py-2 border border-slate-300 bg-white rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                            />
+                          </div>
+
+                          {item.inspection && rowCat === '土木' && INSPECTION_TEMPLATES[item.name] && (
+                            <div className="mt-3 border-l-4 border-indigo-500 pl-4 py-2 bg-white rounded-r-xl">
+                              <h5 className="font-bold text-slate-800 mb-3">{item.name}自主檢查</h5>
+                              
+                              {INSPECTION_TEMPLATES[item.name].fields.length > 0 && (
+                                <div className="grid grid-cols-2 gap-3 mb-4">
+                                  {INSPECTION_TEMPLATES[item.name].fields.map(f => (
+                                    <div key={f}>
+                                      <label className="block text-xs font-medium text-slate-600 mb-1">{f}</label>
+                                      <input type="text" value={item.inspection!.fields[f] || ''} onChange={e => {
+                                        const newItems = [...workItems];
+                                        newItems[idx].inspection!.fields[f] = e.target.value;
+                                        setWorkItems(newItems);
+                                      }} className="w-full px-2 py-1 text-sm border rounded outline-none focus:ring-1" />
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              <div className="space-y-2 mb-4">
+                                {INSPECTION_TEMPLATES[item.name].checks.map((checkText, cIdx) => (
+                                  <label key={cIdx} className="flex items-start gap-2 cursor-pointer bg-slate-50 p-2 border rounded shadow-sm">
+                                    <input type="checkbox" checked={item.inspection!.checks[cIdx]} onChange={e => {
+                                      const newItems = [...workItems];
+                                      newItems[idx].inspection!.checks[cIdx] = e.target.checked;
+                                      setWorkItems(newItems);
+                                    }} className="mt-0.5 rounded text-indigo-600" />
+                                    <span className="text-sm text-slate-700">{checkText}</span>
+                                  </label>
+                                ))}
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-3 mb-4">
+                                <div>
+                                  <label className="block text-xs font-medium text-slate-600 mb-1">檢查結果</label>
+                                  <select value={item.inspection!.result} onChange={e => {
+                                    const newItems = [...workItems];
+                                    newItems[idx].inspection!.result = e.target.value;
+                                    setWorkItems(newItems);
+                                  }} className="w-full px-2 py-1.5 text-sm border rounded outline-none font-bold">
+                                    {INSPECTION_TEMPLATES[item.name].results.map(r => <option key={r} value={r}>{r}</option>)}
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium text-slate-600 mb-1">異常/改善說明</label>
+                                  <input type="text" value={item.inspection!.note} onChange={e => {
+                                    const newItems = [...workItems];
+                                    newItems[idx].inspection!.note = e.target.value;
+                                    setWorkItems(newItems);
+                                  }} placeholder="無異常或填寫改善內容" className="w-full px-2 py-1 text-sm border rounded outline-none" />
+                                </div>
+                              </div>
+
+                              <div className="bg-teal-50/50 border border-teal-200 border-dashed rounded p-3">
+                                <label className="block text-xs font-bold text-teal-700 mb-2">{INSPECTION_TEMPLATES[item.name].photoLabel} (必填)</label>
+                                <div className="flex gap-2">
+                                  <label className="flex-1 cursor-pointer bg-white hover:bg-teal-50 text-teal-700 font-bold py-1.5 px-2 rounded border border-teal-200 text-center text-xs flex items-center justify-center gap-1">
+                                    <span>📸</span> 拍照
+                                    <input type="file" accept="image/*" capture="environment" onChange={e => {
+                                      if (e.target.files && e.target.files[0]) {
+                                        const newItems = [...workItems];
+                                        newItems[idx].inspection!.photo = e.target.files[0];
+                                        setWorkItems(newItems);
+                                      }
+                                    }} className="hidden" />
+                                  </label>
+                                  <label className="flex-1 cursor-pointer bg-white hover:bg-teal-50 text-teal-700 font-bold py-1.5 px-2 rounded border border-teal-200 text-center text-xs flex items-center justify-center gap-1">
+                                    <span>🖼️</span> 相簿
+                                    <input type="file" accept="image/*" onChange={e => {
+                                      if (e.target.files && e.target.files[0]) {
+                                        const newItems = [...workItems];
+                                        newItems[idx].inspection!.photo = e.target.files[0];
+                                        setWorkItems(newItems);
+                                      }
+                                    }} className="hidden" />
+                                  </label>
+                                </div>
+                                {typeof item.inspection!.photo === 'string' && (
+                                  <img src={`${item.inspection!.photo}`} alt="已上傳" className="mt-2 h-16 w-16 object-cover rounded shadow" />
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* 快速依類別新增工項按鈕列 */}
+                  <div className="flex flex-wrap items-center gap-2 mt-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const lastCat = workItems[workItems.length - 1]?.category || WORK_CATEGORIES[0] || (isManufacturing ? 'RH鋼/柱' : '土木');
+                        const defaultName = categoryToItems[lastCat]?.[0] || '';
+                        const newItem: WorkItem = { category: lastCat, name: defaultName, progress: '', worker_count: '', work_hours: '' };
+                        if (lastCat === '土木' && INSPECTION_TEMPLATES[defaultName]) {
+                          const tpl = INSPECTION_TEMPLATES[defaultName];
+                          newItem.inspection = {
+                            fields: tpl.fields.reduce((acc, f) => ({ ...acc, [f]: '' }), {}),
+                            checks: new Array(tpl.checks.length).fill(false),
+                            result: tpl.results[0],
+                            note: ''
+                          };
+                        }
+                        setWorkItems([...workItems, newItem]);
+                      }}
+                      className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition-colors cursor-pointer"
+                    >
+                      + 新增工項
+                    </button>
+
+                    {WORK_CATEGORIES.map(cat => (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => {
+                          const defaultName = categoryToItems[cat]?.[0] || '';
+                          const newItem: WorkItem = { category: cat, name: defaultName, progress: '', worker_count: '', work_hours: '' };
+                          if (cat === '土木' && INSPECTION_TEMPLATES[defaultName]) {
+                            const tpl = INSPECTION_TEMPLATES[defaultName];
+                            newItem.inspection = {
+                              fields: tpl.fields.reduce((acc, f) => ({ ...acc, [f]: '' }), {}),
+                              checks: new Array(tpl.checks.length).fill(false),
+                              result: tpl.results[0],
+                              note: ''
+                            };
+                          }
+                          setWorkItems([...workItems, newItem]);
+                        }}
+                        className="px-2.5 py-1.5 bg-white hover:bg-indigo-50 text-indigo-700 border border-indigo-200 text-xs font-bold rounded-lg transition-colors cursor-pointer"
+                      >
+                        + 新增「{isManufacturing ? cat : (cat.endsWith('工程') ? cat : `${cat}工程`)}」工項
+                      </button>
                     ))}
                   </div>
-                  <button type="button" onClick={() => {
-                    const defaultName = categoryToItems[laborForm.work_category]?.[0] || '';
-                    const newItem: WorkItem = { name: defaultName, progress: '', worker_count: '', work_hours: '' };
-                    if (laborForm.work_category === '土木' && INSPECTION_TEMPLATES[defaultName]) {
-                      const tpl = INSPECTION_TEMPLATES[defaultName];
-                      newItem.inspection = {
-                        fields: tpl.fields.reduce((acc, f) => ({...acc, [f]: ''}), {}),
-                        checks: new Array(tpl.checks.length).fill(false),
-                        result: tpl.results[0],
-                        note: ''
-                      };
-                    }
-                    setWorkItems([...workItems, newItem]);
-                  }} className="text-sm text-indigo-600 font-medium hover:underline mt-2">+ 新增工項</button>
                 </div>
 
                 <div className="border border-green-200 bg-green-50/50 rounded-xl p-4 mt-6">
@@ -2081,7 +2253,10 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                         <tbody>
                           {safeParseJSON(viewingRecord.data.work_items, []).map((w: any, i: number) => (
                             <tr key={i}>
-                              <td className="border border-slate-300 p-2">{w.name}</td>
+                              <td className="border border-slate-300 p-2">
+                                {w.category ? <span className="font-bold text-indigo-700 mr-1.5">[{w.category}]</span> : null}
+                                {w.name}
+                              </td>
                               <td className="border border-slate-300 p-2">{w.progress}</td>
                               <td className="border border-slate-300 p-2 text-right">{w.worker_count || 0}</td>
                               <td className="border border-slate-300 p-2 text-right">{w.work_hours || 0}</td>
