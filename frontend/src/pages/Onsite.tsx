@@ -53,13 +53,17 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
   const [dispatchOrders, setDispatchOrders] = useState<any[]>([]);
 
   const formatDispatchItemLabel = (it: any) => {
-    const desc = (it?.description || '').trim();
+    const memberOrDesc = (it?.member_no || it?.description || '').trim();
     const meta: string[] = [];
-    if (it?.drawing_no) meta.push(`圖號:${it.drawing_no}`);
     if (it?.spec) meta.push(`規格:${it.spec}`);
+    if (it?.length) meta.push(`長度:${it.length}`);
     if (it?.quantity) meta.push(`數量:${it.quantity}`);
+    if (it?.material) meta.push(`材質:${it.material}`);
+    if (it?.total_weight) meta.push(`總量:${it.total_weight}Kgs`);
+    if (!it?.member_no && it?.drawing_no) meta.push(`圖號:${it.drawing_no}`);
+    if (it?.note) meta.push(`${it.note}`);
     const metaStr = meta.length > 0 ? ` (${meta.join(' / ')})` : '';
-    return `${desc || it?.category || '加工工項'}${metaStr}`;
+    return `${memberOrDesc || it?.category || '加工工項'}${metaStr}`;
   };
 
   // 工具箱會議 State

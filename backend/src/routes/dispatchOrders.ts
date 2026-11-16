@@ -1,9 +1,174 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
+import multer from 'multer';
+import * as XLSX from 'xlsx';
 import { authenticateToken, AuthRequest } from '../middleware/authMiddleware';
 
 const router = Router();
 const prisma = new PrismaClient();
+const memoryUpload = multer({ storage: multer.memoryStorage() });
+
+// Download Excel template for steel structure / dispatch order items
+router.get('/excel-template', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const wb = XLSX.utils.book_new();
+    const rows = [
+      ['鋼構總表', '', '', '', '', '', '', '', ''],
+      ['案場名稱：', '', '', '', '', '', '', '', ''],
+      ['需求日期：', '', '', '', '', '', '', '', ''],
+      ['', '', '', '', '', '', '', '', ''],
+      ['項目', '構件編號', '數量', '規格尺寸', '長度', '材質', '單重(Kg)', '總量(Kgs)', '備註'],
+      ['RH鋼/柱', 'ASC-1', 1, 'RH200x100x5.5x8', 3559, 'SN400B', 85.72, 85.72, '熱浸鍍鋅>100μm'],
+      ['', 'ASC-2', 1, 'RH200x100x5.5x8', 3086.5, 'SN400B', 74.13, 74.13, '熱浸鍍鋅>100μm'],
+      ['RH鋼/樑', 'ASG-1', 1, 'RH200x100x5.5x8', 7554, 'SN400B', 166.38, 166.38, '熱浸鍍鋅>100μm'],
+      ['C鋼', 'APN-1', 8, 'C150X65X20X3.2', 3596, 'SS400', 27.01, 216.08, '熱浸鍍鋅>65μm'],
+      ['槽鋼', 'ABR-1', 7, 'U100X50X5X7.5', 1490.1, 'SS400', 13.95, 97.65, '熱浸鍍鋅>100μm'],
+      ['零件板', 'CCL-1', 198, 'L105X57X4', 220, 'SS400', 1.1, 217.8, '熱浸鍍鋅>100μm'],
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = [
+      { wch: 14 },
+      { wch: 14 },
+      { wch: 10 },
+      { wch: 20 },
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 14 },
+      { wch: 14 },
+      { wch: 20 },
+    ];
+    XLSX.utils.book_append_sheet(wb, ws, '工作表1');
+    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename*=UTF-8''${encodeURIComponent('派工單鋼構總表範本.xlsx')}`
+    );
+    res.send(buf);
+  } catch (error) {
+    console.error('Excel template error:', error);
+    res.status(500).json({ error: '下載範本失敗' });
+  }
+});
+
+// Parse uploaded Excel for dispatch order items
+router.post('/parse-excel', authenticateToken, memoryUpload.single('file'), async (req: AuthRequest, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: '請選擇要匯入的 Excel 檔案' });
+    }
+
+    const wb = XLSX.read(req.file.buffer, { type: 'buffer' });
+    if (!wb.SheetNames || wb.SheetNames.length === 0) {
+      return res.status(400).json({ error: '拒絕匯入：Excel 檔案內無任何工作表' });
+    }
+
+    const REQUIRED_HEADERS = ['項目', '構件編號', '數量', '規格尺寸', '長度', '材質', '單重(Kg)', '總量(Kgs)', '備註'];
+    const parsedItems: any[] = [];
+    let detectedSiteName = '';
+
+    for (const sheetName of wb.SheetNames) {
+      const sheet = wb.Sheets[sheetName];
+      const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+      if (rows.length === 0) continue;
+
+      // Scan top rows for metadata (e.g. 案場名稱：) and find the header row
+      let headerRowIndex = -1;
+      let colMap: Record<string, number> = {};
+
+      for (let i = 0; i < Math.min(rows.length, 20); i++) {
+        const rowCells = rows[i].map(c => String(c ?? '').trim());
+        const siteLabelIdx = rowCells.findIndex(c => c.startsWith('案場名稱'));
+        if (siteLabelIdx >= 0 && rowCells[siteLabelIdx + 1]) {
+          detectedSiteName = rowCells[siteLabelIdx + 1];
+        }
+
+        const matchedAll = REQUIRED_HEADERS.every(reqH => rowCells.includes(reqH));
+        if (matchedAll) {
+          headerRowIndex = i;
+          REQUIRED_HEADERS.forEach(reqH => {
+            colMap[reqH] = rowCells.indexOf(reqH);
+          });
+          break;
+        }
+      }
+
+      if (headerRowIndex === -1) {
+        return res.status(400).json({
+          error: `拒絕匯入：工作表「${sheetName}」格式不符合！必須包含欄位：${REQUIRED_HEADERS.join('、')}`
+        });
+      }
+
+      let currentCategory = '';
+      for (let r = headerRowIndex + 1; r < rows.length; r++) {
+        const row = rows[r];
+        if (!Array.isArray(row)) continue;
+
+        const rawCategory = String(row[colMap['項目']] ?? '').trim();
+        const memberNo = String(row[colMap['構件編號']] ?? '').trim();
+        const rawQty = row[colMap['數量']];
+        const spec = String(row[colMap['規格尺寸']] ?? '').trim();
+        const rawLen = row[colMap['長度']];
+        const material = String(row[colMap['材質']] ?? '').trim();
+        const rawUnitWeight = row[colMap['單重(Kg)']];
+        const rawTotalWeight = row[colMap['總量(Kgs)']];
+        const note = String(row[colMap['備註']] ?? '').trim();
+
+        // Skip completely empty rows or summary/total row ('總計' / '合計')
+        if (rawCategory === '總計' || rawCategory === '合計' || memberNo === '總計' || memberNo === '合計') {
+          continue;
+        }
+        if (!rawCategory && !memberNo && !spec && (rawQty === '' || rawQty === null || rawQty === undefined)) {
+          continue;
+        }
+
+        if (rawCategory) {
+          currentCategory = rawCategory;
+        }
+
+        const formatNumStr = (val: any) => {
+          if (val === '' || val === null || val === undefined) return '';
+          const n = Number(String(val).replace(/,/g, '').trim());
+          if (Number.isNaN(n)) return String(val).trim();
+          return String(Math.round(n * 100) / 100);
+        };
+
+        const qtyStr = formatNumStr(rawQty);
+        const unitWStr = formatNumStr(rawUnitWeight);
+        let totalWStr = formatNumStr(rawTotalWeight);
+        if (!totalWStr && qtyStr && unitWStr && !Number.isNaN(Number(qtyStr)) && !Number.isNaN(Number(unitWStr))) {
+          totalWStr = String(Math.round(Number(qtyStr) * Number(unitWStr) * 100) / 100);
+        }
+
+        parsedItems.push({
+          category: currentCategory || '鋼構構件',
+          member_no: memberNo,
+          quantity: qtyStr,
+          spec,
+          length: formatNumStr(rawLen),
+          material,
+          unit_weight: unitWStr,
+          total_weight: totalWStr,
+          note,
+        });
+      }
+    }
+
+    if (parsedItems.length === 0) {
+      return res.status(400).json({ error: '拒絕匯入：Excel 檔案內無任何有效的構件明細資料列' });
+    }
+
+    res.json({
+      items: parsedItems,
+      site_name: detectedSiteName,
+      count: parsedItems.length,
+    });
+  } catch (error) {
+    console.error('Parse dispatch excel error:', error);
+    res.status(500).json({ error: '解析 Excel 失敗，請確認檔案格式是否正確' });
+  }
+});
 
 async function generateNextDispatchNo(): Promise<string> {
   const now = new Date();
