@@ -51,6 +51,8 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
   const [users, setUsers] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [dispatchOrders, setDispatchOrders] = useState<any[]>([]);
+  const [projectExecFiles, setProjectExecFiles] = useState<any[]>([]);
+  const [loadingExecFiles, setLoadingExecFiles] = useState(false);
 
   const formatDispatchItemLabel = (it: any) => {
     const memberOrDesc = (it?.member_no || it?.description || '').trim();
@@ -447,6 +449,33 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
     setToolboxPreviewUrls(urls);
     return () => urls.forEach(url => URL.revokeObjectURL(url));
   }, [toolboxPhotos]);
+
+  useEffect(() => {
+    if (!isLaborModalOpen || !laborForm.project_id) {
+      setProjectExecFiles([]);
+      return;
+    }
+    let cancelled = false;
+    setLoadingExecFiles(true);
+    axios
+      .get(`/api/projects/${laborForm.project_id}/files`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      .then(res => {
+        if (!cancelled) {
+          setProjectExecFiles(Array.isArray(res.data) ? res.data : []);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setProjectExecFiles([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingExecFiles(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isLaborModalOpen, laborForm.project_id, token]);
 
   useEffect(() => {
     fetchData();
@@ -1985,9 +2014,132 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                     <span className="text-xs font-medium text-red-500 bg-red-50 px-2 py-1 rounded">未確認不得正式保存施工日報</span>
                   </div>
                   <div className="space-y-4">
+                    {/* 開案執行書：加工圖面 & BOM表 查閱與複選 */}
+                    <div className="bg-white border border-teal-200 rounded-xl p-3.5 space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <label className="text-sm font-bold text-teal-800 flex items-center gap-1.5">
+                          <FileText size={16} className="text-teal-600" />
+                          開案執行書 — 加工圖面 & BOM表 查閱與選擇 (可複選)
+                        </label>
+                        <span className="text-xs text-slate-500">
+                          勾選檔名將自動帶入下方「圖號 / 查閱檔案」，點擊右側「查閱」可開啟檔案
+                        </span>
+                      </div>
+
+                      {!laborForm.project_id ? (
+                        <div className="text-xs text-slate-400 py-2">
+                          請先於上方選擇「{isManufacturing ? '派工單號 / 專案代碼' : '專案代碼'}」以載入該專案的開案執行書檔案。
+                        </div>
+                      ) : loadingExecFiles ? (
+                        <div className="text-xs text-slate-500 py-2">載入開案執行書檔案中...</div>
+                      ) : (() => {
+                        const drawingFiles = projectExecFiles.filter(f =>
+                          ['加工圖面', '六、加工圖面'].includes((f.category || '').trim())
+                        );
+                        const bomFiles = projectExecFiles.filter(f =>
+                          ['Bom表', 'BOM表', '七、Bom表'].includes((f.category || '').trim())
+                        );
+                        const selectedNames = (laborForm.drawing_number || '')
+                          .split('、')
+                          .map(s => s.trim())
+                          .filter(Boolean);
+
+                        const toggleFileName = (fileName: string) => {
+                          const exists = selectedNames.includes(fileName);
+                          const next = exists
+                            ? selectedNames.filter(n => n !== fileName)
+                            : [...selectedNames, fileName];
+                          setLaborForm({ ...laborForm, drawing_number: next.join('、') });
+                        };
+
+                        if (drawingFiles.length === 0 && bomFiles.length === 0) {
+                          return (
+                            <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                              此專案之「開案執行書」目前尚未上傳「六、加工圖面」或「七、BOM表」檔案，您可直接於下方手動輸入圖號。
+                            </div>
+                          );
+                        }
+
+                        const renderFileRow = (f: any, badgeLabel: string, badgeClass: string) => {
+                          const isChecked = selectedNames.includes(f.file_name);
+                          return (
+                            <div
+                              key={f.id}
+                              className={`flex flex-wrap items-center justify-between gap-2 p-2 rounded-lg border transition-colors ${
+                                isChecked
+                                  ? 'bg-teal-50/80 border-teal-400'
+                                  : 'bg-slate-50 border-slate-200 hover:border-teal-300'
+                              }`}
+                            >
+                              <label className="flex items-center gap-2.5 flex-1 min-w-[200px] cursor-pointer text-xs">
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={() => toggleFileName(f.file_name)}
+                                  className="w-4 h-4 text-teal-600 rounded"
+                                />
+                                <span className={`px-2 py-0.5 rounded font-bold shrink-0 ${badgeClass}`}>
+                                  {badgeLabel}
+                                </span>
+                                <span className="font-bold text-slate-800 break-all">{f.file_name}</span>
+                              </label>
+
+                              <div className="flex items-center gap-2 shrink-0">
+                                {f.uploaded_at && (
+                                  <span className="text-[11px] text-slate-400 hidden sm:inline">
+                                    {new Date(f.uploaded_at).toLocaleDateString()}
+                                  </span>
+                                )}
+                                <a
+                                  href={f.file_path}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="px-2.5 py-1 bg-white hover:bg-teal-600 hover:text-white text-teal-700 border border-teal-300 rounded-md text-xs font-bold transition-colors flex items-center gap-1 shadow-sm"
+                                >
+                                  🔍 查閱檔案
+                                </a>
+                              </div>
+                            </div>
+                          );
+                        };
+
+                        return (
+                          <div className="space-y-3">
+                            <div>
+                              <div className="text-xs font-bold text-slate-600 mb-1.5">
+                                📐 六、加工圖面 ({drawingFiles.length} 份)
+                              </div>
+                              {drawingFiles.length > 0 ? (
+                                <div className="space-y-1.5">
+                                  {drawingFiles.map(f => renderFileRow(f, '加工圖面', 'bg-blue-100 text-blue-800'))}
+                                </div>
+                              ) : (
+                                <div className="text-xs text-slate-400 pl-2">尚無上傳加工圖面</div>
+                              )}
+                            </div>
+
+                            <div>
+                              <div className="text-xs font-bold text-slate-600 mb-1.5">
+                                📋 七、BOM表 ({bomFiles.length} 份)
+                              </div>
+                              {bomFiles.length > 0 ? (
+                                <div className="space-y-1.5">
+                                  {bomFiles.map(f => renderFileRow(f, 'BOM表', 'bg-purple-100 text-purple-800'))}
+                                </div>
+                              ) : (
+                                <div className="text-xs text-slate-400 pl-2">尚無上傳 BOM 表</div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">圖號</label>
-                      <input type="text" value={laborForm.drawing_number} onChange={e => setLaborForm({...laborForm, drawing_number: e.target.value})} placeholder="例如：C-101 / S-205 / E-301" required className="w-full px-3 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-teal-500 bg-white" />
+                      <label className="block text-sm font-medium text-slate-700 mb-1">
+                        圖號 / 已選擇查閱之加工圖面與BOM表檔名 *
+                      </label>
+                      <input type="text" value={laborForm.drawing_number} onChange={e => setLaborForm({...laborForm, drawing_number: e.target.value})} placeholder="可由上方勾選加工圖面/BOM表自動帶入，或手動輸入 (例如：C-101 / S-205)" required className="w-full px-3 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-teal-500 bg-white" />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1">版次</label>
@@ -2398,6 +2550,14 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                     <div><strong>工務經理：</strong> {viewingRecord.data.pm?.name || '無'}</div>
                     <div><strong>記錄人員：</strong> {viewingRecord.data.recorder?.name}</div>
                     <div className="col-span-2"><strong>現場工程師：</strong> {viewingRecord.data.engineers ? safeParseJSON(viewingRecord.data.engineers, []).join(', ') : '無'}</div>
+                    {viewingRecord.data.drawing_number && (
+                      <div className="col-span-2 text-base bg-teal-50/70 border border-teal-200 px-3 py-2 rounded-lg">
+                        <strong>查閱圖面 / BOM表 (圖號)：</strong> {viewingRecord.data.drawing_number}
+                        {viewingRecord.data.drawing_revision ? ` ｜ 版次：${viewingRecord.data.drawing_revision}` : ''}
+                        {viewingRecord.data.construction_location ? ` ｜ 位置：${viewingRecord.data.construction_location}` : ''}
+                        {viewingRecord.data.drawing_check_result ? ` （${viewingRecord.data.drawing_check_result}）` : ''}
+                      </div>
+                    )}
                   </div>
                   
                   {viewingRecord.data.dispatch_workers && safeParseJSON(viewingRecord.data.dispatch_workers, []).length > 0 && (
