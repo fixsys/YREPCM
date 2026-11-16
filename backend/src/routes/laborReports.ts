@@ -230,6 +230,7 @@ router.get('/:id/export', authenticateToken, async (req: AuthRequest, res) => {
       where: { id: String(req.params.id) },
       include: {
         project: true,
+        dispatchOrder: true,
         recorder: true,
         pm: true
       }
@@ -286,31 +287,79 @@ router.get('/:id/export', authenticateToken, async (req: AuthRequest, res) => {
 
 
 
+    const normItemKey = (s: string) =>
+      String(s || '')
+        .replace(/\s*\/?\s*數量:[^/)]+/g, '')
+        .replace(/\(\s*\)/g, '')
+        .trim();
+
+    const accumulatedItemQtyMap: Record<string, number> = {};
+    for (const r of pastReports) {
+      let rItems: any[] = [];
+      try {
+        rItems = typeof r.work_items === 'string' ? JSON.parse(r.work_items) : (r.work_items || []);
+      } catch {}
+      if (Array.isArray(rItems)) {
+        for (const it of rItems) {
+          const k = normItemKey(it?.name);
+          if (!k) continue;
+          const val = parseFloat(String(it?.progress || '').replace(/,/g, ''));
+          if (!Number.isNaN(val)) {
+            accumulatedItemQtyMap[k] = Math.round(((accumulatedItemQtyMap[k] || 0) + val) * 100) / 100;
+          }
+        }
+      }
+    }
+
     let workItems = [];
     try { workItems = typeof report.work_items === 'string' ? JSON.parse(report.work_items) : (report.work_items || []); } catch(e){}
-    // Inject contract quantity and unit if project has work_items_config
+    const allConfigItems: any[] = [];
     if (report.project && report.project.work_items_config) {
       try {
         const config = typeof report.project.work_items_config === 'string' 
           ? JSON.parse(report.project.work_items_config) 
           : report.project.work_items_config;
-        
-        const allConfigItems: any[] = [];
         Object.values(config).forEach((arr) => {
           if (Array.isArray(arr)) {
             allConfigItems.push(...arr);
           }
         });
-        
-        workItems.forEach((wi: any) => {
-          const cfg = allConfigItems.find((c: any) => c.name === wi.name);
-          if (cfg) {
-            wi.contractQuantity = cfg.contractQuantity;
-            wi.unit = cfg.unit;
-          }
-        });
       } catch (e) {}
     }
+    const dispatchItems: any[] = Array.isArray(report.dispatchOrder?.items) ? report.dispatchOrder.items : [];
+
+    workItems.forEach((wi: any) => {
+      const cleanName = normItemKey(wi.name);
+      const cfg = allConfigItems.find((c: any) => normItemKey(c?.name) === cleanName);
+      if (cfg) {
+        wi.contractQuantity = cfg.contractQuantity;
+        wi.unit = cfg.unit;
+      }
+      if (wi.target_quantity !== undefined && wi.target_quantity !== '') {
+        wi.contractQuantity = wi.target_quantity;
+      } else if (wi.contractQuantity === undefined && dispatchItems.length > 0) {
+        const foundDo = dispatchItems.find((d: any) => {
+          const m = (d?.member_no || d?.description || '').trim();
+          return m && cleanName.startsWith(m);
+        });
+        if (foundDo && foundDo.quantity !== undefined && foundDo.quantity !== '') {
+          wi.contractQuantity = foundDo.quantity;
+        }
+      }
+      if (wi.contractQuantity === undefined) {
+        const legacyMatch = String(wi.name || '').match(/數量:\s*(\d+(?:\.\d+)?)/);
+        if (legacyMatch) wi.contractQuantity = legacyMatch[1];
+      }
+      wi.name = cleanName;
+      wi.accumulatedQty = accumulatedItemQtyMap[cleanName] ?? wi.progress ?? '';
+      const targetNum = parseFloat(String(wi.contractQuantity ?? '').replace(/,/g, ''));
+      const accNum = parseFloat(String(wi.accumulatedQty ?? '').replace(/,/g, ''));
+      if (!Number.isNaN(targetNum) && targetNum > 0 && !Number.isNaN(accNum)) {
+        const pct = Math.min(100, Math.round((accNum / targetNum) * 1000) / 10);
+        wi.completionRate = `${pct}%`;
+        wi.notes = `${pct}%`;
+      }
+    });
     
     
 
@@ -499,10 +548,10 @@ const wb = new ExcelJS.Workbook();
     ws.mergeCells(`A${r}:C${r}`);
     ws.getCell(`A${r}`).value = '施工項目'; applyStyle(ws.getCell(`A${r}`), true);
     ws.getCell(`D${r}`).value = '單位'; applyStyle(ws.getCell(`D${r}`), true);
-    ws.getCell(`E${r}`).value = '契約數量'; applyStyle(ws.getCell(`E${r}`), true);
+    ws.getCell(`E${r}`).value = '目標/契約數量'; applyStyle(ws.getCell(`E${r}`), true);
     ws.getCell(`F${r}`).value = '本日完成數量'; applyStyle(ws.getCell(`F${r}`), true);
     ws.getCell(`G${r}`).value = '累計完成數量'; applyStyle(ws.getCell(`G${r}`), true);
-    ws.getCell(`H${r}`).value = '備註'; applyStyle(ws.getCell(`H${r}`), true);
+    ws.getCell(`H${r}`).value = '目前完成進度'; applyStyle(ws.getCell(`H${r}`), true);
     r++;
 
     for(let i=0; i<11; i++) {
@@ -745,6 +794,7 @@ router.get('/:id/export-pdf', authenticateToken, async (req: AuthRequest, res) =
       where: { id: String(req.params.id) },
       include: {
         project: true,
+        dispatchOrder: true,
         recorder: true,
         pm: true
       }
@@ -793,31 +843,79 @@ router.get('/:id/export-pdf', authenticateToken, async (req: AuthRequest, res) =
     const accumulatedDuration = getDiffDays(pStart, reportDate);
     const remainingDuration = getDiffDays(reportDate, pEnd);
 
+    const normItemKey = (s: string) =>
+      String(s || '')
+        .replace(/\s*\/?\s*數量:[^/)]+/g, '')
+        .replace(/\(\s*\)/g, '')
+        .trim();
+
+    const accumulatedItemQtyMap: Record<string, number> = {};
+    for (const r of pastReports) {
+      let rItems: any[] = [];
+      try {
+        rItems = typeof r.work_items === 'string' ? JSON.parse(r.work_items) : (r.work_items || []);
+      } catch {}
+      if (Array.isArray(rItems)) {
+        for (const it of rItems) {
+          const k = normItemKey(it?.name);
+          if (!k) continue;
+          const val = parseFloat(String(it?.progress || '').replace(/,/g, ''));
+          if (!Number.isNaN(val)) {
+            accumulatedItemQtyMap[k] = Math.round(((accumulatedItemQtyMap[k] || 0) + val) * 100) / 100;
+          }
+        }
+      }
+    }
+
     let workItems = [];
     try { workItems = typeof report.work_items === 'string' ? JSON.parse(report.work_items) : (report.work_items || []); } catch(e){}
-    // Inject contract quantity and unit if project has work_items_config
+    const allConfigItems: any[] = [];
     if (report.project && report.project.work_items_config) {
       try {
         const config = typeof report.project.work_items_config === 'string' 
           ? JSON.parse(report.project.work_items_config) 
           : report.project.work_items_config;
-        
-        const allConfigItems: any[] = [];
         Object.values(config).forEach((arr) => {
           if (Array.isArray(arr)) {
             allConfigItems.push(...arr);
           }
         });
-        
-        workItems.forEach((wi: any) => {
-          const cfg = allConfigItems.find((c: any) => c.name === wi.name);
-          if (cfg) {
-            wi.contractQuantity = cfg.contractQuantity;
-            wi.unit = cfg.unit;
-          }
-        });
       } catch (e) {}
     }
+    const dispatchItems: any[] = Array.isArray(report.dispatchOrder?.items) ? report.dispatchOrder.items : [];
+
+    workItems.forEach((wi: any) => {
+      const cleanName = normItemKey(wi.name);
+      const cfg = allConfigItems.find((c: any) => normItemKey(c?.name) === cleanName);
+      if (cfg) {
+        wi.contractQuantity = cfg.contractQuantity;
+        wi.unit = cfg.unit;
+      }
+      if (wi.target_quantity !== undefined && wi.target_quantity !== '') {
+        wi.contractQuantity = wi.target_quantity;
+      } else if (wi.contractQuantity === undefined && dispatchItems.length > 0) {
+        const foundDo = dispatchItems.find((d: any) => {
+          const m = (d?.member_no || d?.description || '').trim();
+          return m && cleanName.startsWith(m);
+        });
+        if (foundDo && foundDo.quantity !== undefined && foundDo.quantity !== '') {
+          wi.contractQuantity = foundDo.quantity;
+        }
+      }
+      if (wi.contractQuantity === undefined) {
+        const legacyMatch = String(wi.name || '').match(/數量:\s*(\d+(?:\.\d+)?)/);
+        if (legacyMatch) wi.contractQuantity = legacyMatch[1];
+      }
+      wi.name = cleanName;
+      wi.accumulatedQty = accumulatedItemQtyMap[cleanName] ?? wi.progress ?? '';
+      const targetNum = parseFloat(String(wi.contractQuantity ?? '').replace(/,/g, ''));
+      const accNum = parseFloat(String(wi.accumulatedQty ?? '').replace(/,/g, ''));
+      if (!Number.isNaN(targetNum) && targetNum > 0 && !Number.isNaN(accNum)) {
+        const pct = Math.min(100, Math.round((accNum / targetNum) * 1000) / 10);
+        wi.completionRate = `${pct}%`;
+        wi.notes = `${pct}%`;
+      }
+    });
     let workers = [];
     try { workers = typeof report.dispatch_workers === 'string' ? JSON.parse(report.dispatch_workers) : (report.dispatch_workers || []); } catch(e){}
     let equips = [];

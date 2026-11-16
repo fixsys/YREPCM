@@ -55,16 +55,21 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
   const formatDispatchItemLabel = (it: any) => {
     const memberOrDesc = (it?.member_no || it?.description || '').trim();
     const meta: string[] = [];
+    if (!it?.member_no && it?.drawing_no) meta.push(`圖號:${it.drawing_no}`);
     if (it?.spec) meta.push(`規格:${it.spec}`);
     if (it?.length) meta.push(`長度:${it.length}`);
-    if (it?.quantity) meta.push(`數量:${it.quantity}`);
     if (it?.material) meta.push(`材質:${it.material}`);
-    if (it?.total_weight) meta.push(`總量:${it.total_weight}Kgs`);
-    if (!it?.member_no && it?.drawing_no) meta.push(`圖號:${it.drawing_no}`);
     if (it?.note) meta.push(`${it.note}`);
     const metaStr = meta.length > 0 ? ` (${meta.join(' / ')})` : '';
     return `${memberOrDesc || it?.category || '加工工項'}${metaStr}`;
   };
+
+  // Normalize item name (strip legacy '/ 數量:XX' or '(數量:XX)' for matching)
+  const normalizeItemKey = (name: string) =>
+    (name || '')
+      .replace(/\s*\/?\s*數量:[^/)]+/g, '')
+      .replace(/\(\s*\)/g, '')
+      .trim();
 
   // 工具箱會議 State
   const [toolboxMeetings, setToolboxMeetings] = useState<any[]>([]);
@@ -151,7 +156,10 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
   type WorkItem = {
     category?: string;
     name: string;
+    target_quantity?: string;
+    unit?: string;
     progress: string;
+    notes?: string;
     worker_count?: string;
     work_hours?: string;
     inspection?: {
@@ -162,7 +170,7 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
       photo?: string | File;
     }
   };
-  const [workItems, setWorkItems] = useState<WorkItem[]>([{category: '', name: '', progress: '', worker_count: '', work_hours: ''}]);
+  const [workItems, setWorkItems] = useState<WorkItem[]>([{category: '', name: '', target_quantity: '', progress: '', worker_count: '', work_hours: ''}]);
 
   const INSPECTION_TEMPLATES: Record<string, { fields: string[], checks: string[], results: string[], photoLabel: string }> = {
     'PC': {
@@ -243,6 +251,86 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
     }
     return defaultCategories;
   }, [isManufacturing, laborForm.dispatch_order_id, laborForm.project_id, dispatchOrders, projects]);
+
+  // 查詢工項對應之目標數量 (契約數量 / 派工單需求數量)
+  const getTargetQuantityForItem = useCallback(
+    (category: string, itemName: string, overrideProjectId?: string, overrideDispatchOrderId?: string): string => {
+      if (!itemName) return '';
+      const normKey = normalizeItemKey(itemName);
+      const pid = overrideProjectId ?? laborForm.project_id;
+      const doId = overrideDispatchOrderId ?? laborForm.dispatch_order_id;
+
+      // 1. 若為製造報工或有選派工單，從派工單明細查找數量
+      const targetOrders = doId
+        ? dispatchOrders.filter(o => o.id === doId)
+        : pid
+        ? dispatchOrders.filter(o => o.project_id === pid)
+        : dispatchOrders;
+      for (const ord of targetOrders) {
+        if (Array.isArray(ord.items)) {
+          for (const it of ord.items) {
+            const label = formatDispatchItemLabel(it);
+            if (label === itemName || normalizeItemKey(label) === normKey || (it.member_no && itemName.startsWith(it.member_no))) {
+              if (it.quantity !== undefined && it.quantity !== null && String(it.quantity).trim() !== '') {
+                const numMatch = String(it.quantity).match(/(\d+(?:\.\d+)?)/);
+                return numMatch ? numMatch[1] : String(it.quantity).trim();
+              }
+            }
+          }
+        }
+      }
+
+      // 2. 從專案施工細項設定 (work_items_config) 查找契約數量
+      if (pid) {
+        const proj = projects.find(p => p.id === pid);
+        if (proj && proj.work_items_config && !Array.isArray(proj.work_items_config)) {
+          const cfg = proj.work_items_config as Record<string, any[]>;
+          const searchCats = category && cfg[category] ? [cfg[category], ...Object.values(cfg)] : Object.values(cfg);
+          for (const arr of searchCats) {
+            if (Array.isArray(arr)) {
+              const found = arr.find((c: any) => c && (c.name === itemName || normalizeItemKey(c.name) === normKey));
+              if (found && found.contractQuantity !== undefined && found.contractQuantity !== null && String(found.contractQuantity) !== '') {
+                return String(found.contractQuantity);
+              }
+            }
+          }
+        }
+      }
+
+      // 3. 相容舊格式：若舊名稱含有「數量:50」自動擷取
+      const legacyMatch = itemName.match(/數量:\s*(\d+(?:\.\d+)?)/);
+      if (legacyMatch) return legacyMatch[1];
+
+      return '';
+    },
+    [dispatchOrders, projects, laborForm.project_id, laborForm.dispatch_order_id]
+  );
+
+  // 計算截至指定日期(含)前，同專案/同派工單下某工項的歷史累計完成數量（不含當前編輯中或指定排除之報表）
+  const getPastAccumulatedQty = useCallback(
+    (itemName: string, projectId: string, dispatchOrderId: string, excludeReportId?: string | null, upToDate?: string) => {
+      if (!itemName) return 0;
+      const normTarget = normalizeItemKey(itemName);
+      let sum = 0;
+      laborReports.forEach(r => {
+        if (excludeReportId && r.id === excludeReportId) return;
+        if (dispatchOrderId && r.dispatch_order_id && r.dispatch_order_id !== dispatchOrderId) return;
+        if (projectId && r.project_id !== projectId) return;
+        if (upToDate && new Date(r.report_date).getTime() > new Date(upToDate).getTime()) return;
+        const rItems = safeParseJSON(r.work_items, []);
+        if (Array.isArray(rItems)) {
+          rItems.forEach((wi: any) => {
+            if (wi && (wi.name === itemName || normalizeItemKey(wi.name) === normTarget)) {
+              const val = parseFloat(String(wi.progress || '').replace(/,/g, ''));
+              if (!Number.isNaN(val)) sum += val;
+            }
+          });
+        }
+      });
+      return Math.round(sum * 100) / 100;
+    },
+    [laborReports]
+  );
 
   const WORK_CATEGORIES = useMemo(() => {
     const cats = Object.keys(categoryToItems);
@@ -493,9 +581,16 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
       laborPhotosOther.forEach(file => formData.append('photos_other', file));
       
       const workItemsToSave = workItems.filter(w => w.name && w.progress).map((w, idx) => {
+        const cat = w.category || laborForm.work_category || WORK_CATEGORIES[0] || '土木';
+        const resolvedTarget =
+          w.target_quantity !== undefined && w.target_quantity !== ''
+            ? w.target_quantity
+            : getTargetQuantityForItem(cat, w.name);
         const itemCopy = {
           ...w,
-          category: w.category || laborForm.work_category || WORK_CATEGORIES[0] || '土木'
+          name: normalizeItemKey(w.name),
+          category: cat,
+          target_quantity: resolvedTarget,
         };
         if (itemCopy.inspection && itemCopy.inspection.photo instanceof File) {
           formData.append(`inspection_photo_${idx}`, itemCopy.inspection.photo);
@@ -777,25 +872,42 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                   )}
                   <div className="text-sm text-slate-600 mt-auto border-t border-slate-100 pt-3">
                     <strong className="block mb-1">施工項目進度:</strong>
-                    <ul className="list-disc pl-4 space-y-1">
-                      {l.work_items && safeParseJSON(l.work_items, []).map((w: any, i: number) => (
-                        <li key={i} className="mb-2 last:mb-0">
-                          <div>
-                            {w.category && (
-                              <span className="text-xs font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded mr-1.5">
-                                {w.category}
-                              </span>
-                            )}
-                            <span className="font-medium">{w.name}</span>
-                            {(w.worker_count || w.work_hours) && (
-                              <span className="text-xs text-slate-500 ml-2">({w.worker_count || 0}人 / {w.work_hours || 0}小時)</span>
-                            )}
-                          </div>
-                          {w.progress && (
-                            <div className="text-slate-500 mt-0.5 whitespace-pre-wrap">{w.progress}</div>
-                          )}
-                        </li>
-                      ))}
+                    <ul className="list-disc pl-4 space-y-2">
+                      {l.work_items && safeParseJSON(l.work_items, []).map((w: any, i: number) => {
+                        const targetStr =
+                          w.target_quantity !== undefined && w.target_quantity !== ''
+                            ? w.target_quantity
+                            : getTargetQuantityForItem(w.category || l.work_category, w.name, l.project_id, l.dispatch_order_id);
+                        const targetN = parseFloat(String(targetStr).replace(/,/g, ''));
+                        const todayN = parseFloat(String(w.progress || '').replace(/,/g, ''));
+                        const pastN = getPastAccumulatedQty(w.name, l.project_id, l.dispatch_order_id || '', l.id, l.report_date);
+                        const accN = Math.round(((Number.isNaN(todayN) ? 0 : todayN) + pastN) * 100) / 100;
+                        const pct = !Number.isNaN(targetN) && targetN > 0 ? Math.min(100, Math.round((accN / targetN) * 1000) / 10) : null;
+
+                        return (
+                          <li key={i} className="mb-2 last:mb-0">
+                            <div>
+                              {w.category && (
+                                <span className="text-xs font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded mr-1.5">
+                                  {w.category}
+                                </span>
+                              )}
+                              <span className="font-medium text-slate-800">{normalizeItemKey(w.name)}</span>
+                              {(w.worker_count || w.work_hours) && (
+                                <span className="text-xs text-slate-500 ml-2">({w.worker_count || 0}人 / {w.work_hours || 0}小時)</span>
+                              )}
+                            </div>
+                            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600 bg-slate-50 px-2.5 py-1.5 rounded border border-slate-100">
+                              <span>目標數量：<strong>{!Number.isNaN(targetN) && targetN > 0 ? targetN : '-'}</strong></span>
+                              <span>今日數量：<strong className="text-indigo-700">{w.progress || '-'}</strong></span>
+                              <span>累計完成：<strong>{accN}</strong></span>
+                              {pct !== null && (
+                                <span className="font-bold text-emerald-700 ml-auto">完成進度：{pct}%</span>
+                              )}
+                            </div>
+                          </li>
+                        );
+                      })}
                     </ul>
                     <div className="mt-3 pt-3 border-t border-slate-100 flex gap-2 items-center flex-wrap">
                       {l.safety_check_1 && l.safety_check_2 && l.safety_check_3 && (
@@ -1315,10 +1427,12 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                               project_id: order.project_id || prev.project_id,
                               work_category: allCats.join('、') || firstCat
                             }));
-                            // 預設先帶入第一個類別的第一項，使用者可自由新增多個不同類別與工項
+                            // 預設先帶入第一個類別的第一項，並自動帶入目標數量
+                            const defaultItemName = catMap[firstCat]?.[0] || '';
+                            const defaultTargetQty = getTargetQuantityForItem(firstCat, defaultItemName, order.project_id, orderId);
                             const initialItems: WorkItem[] = allCats.length > 0
-                              ? [{ category: firstCat, name: catMap[firstCat]?.[0] || '', progress: '', worker_count: '', work_hours: '' }]
-                              : [{ category: firstCat, name: '', progress: '', worker_count: '', work_hours: '' }];
+                              ? [{ category: firstCat, name: defaultItemName, target_quantity: defaultTargetQty, progress: '', worker_count: '', work_hours: '' }]
+                              : [{ category: firstCat, name: '', target_quantity: '', progress: '', worker_count: '', work_hours: '' }];
                             setWorkItems(initialItems);
                             setDispatchWorkers(prev => prev.map(w => ({
                               ...w,
@@ -1506,9 +1620,27 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                       const rowCat = item.category || (laborForm.work_category || '').split('、')[0] || WORK_CATEGORIES[0] || (isManufacturing ? 'RH鋼/柱' : '土木');
                       const rowCategoryOptions = Array.from(new Set([rowCat, ...WORK_CATEGORIES])).filter(Boolean);
                       const itemsForRowCat = categoryToItems[rowCat] || [];
+                      const resolvedTargetQtyStr =
+                        item.target_quantity !== undefined && item.target_quantity !== ''
+                          ? item.target_quantity
+                          : getTargetQuantityForItem(rowCat, item.name);
+                      const targetNum = parseFloat(String(resolvedTargetQtyStr).replace(/,/g, ''));
+                      const todayNum = parseFloat(String(item.progress || '').replace(/,/g, ''));
+                      const pastQty = getPastAccumulatedQty(
+                        item.name,
+                        laborForm.project_id,
+                        laborForm.dispatch_order_id,
+                        editingLaborId,
+                        laborForm.report_date
+                      );
+                      const totalAccumulatedQty = Math.round(((Number.isNaN(todayNum) ? 0 : todayNum) + pastQty) * 100) / 100;
+                      const completionPct =
+                        !Number.isNaN(targetNum) && targetNum > 0
+                          ? Math.min(100, Math.round((totalAccumulatedQty / targetNum) * 1000) / 10)
+                          : null;
 
                       return (
-                        <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5">
+                        <div key={idx} className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5">
                           <div className="flex flex-wrap md:flex-nowrap gap-2 items-center">
                             {/* 每列獨立的工作類別選單 */}
                             <select
@@ -1516,11 +1648,13 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                               onChange={e => {
                                 const nextCat = e.target.value;
                                 const nextDefaultItem = categoryToItems[nextCat]?.[0] || '';
+                                const nextTargetQty = getTargetQuantityForItem(nextCat, nextDefaultItem);
                                 const newItems = [...workItems];
                                 newItems[idx] = {
                                   ...newItems[idx],
                                   category: nextCat,
                                   name: nextDefaultItem,
+                                  target_quantity: nextTargetQty,
                                 };
                                 if (nextCat === '土木' && INSPECTION_TEMPLATES[nextDefaultItem]) {
                                   const tpl = INSPECTION_TEMPLATES[nextDefaultItem];
@@ -1549,11 +1683,14 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                               <select
                                 value={item.name}
                                 onChange={e => {
+                                  const nextName = e.target.value;
+                                  const nextTargetQty = getTargetQuantityForItem(rowCat, nextName);
                                   const newItems = [...workItems];
                                   newItems[idx].category = rowCat;
-                                  newItems[idx].name = e.target.value;
-                                  if (rowCat === '土木' && INSPECTION_TEMPLATES[e.target.value]) {
-                                    const tpl = INSPECTION_TEMPLATES[e.target.value];
+                                  newItems[idx].name = nextName;
+                                  newItems[idx].target_quantity = nextTargetQty;
+                                  if (rowCat === '土木' && INSPECTION_TEMPLATES[nextName]) {
+                                    const tpl = INSPECTION_TEMPLATES[nextName];
                                     newItems[idx].inspection = {
                                       fields: tpl.fields.reduce((acc, f) => ({ ...acc, [f]: '' }), {}),
                                       checks: new Array(tpl.checks.length).fill(false),
@@ -1568,7 +1705,7 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                                 className="flex-1 min-w-[160px] px-3 py-2 border border-slate-300 rounded-lg outline-none bg-white text-sm"
                               >
                                 {Array.from(new Set([item.name, ...itemsForRowCat])).filter(Boolean).map(opts => (
-                                  <option key={opts} value={opts}>{opts}</option>
+                                  <option key={opts} value={opts}>{normalizeItemKey(opts)}</option>
                                 ))}
                               </select>
                             ) : (
@@ -1610,20 +1747,55 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                             </button>
                           </div>
 
-                          <div>
-                            <input
-                              type="text"
-                              value={item.progress}
-                              onChange={e => {
-                                const newItems = [...workItems];
-                                newItems[idx].category = rowCat;
-                                newItems[idx].progress = e.target.value;
-                                setWorkItems(newItems);
-                              }}
-                              placeholder="填寫進度說明 (例: 已完成50%)"
-                              required
-                              className="w-full px-3 py-2 border border-slate-300 bg-white rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
-                            />
+                          {/* 目標數量 (獨立欄位) + 今日生產/完成數量 + 即時進度計算 */}
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 items-center pt-1">
+                            <div className="flex items-center bg-white border border-slate-300 rounded-lg px-3 py-1.5">
+                              <span className="text-xs font-bold text-slate-500 mr-2 shrink-0">目標數量：</span>
+                              <input
+                                type="number"
+                                step="any"
+                                value={resolvedTargetQtyStr}
+                                onChange={e => {
+                                  const newItems = [...workItems];
+                                  newItems[idx].category = rowCat;
+                                  newItems[idx].target_quantity = e.target.value;
+                                  setWorkItems(newItems);
+                                }}
+                                placeholder="自動帶入或輸入"
+                                className="w-full text-sm font-bold text-slate-800 outline-none bg-transparent text-right"
+                              />
+                            </div>
+
+                            <div className="flex items-center bg-white border-2 border-indigo-300 rounded-lg px-3 py-1.5 focus-within:ring-2 focus-within:ring-indigo-500">
+                              <span className="text-xs font-bold text-indigo-700 mr-2 shrink-0">
+                                {isManufacturing ? '今日生產數量 *：' : '今日完成數量 *：'}
+                              </span>
+                              <input
+                                type="number"
+                                step="any"
+                                value={item.progress}
+                                onChange={e => {
+                                  const newItems = [...workItems];
+                                  newItems[idx].category = rowCat;
+                                  newItems[idx].target_quantity = resolvedTargetQtyStr;
+                                  newItems[idx].progress = e.target.value;
+                                  setWorkItems(newItems);
+                                }}
+                                placeholder="請輸入數量"
+                                required
+                                className="w-full text-sm font-extrabold text-indigo-700 outline-none bg-transparent text-right"
+                              />
+                            </div>
+
+                            <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5 text-xs">
+                              <span className="text-slate-600">
+                                累計完成：<strong className="text-slate-800">{totalAccumulatedQty}</strong>
+                                {!Number.isNaN(targetNum) && targetNum > 0 ? ` / ${targetNum}` : ''}
+                              </span>
+                              <span className="font-extrabold text-emerald-700 text-sm">
+                                進度：{completionPct !== null ? `${completionPct}%` : '-'}
+                              </span>
+                            </div>
                           </div>
 
                           {item.inspection && rowCat === '土木' && INSPECTION_TEMPLATES[item.name] && (
@@ -1721,7 +1893,8 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                       onClick={() => {
                         const lastCat = workItems[workItems.length - 1]?.category || WORK_CATEGORIES[0] || (isManufacturing ? 'RH鋼/柱' : '土木');
                         const defaultName = categoryToItems[lastCat]?.[0] || '';
-                        const newItem: WorkItem = { category: lastCat, name: defaultName, progress: '', worker_count: '', work_hours: '' };
+                        const defaultTargetQty = getTargetQuantityForItem(lastCat, defaultName);
+                        const newItem: WorkItem = { category: lastCat, name: defaultName, target_quantity: defaultTargetQty, progress: '', worker_count: '', work_hours: '' };
                         if (lastCat === '土木' && INSPECTION_TEMPLATES[defaultName]) {
                           const tpl = INSPECTION_TEMPLATES[defaultName];
                           newItem.inspection = {
@@ -1744,7 +1917,8 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                         type="button"
                         onClick={() => {
                           const defaultName = categoryToItems[cat]?.[0] || '';
-                          const newItem: WorkItem = { category: cat, name: defaultName, progress: '', worker_count: '', work_hours: '' };
+                          const defaultTargetQty = getTargetQuantityForItem(cat, defaultName);
+                          const newItem: WorkItem = { category: cat, name: defaultName, target_quantity: defaultTargetQty, progress: '', worker_count: '', work_hours: '' };
                           if (cat === '土木' && INSPECTION_TEMPLATES[defaultName]) {
                             const tpl = INSPECTION_TEMPLATES[defaultName];
                             newItem.inspection = {
@@ -2255,33 +2429,73 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                   )}
                   
                   <div>
-                    <h3 className="text-xl font-bold mb-3 border-l-4 border-indigo-600 pl-3">施工項目與出工人數</h3>
+                    <h3 className="text-xl font-bold mb-3 border-l-4 border-indigo-600 pl-3">施工項目與完成進度統計</h3>
                     <div className="overflow-x-auto">
-                      <table className="w-full text-left border-collapse border border-slate-300">
+                      <table className="w-full text-left border-collapse border border-slate-300 text-sm">
                         <thead>
                           <tr className="bg-slate-100">
                             <th className="border border-slate-300 p-2">工項名稱</th>
-                            <th className="border border-slate-300 p-2">施工進度</th>
+                            <th className="border border-slate-300 p-2 text-right">目標數量</th>
+                            <th className="border border-slate-300 p-2 text-right">今日完成數量</th>
+                            <th className="border border-slate-300 p-2 text-right">累計完成數量</th>
+                            <th className="border border-slate-300 p-2 text-right">目前完成進度</th>
                             <th className="border border-slate-300 p-2 text-right">出工人數</th>
                             <th className="border border-slate-300 p-2 text-right">施工時數</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {safeParseJSON(viewingRecord.data.work_items, []).map((w: any, i: number) => (
-                            <tr key={i}>
-                              <td className="border border-slate-300 p-2">
-                                {w.category ? <span className="font-bold text-indigo-700 mr-1.5">[{w.category}]</span> : null}
-                                {w.name}
-                              </td>
-                              <td className="border border-slate-300 p-2">{w.progress}</td>
-                              <td className="border border-slate-300 p-2 text-right">{w.worker_count || 0}</td>
-                              <td className="border border-slate-300 p-2 text-right">{w.work_hours || 0}</td>
-                            </tr>
-                          ))}
+                          {safeParseJSON(viewingRecord.data.work_items, []).map((w: any, i: number) => {
+                            const targetStr =
+                              w.target_quantity !== undefined && w.target_quantity !== ''
+                                ? w.target_quantity
+                                : getTargetQuantityForItem(
+                                    w.category || viewingRecord.data.work_category,
+                                    w.name,
+                                    viewingRecord.data.project_id,
+                                    viewingRecord.data.dispatch_order_id
+                                  );
+                            const targetN = parseFloat(String(targetStr).replace(/,/g, ''));
+                            const todayN = parseFloat(String(w.progress || '').replace(/,/g, ''));
+                            const pastN = getPastAccumulatedQty(
+                              w.name,
+                              viewingRecord.data.project_id,
+                              viewingRecord.data.dispatch_order_id || '',
+                              viewingRecord.data.id,
+                              viewingRecord.data.report_date
+                            );
+                            const accN = Math.round(((Number.isNaN(todayN) ? 0 : todayN) + pastN) * 100) / 100;
+                            const pct =
+                              !Number.isNaN(targetN) && targetN > 0
+                                ? `${Math.min(100, Math.round((accN / targetN) * 1000) / 10)}%`
+                                : '-';
+
+                            return (
+                              <tr key={i}>
+                                <td className="border border-slate-300 p-2">
+                                  {w.category ? <span className="font-bold text-indigo-700 mr-1.5">[{w.category}]</span> : null}
+                                  {normalizeItemKey(w.name)}
+                                </td>
+                                <td className="border border-slate-300 p-2 text-right font-mono">
+                                  {!Number.isNaN(targetN) && targetN > 0 ? targetN : (targetStr || '-')}
+                                </td>
+                                <td className="border border-slate-300 p-2 text-right font-mono font-bold text-indigo-700">
+                                  {w.progress || '-'}
+                                </td>
+                                <td className="border border-slate-300 p-2 text-right font-mono font-bold">
+                                  {accN}
+                                </td>
+                                <td className="border border-slate-300 p-2 text-right font-mono font-extrabold text-emerald-700">
+                                  {pct}
+                                </td>
+                                <td className="border border-slate-300 p-2 text-right">{w.worker_count || 0}</td>
+                                <td className="border border-slate-300 p-2 text-right">{w.work_hours || 0}</td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                         <tfoot>
                           <tr className="bg-indigo-50 font-bold">
-                            <td colSpan={2} className="border border-slate-300 p-2 text-right">總計：</td>
+                            <td colSpan={5} className="border border-slate-300 p-2 text-right">總計：</td>
                             <td className="border border-slate-300 p-2 text-right text-indigo-700">{safeParseJSON(viewingRecord.data.work_items, []).reduce((acc: number, w: any) => acc + (Number(w.worker_count) || 0), 0)} 人</td>
                             <td className="border border-slate-300 p-2 text-right text-indigo-700">{safeParseJSON(viewingRecord.data.work_items, []).reduce((acc: number, w: any) => acc + (Number(w.work_hours) || 0), 0)} 小時</td>
                           </tr>
