@@ -939,24 +939,16 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                 <div className="p-4 flex flex-col flex-1">
                   <div className="flex flex-col gap-2 mb-2">
                     <div className="flex justify-between items-start gap-2 flex-wrap">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        {isManufacturing && safeParseJSON(t.work_items, []).length > 0 ? (
-                          safeParseJSON(t.work_items, []).map((wi: any, idx: number) => (
-                            <span key={idx} className="text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded text-xs font-bold">
-                              {wi.name}
+                      {!isManufacturing && (
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded text-sm">{t.project?.project_code || '無專案'}</span>
+                          {t.dispatchOrder?.dispatch_no && (
+                            <span className="text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded text-xs font-bold font-mono">
+                              派工單: {t.dispatchOrder.dispatch_no}
                             </span>
-                          ))
-                        ) : (
-                          <>
-                            <span className="text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded text-sm">{t.project?.project_code || '無專案'}</span>
-                            {t.dispatchOrder?.dispatch_no && (
-                              <span className="text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded text-xs font-bold font-mono">
-                                派工單: {t.dispatchOrder.dispatch_no}
-                              </span>
-                            )}
-                          </>
-                        )}
-                      </div>
+                          )}
+                        </div>
+                      )}
                       <span className="text-xs text-slate-500 flex items-center gap-1 shrink-0">
                         <Clock size={12}/> {new Date(t.record_date).toLocaleDateString()}
                       </span>
@@ -965,9 +957,19 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                       {t.work_category}工程 會議
                     </h4>
                   </div>
-                  <p className="text-sm text-slate-600 mb-4 line-clamp-2">
-                    {t.work_content}
-                  </p>
+                  {isManufacturing ? (
+                    <div className="flex flex-col items-start gap-1.5 mb-4">
+                      {safeParseJSON(t.work_items, []).filter((wi: any) => wi?.name).map((wi: any, idx: number) => (
+                        <span key={idx} className="text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded text-xs font-bold">
+                          {wi.name}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-600 mb-4 line-clamp-2">
+                      {t.work_content}
+                    </p>
+                  )}
                   <div className="mt-auto border-t border-slate-100 pt-3 flex justify-between items-center text-xs text-slate-500">
                     <span>紀錄: {t.recorder?.name}</span>
                     <span>人數: {t.worker_count} 人</span>
