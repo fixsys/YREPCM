@@ -169,26 +169,31 @@
       <td colspan="21" style="font-weight: bold;">工作內容:(重要工作項目打勾)</td>
     </tr>
     
-    <!-- 20 rows of 安全宣導內容 span -->
+    <%
+      const mfgRowCount = isMfg ? Math.max(parsedWorkItems.length, 1) : 6;
+      const safetyRowSpan = 14 + mfgRowCount;
+    %>
     <tr>
-      <td rowspan="20" class="vertical-text" style="font-weight: bold; font-size: 14px;">安全宣導內容(現場監工確實填寫)</td>
-      <td colspan="5" style="font-weight: bold;"><%= isMfg ? '專案代碼+名稱 / 派工單號' : '工作項目' %></td>
-      <td colspan="5" style="font-weight: bold;">備註</td>
-      <td colspan="5" style="font-weight: bold;"><%= isMfg ? '專案代碼+名稱 / 派工單號' : '工作項目' %></td>
-      <td colspan="5" style="font-weight: bold;">備註</td>
+      <td rowspan="<%= safetyRowSpan %>" class="vertical-text" style="font-weight: bold; font-size: 14px;">安全宣導內容(現場監工確實填寫)</td>
+      <% if (isMfg) { %>
+        <td colspan="12" style="font-weight: bold; padding: 6px 8px;">專案代碼+名稱 / 派工單號</td>
+        <td colspan="8" style="font-weight: bold; padding: 6px 8px;">備註</td>
+      <% } else { %>
+        <td colspan="5" style="font-weight: bold;">工作項目</td>
+        <td colspan="5" style="font-weight: bold;">備註</td>
+        <td colspan="5" style="font-weight: bold;">工作項目</td>
+        <td colspan="5" style="font-weight: bold;">備註</td>
+      <% } %>
     </tr>
 
     <% 
       if (isMfg) {
-        for (let i = 0; i < 6; i++) {
-          const leftItem = parsedWorkItems[i * 2];
-          const rightItem = parsedWorkItems[i * 2 + 1];
+        for (let i = 0; i < mfgRowCount; i++) {
+          const item = parsedWorkItems[i];
     %>
     <tr>
-      <td colspan="5" class="left-align"><%- leftItem ? `${box(true)} ${leftItem.name}` : '' %></td>
-      <td colspan="5" class="left-align"><%= leftItem ? (leftItem.note || '') : '' %></td>
-      <td colspan="5" class="left-align"><%- rightItem ? `${box(true)} ${rightItem.name}` : '' %></td>
-      <td colspan="5" class="left-align"><%= rightItem ? (rightItem.note || '') : '' %></td>
+      <td colspan="12" class="left-align" style="padding: 6px 8px; line-height: 1.5;"><%- item ? `${box(true)} ${item.name}` : '&nbsp;' %></td>
+      <td colspan="8" class="left-align" style="padding: 6px 8px; line-height: 1.5;"><%= item ? (item.note || '') : '' %></td>
     </tr>
     <%
         }
