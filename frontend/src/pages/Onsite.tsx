@@ -568,8 +568,12 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
     if (!toolboxForm.safety_check_1 || !toolboxForm.safety_check_2 || !toolboxForm.safety_check_3) {
       return alert('請確認所有工安提醒項目皆已勾選！');
     }
-    if (isManufacturing && (!toolboxForm.work_items || toolboxForm.work_items.length === 0)) {
-      return alert('請至少勾選一張今日參與生產的「專案代碼+名稱 / 派工單號」！');
+    const validToolboxWorkItems = isManufacturing
+      ? (toolboxForm.work_items || []).filter((w: any) => w && w.name && String(w.name).trim() !== '')
+      : toolboxForm.work_items;
+
+    if (isManufacturing && validToolboxWorkItems.length === 0) {
+      return alert('請至少選擇一筆今日參與生產的「專案 / 派工單號」！');
     }
 
     setIsSubmitting(true);
@@ -578,11 +582,12 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
     const resolvedProjectId =
       toolboxForm.project_id ||
       (isManufacturing
-        ? dispatchOrders.find(o => toolboxForm.work_items.some((w: any) => w.name === formatDispatchOrderWorkItem(o)))?.project_id ||
+        ? validToolboxWorkItems.find((w: any) => w.project_id)?.project_id ||
+          dispatchOrders.find(o => validToolboxWorkItems.some((w: any) => w.name === formatDispatchOrderWorkItem(o)))?.project_id ||
           projects[0]?.id ||
           ''
         : '');
-    Object.entries({ ...toolboxForm, project_id: resolvedProjectId }).forEach(([key, val]) => {
+    Object.entries({ ...toolboxForm, project_id: resolvedProjectId, work_items: validToolboxWorkItems }).forEach(([key, val]) => {
       if (key === 'equipments') {
         formData.append(key, JSON.stringify((val as any[]).filter(e => e.name && e.quantity > 0)));
       } else {
@@ -610,13 +615,58 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
 
   const handleAddToolbox = () => {
     setEditingToolboxId(null);
-    setToolboxForm({ project_id: '', dispatch_order_id: '', record_date: new Date().toISOString().slice(0, 10), recorder_id: user?.id || '', worker_count: '', work_category: isManufacturing ? '鋼構加工' : '土木', work_content: '', safety_check_1: false, safety_check_2: false, safety_check_3: false, work_area: '', work_items: [], hazards: [], safety_measures: [], equipments: [], other_risks: '', signatures: [] });
+    setToolboxForm({
+      project_id: '',
+      dispatch_order_id: '',
+      record_date: new Date().toISOString().slice(0, 10),
+      recorder_id: user?.id || '',
+      worker_count: '',
+      work_category: isManufacturing ? '鋼構加工' : '土木',
+      work_content: '',
+      safety_check_1: false,
+      safety_check_2: false,
+      safety_check_3: false,
+      work_area: '',
+      work_items: isManufacturing ? [{ project_id: '', dispatch_order_id: '', name: '', note: '' }] : [],
+      hazards: [],
+      safety_measures: [],
+      equipments: [],
+      other_risks: '',
+      signatures: []
+    });
     setToolboxPhotos([]);
     setIsToolboxModalOpen(true);
   };
 
   const handleEditToolbox = (t: any) => {
     setEditingToolboxId(t.id);
+    const rawItems = safeParseJSON(t.work_items, []);
+    const hydratedItems = isManufacturing
+      ? (Array.isArray(rawItems) && rawItems.length > 0
+          ? rawItems.map((w: any) => {
+              if (w.project_id && w.dispatch_order_id) return w;
+              const matchedOrder = dispatchOrders.find(
+                (o: any) =>
+                  o.id === w.dispatch_order_id ||
+                  formatDispatchOrderWorkItem(o) === w.name ||
+                  (o.dispatch_no && String(w.name || '').includes(o.dispatch_no))
+              );
+              const matchedProj =
+                projects.find((p: any) => p.id === (w.project_id || matchedOrder?.project_id)) ||
+                projects.find(
+                  (p: any) =>
+                    (p.project_code && String(w.name || '').includes(p.project_code)) ||
+                    (p.name && String(w.name || '').includes(p.name))
+                );
+              return {
+                ...w,
+                project_id: w.project_id || matchedOrder?.project_id || matchedProj?.id || '',
+                dispatch_order_id: w.dispatch_order_id || matchedOrder?.id || '',
+              };
+            })
+          : [{ project_id: t.project_id || '', dispatch_order_id: t.dispatch_order_id || '', name: '', note: '' }])
+      : rawItems;
+
     setToolboxForm({
       project_id: t.project_id,
       dispatch_order_id: t.dispatch_order_id || '',
@@ -629,7 +679,7 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
       safety_check_2: t.safety_check_2,
       safety_check_3: t.safety_check_3,
       work_area: t.work_area || '',
-      work_items: safeParseJSON(t.work_items, []),
+      work_items: hydratedItems,
       hazards: safeParseJSON(t.hazards, []),
       safety_measures: safeParseJSON(t.safety_measures, []),
       equipments: safeParseJSON(t.equipments, []),
@@ -1233,73 +1283,198 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                   <div className="mb-4">
                     <label className="block text-sm font-bold text-slate-700 mb-2">
                       {isManufacturing
-                        ? '工作內容 — 選擇今日生產之專案與派工單 (可複選多個專案及派工單，並填寫備註) *'
+                        ? '工作內容 — 選擇今日生產之專案與派工單號 (可新增多筆不同專案與派工單) *'
                         : '工作內容 (勾選並填寫備註)'}
                     </label>
                     {isManufacturing ? (
-                      <div className="space-y-2 bg-blue-50/40 p-3 rounded-xl border border-blue-200">
-                        {dispatchOrders.length === 0 ? (
-                          <div className="text-xs text-slate-500 py-2">目前尚無任何生產派工單可供選擇</div>
-                        ) : (
-                          dispatchOrders.map((o: any) => {
-                            const label = formatDispatchOrderWorkItem(o);
-                            const existingItem = toolboxForm.work_items.find(w => w.name === label);
-                            return (
-                              <div
-                                key={o.id}
-                                className={`flex flex-wrap items-center gap-2.5 p-2 rounded-lg border text-sm transition-colors ${
-                                  existingItem
-                                    ? 'bg-white border-blue-400 shadow-sm'
-                                    : 'bg-white/60 border-slate-200 hover:border-blue-300'
-                                }`}
-                              >
-                                <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-800 shrink-0">
-                                  <input
-                                    type="checkbox"
-                                    checked={!!existingItem}
-                                    onChange={e => {
-                                      const nextWorkItems = e.target.checked
-                                        ? [...toolboxForm.work_items, { name: label, note: '', dispatch_order_id: o.id, project_id: o.project_id }]
-                                        : toolboxForm.work_items.filter(w => w.name !== label);
+                      <div className="space-y-3 bg-blue-50/40 p-3.5 rounded-xl border border-blue-200">
+                        {(toolboxForm.work_items.length > 0
+                          ? toolboxForm.work_items
+                          : [{ project_id: '', dispatch_order_id: '', name: '', note: '' }]
+                        ).map((row: any, idx: number, arr: any[]) => {
+                          const rowProjectId = row.project_id || '';
+                          const rowDispatchId = row.dispatch_order_id || '';
+                          const projectDispatchOrders = rowProjectId
+                            ? dispatchOrders.filter((o: any) => String(o.project_id) === String(rowProjectId))
+                            : [];
 
-                                      // 自動帶出第一個勾選派工單的 project_id 與 dispatch_order_id
-                                      const firstOrder = dispatchOrders.find(ord =>
-                                        nextWorkItems.some(w => w.name === formatDispatchOrderWorkItem(ord))
+                          const updateRowAndSync = (nextRows: any[]) => {
+                            const validRows = nextRows.filter(r => r && r.name && String(r.name).trim() !== '');
+                            const firstValid = validRows[0];
+                            const autoContent = validRows.map(r => r.name).join('、');
+                            setToolboxForm({
+                              ...toolboxForm,
+                              project_id: firstValid?.project_id || toolboxForm.project_id,
+                              dispatch_order_id: firstValid?.dispatch_order_id || '',
+                              work_items: nextRows,
+                              work_content: autoContent || toolboxForm.work_content,
+                            });
+                          };
+
+                          return (
+                            <div
+                              key={idx}
+                              className="flex flex-col gap-2.5 p-3 rounded-xl bg-white border border-blue-200 shadow-sm"
+                            >
+                              <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 items-center">
+                                {/* 1. 選擇專案 */}
+                                <div className="md:col-span-5">
+                                  <label className="block text-[11px] font-bold text-slate-500 mb-1">
+                                    1. 選擇專案 ({idx + 1})
+                                  </label>
+                                  <select
+                                    value={rowProjectId}
+                                    onChange={e => {
+                                      const pid = e.target.value;
+                                      const proj = projects.find((p: any) => String(p.id) === String(pid));
+                                      const projOrders = dispatchOrders.filter(
+                                        (o: any) => String(o.project_id) === String(pid)
                                       );
-                                      const autoContent = nextWorkItems.map(w => w.name).join('、');
+                                      const autoOrder = projOrders.length === 1 ? projOrders[0] : null;
+                                      const projLabel = proj
+                                        ? [proj.project_code, proj.name].filter(Boolean).join(' ')
+                                        : '';
+                                      const computedName = autoOrder
+                                        ? formatDispatchOrderWorkItem(autoOrder)
+                                        : projLabel;
 
-                                      setToolboxForm({
-                                        ...toolboxForm,
-                                        project_id: firstOrder?.project_id || toolboxForm.project_id,
-                                        dispatch_order_id: firstOrder?.id || '',
-                                        work_items: nextWorkItems,
-                                        work_content: autoContent || toolboxForm.work_content,
-                                      });
+                                      const nextRows = [...arr];
+                                      nextRows[idx] = {
+                                        ...row,
+                                        project_id: pid,
+                                        dispatch_order_id: autoOrder ? autoOrder.id : '',
+                                        name: computedName,
+                                      };
+                                      updateRowAndSync(nextRows);
                                     }}
-                                    className="w-4 h-4 text-blue-600 rounded"
-                                  />
-                                  <span>{label}</span>
-                                </label>
-                                {existingItem && (
-                                  <input
-                                    type="text"
-                                    placeholder="填寫此派工單今日生產備註 (選填)..."
-                                    value={existingItem.note}
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
+                                  >
+                                    <option value="">-- 請選擇專案 --</option>
+                                    {projects.map((p: any) => {
+                                      const count = dispatchOrders.filter(
+                                        (o: any) => String(o.project_id) === String(p.id)
+                                      ).length;
+                                      return (
+                                        <option key={p.id} value={p.id}>
+                                          {p.project_code} - {p.name}
+                                          {count > 0 ? ` (${count} 張派工單)` : ''}
+                                        </option>
+                                      );
+                                    })}
+                                  </select>
+                                </div>
+
+                                {/* 2. 選擇該專案的派工單號 */}
+                                <div className="md:col-span-4">
+                                  <label className="block text-[11px] font-bold text-slate-500 mb-1">
+                                    2. 選擇該專案派工單號
+                                  </label>
+                                  <select
+                                    value={rowDispatchId}
+                                    disabled={!rowProjectId}
                                     onChange={e => {
-                                      setToolboxForm({
-                                        ...toolboxForm,
-                                        work_items: toolboxForm.work_items.map(w =>
-                                          w.name === label ? { ...w, note: e.target.value } : w
-                                        ),
-                                      });
+                                      const oid = e.target.value;
+                                      const ord = dispatchOrders.find((o: any) => String(o.id) === String(oid));
+                                      const proj = projects.find((p: any) => String(p.id) === String(rowProjectId));
+                                      const projLabel = proj
+                                        ? [proj.project_code, proj.name].filter(Boolean).join(' ')
+                                        : '';
+                                      const computedName = ord
+                                        ? formatDispatchOrderWorkItem(ord)
+                                        : projLabel;
+
+                                      const nextRows = [...arr];
+                                      nextRows[idx] = {
+                                        ...row,
+                                        dispatch_order_id: oid,
+                                        name: computedName,
+                                      };
+                                      updateRowAndSync(nextRows);
                                     }}
-                                    className="flex-1 min-w-[180px] ml-2 border-b border-blue-300 bg-transparent outline-none px-1.5 py-0.5 text-xs text-slate-700"
-                                  />
-                                )}
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-400"
+                                  >
+                                    {!rowProjectId ? (
+                                      <option value="">-- 請先選擇左側專案 --</option>
+                                    ) : projectDispatchOrders.length === 0 ? (
+                                      <option value="">(此專案尚無派工單，僅帶入專案)</option>
+                                    ) : (
+                                      <>
+                                        <option value="">-- 請選擇派工單號 ({projectDispatchOrders.length} 筆) --</option>
+                                        {projectDispatchOrders.map((o: any) => (
+                                          <option key={o.id} value={o.id}>
+                                            {o.dispatch_no}
+                                            {o.priority ? ` [${o.priority}]` : ''}
+                                          </option>
+                                        ))}
+                                      </>
+                                    )}
+                                  </select>
+                                </div>
+
+                                {/* 3. 備註 + 刪除 */}
+                                <div className="md:col-span-3 flex items-end gap-2">
+                                  <div className="flex-1">
+                                    <label className="block text-[11px] font-bold text-slate-500 mb-1">
+                                      3. 備註 (選填)
+                                    </label>
+                                    <input
+                                      type="text"
+                                      placeholder="填寫生產備註..."
+                                      value={row.note || ''}
+                                      onChange={e => {
+                                        const nextRows = [...arr];
+                                        nextRows[idx] = { ...row, note: e.target.value };
+                                        setToolboxForm({ ...toolboxForm, work_items: nextRows });
+                                      }}
+                                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const nextRows =
+                                        arr.length > 1
+                                          ? arr.filter((_, i) => i !== idx)
+                                          : [{ project_id: '', dispatch_order_id: '', name: '', note: '' }];
+                                      updateRowAndSync(nextRows);
+                                    }}
+                                    title="移除此列"
+                                    className="p-2 mb-0.5 text-red-500 hover:bg-red-50 rounded-lg border border-transparent hover:border-red-200 transition-colors shrink-0 cursor-pointer"
+                                  >
+                                    <Trash2 size={18} />
+                                  </button>
+                                </div>
                               </div>
-                            );
-                          })
-                        )}
+
+                              {row.name && (
+                                <div className="text-xs text-blue-800 bg-blue-50 px-2.5 py-1 rounded border border-blue-100 flex items-center gap-1.5">
+                                  <span className="font-bold">報表顯示內容：</span>
+                                  <span className="font-mono font-semibold">{row.name}</span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const currentRows =
+                              toolboxForm.work_items.length > 0
+                                ? toolboxForm.work_items
+                                : [{ project_id: '', dispatch_order_id: '', name: '', note: '' }];
+                            setToolboxForm({
+                              ...toolboxForm,
+                              work_items: [
+                                ...currentRows,
+                                { project_id: '', dispatch_order_id: '', name: '', note: '' },
+                              ],
+                            });
+                          }}
+                          className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow-sm transition-colors cursor-pointer flex items-center gap-1.5"
+                        >
+                          <Plus size={15} /> 新增專案 / 派工單
+                        </button>
                       </div>
                     ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
