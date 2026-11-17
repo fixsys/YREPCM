@@ -129,7 +129,15 @@
   </colgroup>
     <tr>
       <td colspan="2" style="white-space: nowrap; padding: 0 1px;">工程名稱</td>
-      <td colspan="7" class="left-align"><%= meeting.project ? meeting.project.name : '' %></td>
+      <td colspan="7" class="left-align">
+        <%
+          const parsedWorkItems = Array.isArray(meeting.work_items)
+            ? meeting.work_items
+            : (typeof meeting.work_items === 'string' ? (() => { try { return JSON.parse(meeting.work_items); } catch { return []; } })() : []);
+          const isMfg = meeting.module_type === 'MANUFACTURING';
+        %>
+        <%= isMfg && parsedWorkItems.length > 0 ? parsedWorkItems.map(w => w.name).join('、') : (meeting.project ? meeting.project.name : '') %>
+      </td>
       <td colspan="4">會議日期</td>
       <td colspan="8" class="left-align"><%= new Date(meeting.record_date).toLocaleDateString() %></td>
     </tr>
@@ -164,30 +172,44 @@
     <!-- 20 rows of 安全宣導內容 span -->
     <tr>
       <td rowspan="20" class="vertical-text" style="font-weight: bold; font-size: 14px;">安全宣導內容(現場監工確實填寫)</td>
-      <td colspan="5" style="font-weight: bold;">工作項目</td>
+      <td colspan="5" style="font-weight: bold;"><%= isMfg ? '專案代碼+名稱 / 派工單號' : '工作項目' %></td>
       <td colspan="5" style="font-weight: bold;">備註</td>
-      <td colspan="5" style="font-weight: bold;">工作項目</td>
+      <td colspan="5" style="font-weight: bold;"><%= isMfg ? '專案代碼+名稱 / 派工單號' : '工作項目' %></td>
       <td colspan="5" style="font-weight: bold;">備註</td>
     </tr>
 
     <% 
-      const wItems1 = ['測量、收方', '灌漿作業', '鋼筋綁紮', '板模作業', '鋼構作業', '吊掛作業'];
-      const wItems2 = ['浪板鋪設更換作業', '太陽能板鋪設作業', '機電設備作業', '機電配管線作業', '材料堆疊、環境整理', '其他(於備註欄說明)'];
-      for (let i = 0; i < 6; i++) {
-        const i1 = wItems1[i];
-        const i2 = wItems2[i];
-        
-        let c1 = false, n1 = '';
-        if (meeting.work_items) {
-          const found = meeting.work_items.find(w => w.name === i1);
-          if (found) { c1 = true; n1 = found.note || ''; }
+      if (isMfg) {
+        for (let i = 0; i < 6; i++) {
+          const leftItem = parsedWorkItems[i * 2];
+          const rightItem = parsedWorkItems[i * 2 + 1];
+    %>
+    <tr>
+      <td colspan="5" class="left-align"><%- leftItem ? `${box(true)} ${leftItem.name}` : '' %></td>
+      <td colspan="5" class="left-align"><%= leftItem ? (leftItem.note || '') : '' %></td>
+      <td colspan="5" class="left-align"><%- rightItem ? `${box(true)} ${rightItem.name}` : '' %></td>
+      <td colspan="5" class="left-align"><%= rightItem ? (rightItem.note || '') : '' %></td>
+    </tr>
+    <%
         }
+      } else {
+        const wItems1 = ['測量、收方', '灌漿作業', '鋼筋綁紮', '板模作業', '鋼構作業', '吊掛作業'];
+        const wItems2 = ['浪板鋪設更換作業', '太陽能板鋪設作業', '機電設備作業', '機電配管線作業', '材料堆疊、環境整理', '其他(於備註欄說明)'];
+        for (let i = 0; i < 6; i++) {
+          const i1 = wItems1[i];
+          const i2 = wItems2[i];
+          
+          let c1 = false, n1 = '';
+          if (parsedWorkItems) {
+            const found = parsedWorkItems.find(w => w.name === i1);
+            if (found) { c1 = true; n1 = found.note || ''; }
+          }
 
-        let c2 = false, n2 = '';
-        if (meeting.work_items) {
-          const found = meeting.work_items.find(w => w.name === i2);
-          if (found) { c2 = true; n2 = found.note || ''; }
-        }
+          let c2 = false, n2 = '';
+          if (parsedWorkItems) {
+            const found = parsedWorkItems.find(w => w.name === i2);
+            if (found) { c2 = true; n2 = found.note || ''; }
+          }
     %>
     <tr>
       <td colspan="5" class="left-align"><%- box(c1) %> <%= i1 %></td>
@@ -195,7 +217,10 @@
       <td colspan="5" class="left-align"><%- box(c2) %> <%= i2 %></td>
       <td colspan="5" class="left-align"><%= n2 %></td>
     </tr>
-    <% } %>
+    <% 
+        }
+      }
+    %>
 
     <!-- Hazards -->
     <tr>
