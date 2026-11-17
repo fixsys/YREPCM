@@ -615,14 +615,17 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
       return alert('近照、中距離照、遠距照皆須至少上傳 2 張');
     }
 
-    // 檢查是否有任何工項累計完成數量超過目標數量
+    // 檢查是否有任何工項累計完成數量超過目標數量 (若無目標數量則以目標完成度 100% 為上限)
     for (const w of workItems) {
       if (!w.name || !w.progress) continue;
       const cat = w.category || laborForm.work_category || WORK_CATEGORIES[0] || '土木';
       const targetStr = getTargetQuantityForItem(cat, w.name) || w.target_quantity || '';
-      const targetNum = parseFloat(String(targetStr).replace(/,/g, ''));
-      const todayNum = parseFloat(String(w.progress || '').replace(/,/g, ''));
-      if (!Number.isNaN(targetNum) && targetNum > 0 && !Number.isNaN(todayNum)) {
+      const rawTargetNum = parseFloat(String(targetStr).replace(/[,%]/g, ''));
+      const isPctMode = String(targetStr).includes('%') || Number.isNaN(rawTargetNum) || rawTargetNum <= 0;
+      const effectiveTargetNum = isPctMode ? 100 : rawTargetNum;
+      const todayNum = parseFloat(String(w.progress || '').replace(/[,%]/g, ''));
+
+      if (!Number.isNaN(todayNum)) {
         const pastQty = getPastAccumulatedQty(
           w.name,
           laborForm.project_id,
@@ -631,9 +634,12 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
           laborForm.report_date
         );
         const totalAcc = Math.round((pastQty + todayNum) * 100) / 100;
-        if (totalAcc > targetNum) {
+        if (totalAcc > effectiveTargetNum) {
+          const unitSuffix = isPctMode ? '%' : '';
           return alert(
-            `⚠️ 數量超過目標數量警示：\n工項「${normalizeItemKey(w.name)}」目標數量為 ${targetNum}（先前已累計：${pastQty}，今日填寫：${todayNum}，合計：${totalAcc}），已超過目標數量，請修正今日數量後再送出！`
+            `⚠️ 超過${isPctMode ? '目標完成度 (100%)' : '目標數量'}警示：\n工項「${normalizeItemKey(w.name)}」${
+              isPctMode ? '目標完成度為 100%' : `目標數量為 ${effectiveTargetNum}`
+            }（先前已累計：${pastQty}${unitSuffix}，今日填寫：${todayNum}${unitSuffix}，合計：${totalAcc}${unitSuffix}），已超過上限，請修正後再送出！`
           );
         }
       }
@@ -949,14 +955,17 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                     <ul className="list-disc pl-4 space-y-2">
                       {l.work_items && safeParseJSON(l.work_items, []).map((w: any, i: number) => {
                         const targetStr =
-                          w.target_quantity !== undefined && w.target_quantity !== ''
-                            ? w.target_quantity
-                            : getTargetQuantityForItem(w.category || l.work_category, w.name, l.project_id, l.dispatch_order_id);
-                        const targetN = parseFloat(String(targetStr).replace(/,/g, ''));
-                        const todayN = parseFloat(String(w.progress || '').replace(/,/g, ''));
+                          getTargetQuantityForItem(w.category || l.work_category, w.name, l.project_id, l.dispatch_order_id) ||
+                          w.target_quantity ||
+                          '';
+                        const rawTargetN = parseFloat(String(targetStr).replace(/[,%]/g, ''));
+                        const isPctMode = String(targetStr).includes('%') || Number.isNaN(rawTargetN) || rawTargetN <= 0;
+                        const effectiveTargetN = isPctMode ? 100 : rawTargetN;
+                        const todayN = parseFloat(String(w.progress || '').replace(/[,%]/g, ''));
                         const pastN = getPastAccumulatedQty(w.name, l.project_id, l.dispatch_order_id || '', l.id, l.report_date);
                         const accN = Math.round(((Number.isNaN(todayN) ? 0 : todayN) + pastN) * 100) / 100;
-                        const pct = !Number.isNaN(targetN) && targetN > 0 ? Math.min(100, Math.round((accN / targetN) * 1000) / 10) : null;
+                        const pct = Math.min(100, Math.round((accN / effectiveTargetN) * 1000) / 10);
+                        const suffix = isPctMode ? '%' : '';
 
                         return (
                           <li key={i} className="mb-2 last:mb-0">
@@ -972,12 +981,10 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                               )}
                             </div>
                             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600 bg-slate-50 px-2.5 py-1.5 rounded border border-slate-100">
-                              <span>目標數量：<strong>{!Number.isNaN(targetN) && targetN > 0 ? targetN : '-'}</strong></span>
-                              <span>今日數量：<strong className="text-indigo-700">{w.progress || '-'}</strong></span>
-                              <span>累計完成：<strong>{accN}</strong></span>
-                              {pct !== null && (
-                                <span className="font-bold text-emerald-700 ml-auto">完成進度：{pct}%</span>
-                              )}
+                              <span>{isPctMode ? '目標完成度：' : '目標數量：'}<strong>{isPctMode ? '100%' : effectiveTargetN}</strong></span>
+                              <span>{isPctMode ? '今日完成度：' : '今日數量：'}<strong className="text-indigo-700">{w.progress ? `${w.progress}${suffix}` : '-'}</strong></span>
+                              <span>累計完成：<strong>{accN}{suffix}</strong></span>
+                              <span className="font-bold text-emerald-700 ml-auto">完成進度：{pct}%</span>
                             </div>
                           </li>
                         );
@@ -1695,8 +1702,10 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                       const rowCategoryOptions = Array.from(new Set([rowCat, ...WORK_CATEGORIES])).filter(Boolean);
                       const itemsForRowCat = categoryToItems[rowCat] || [];
                       const resolvedTargetQtyStr = getTargetQuantityForItem(rowCat, item.name) || item.target_quantity || '';
-                      const targetNum = parseFloat(String(resolvedTargetQtyStr).replace(/,/g, ''));
-                      const todayNum = parseFloat(String(item.progress || '').replace(/,/g, ''));
+                      const rawTargetNum = parseFloat(String(resolvedTargetQtyStr).replace(/[,%]/g, ''));
+                      const isPctMode = String(resolvedTargetQtyStr).includes('%') || Number.isNaN(rawTargetNum) || rawTargetNum <= 0;
+                      const targetNum = isPctMode ? 100 : rawTargetNum;
+                      const todayNum = parseFloat(String(item.progress || '').replace(/[,%]/g, ''));
                       const pastQty = getPastAccumulatedQty(
                         item.name,
                         laborForm.project_id,
@@ -1705,11 +1714,9 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                         laborForm.report_date
                       );
                       const totalAccumulatedQty = Math.round(((Number.isNaN(todayNum) ? 0 : todayNum) + pastQty) * 100) / 100;
-                      const isOverTarget = !Number.isNaN(targetNum) && targetNum > 0 && totalAccumulatedQty > targetNum;
-                      const completionPct =
-                        !Number.isNaN(targetNum) && targetNum > 0
-                          ? Math.round((totalAccumulatedQty / targetNum) * 1000) / 10
-                          : null;
+                      const isOverTarget = totalAccumulatedQty > targetNum;
+                      const completionPct = Math.round((totalAccumulatedQty / targetNum) * 1000) / 10;
+                      const unitSuffix = isPctMode ? '%' : '';
 
                       return (
                         <div key={idx} className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5">
@@ -1819,15 +1826,17 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                             </button>
                           </div>
 
-                          {/* 目標數量 (唯讀不可由記錄人修改) + 今日生產/完成數量 + 即時進度計算 */}
+                          {/* 目標數量/目標完成度 (唯讀不可由記錄人修改) + 今日生產數量/今日完成度 + 即時進度計算 */}
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 items-center pt-1">
-                            <div className="flex items-center bg-slate-100 border border-slate-300 rounded-lg px-3 py-1.5 cursor-not-allowed" title="目標數量由派工單或專案設定帶入，記錄人不可更改">
-                              <span className="text-xs font-bold text-slate-500 mr-2 shrink-0">目標數量：</span>
+                            <div className="flex items-center bg-slate-100 border border-slate-300 rounded-lg px-3 py-1.5 cursor-not-allowed" title="由派工單或專案設定帶入，若無目標數量則自動以目標完成度 100% 計算">
+                              <span className="text-xs font-bold text-slate-500 mr-2 shrink-0">
+                                {isPctMode ? '目標完成度：' : '目標數量：'}
+                              </span>
                               <input
                                 type="text"
                                 readOnly
                                 tabIndex={-1}
-                                value={resolvedTargetQtyStr || '-'}
+                                value={isPctMode ? '100%' : String(targetNum)}
                                 className="w-full text-sm font-bold text-slate-600 outline-none bg-transparent text-right cursor-not-allowed select-none"
                               />
                             </div>
@@ -1838,34 +1847,46 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                                 : 'border-indigo-300 focus-within:ring-indigo-500'
                             }`}>
                               <span className={`text-xs font-bold mr-2 shrink-0 ${isOverTarget ? 'text-red-700' : 'text-indigo-700'}`}>
-                                {isManufacturing ? '今日生產數量 *：' : '今日完成數量 *：'}
+                                {isPctMode
+                                  ? '今日完成度 *：'
+                                  : isManufacturing
+                                  ? '今日生產數量 *：'
+                                  : '今日完成數量 *：'}
                               </span>
                               <input
                                 type="number"
                                 step="any"
                                 min="0"
+                                max={isPctMode ? 100 : undefined}
                                 value={item.progress}
                                 onChange={e => {
                                   const nextValStr = e.target.value;
                                   const nextValNum = parseFloat(nextValStr);
                                   const nextTotal = Math.round(((Number.isNaN(nextValNum) ? 0 : nextValNum) + pastQty) * 100) / 100;
-                                  if (!Number.isNaN(targetNum) && targetNum > 0 && nextTotal > targetNum) {
+                                  if (nextTotal > targetNum) {
                                     alert(
-                                      `⚠️ 超過目標數量警示：\n工項「${normalizeItemKey(item.name)}」目標數量為 ${targetNum}（先前已累計完成：${pastQty}），今日輸入 ${nextValNum} 後總計達 ${nextTotal}，已超過目標數量！`
+                                      `⚠️ 超過${isPctMode ? '目標完成度 (100%)' : '目標數量'}警示：\n工項「${normalizeItemKey(item.name)}」${
+                                        isPctMode ? '目標完成度為 100%' : `目標數量為 ${targetNum}`
+                                      }（先前已累計完成：${pastQty}${unitSuffix}），今日輸入 ${nextValNum}${unitSuffix} 後總計達 ${nextTotal}${unitSuffix}，已超過上限！`
                                     );
                                   }
                                   const newItems = [...workItems];
                                   newItems[idx].category = rowCat;
-                                  newItems[idx].target_quantity = resolvedTargetQtyStr;
+                                  newItems[idx].target_quantity = isPctMode ? '100%' : String(targetNum);
                                   newItems[idx].progress = nextValStr;
                                   setWorkItems(newItems);
                                 }}
-                                placeholder="請輸入數量"
+                                placeholder={isPctMode ? '輸入完成度 (0~100)' : '請輸入數量'}
                                 required
                                 className={`w-full text-sm font-extrabold outline-none bg-transparent text-right ${
                                   isOverTarget ? 'text-red-700' : 'text-indigo-700'
                                 }`}
                               />
+                              {isPctMode && (
+                                <span className={`text-xs font-bold ml-1 shrink-0 ${isOverTarget ? 'text-red-700' : 'text-indigo-700'}`}>
+                                  %
+                                </span>
+                              )}
                             </div>
 
                             <div className={`flex items-center justify-between border rounded-lg px-3 py-1.5 text-xs ${
@@ -1874,18 +1895,20 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                                 : 'bg-emerald-50 border-emerald-200 text-slate-600'
                             }`}>
                               <span>
-                                累計完成：<strong className={isOverTarget ? 'text-red-700' : 'text-slate-800'}>{totalAccumulatedQty}</strong>
-                                {!Number.isNaN(targetNum) && targetNum > 0 ? ` / ${targetNum}` : ''}
+                                累計完成：<strong className={isOverTarget ? 'text-red-700' : 'text-slate-800'}>{totalAccumulatedQty}{unitSuffix}</strong>
+                                {` / ${targetNum}${unitSuffix}`}
                               </span>
                               <span className={`font-extrabold text-sm ${isOverTarget ? 'text-red-700' : 'text-emerald-700'}`}>
-                                進度：{completionPct !== null ? `${completionPct}%` : '-'}
+                                進度：{`${completionPct}%`}
                               </span>
                             </div>
                           </div>
 
                           {isOverTarget && (
                             <div className="text-xs font-bold text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-1.5 flex items-center gap-1.5">
-                              <span>⚠️ 警示：累計完成數量 ({totalAccumulatedQty}) 已超過目標數量 ({targetNum})！剩餘可填報上限為 {Math.max(0, Math.round((targetNum - pastQty) * 100) / 100)}。</span>
+                              <span>
+                                ⚠️ 警示：累計完成{isPctMode ? '度' : '數量'} ({totalAccumulatedQty}{unitSuffix}) 已超過{isPctMode ? '目標完成度 (100%)' : `目標數量 (${targetNum})`}！剩餘可填報上限為 {Math.max(0, Math.round((targetNum - pastQty) * 100) / 100)}{unitSuffix}。
+                              </span>
                             </div>
                           )}
 
@@ -2730,16 +2753,18 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                         <tbody>
                           {safeParseJSON(viewingRecord.data.work_items, []).map((w: any, i: number) => {
                             const targetStr =
-                              w.target_quantity !== undefined && w.target_quantity !== ''
-                                ? w.target_quantity
-                                : getTargetQuantityForItem(
-                                    w.category || viewingRecord.data.work_category,
-                                    w.name,
-                                    viewingRecord.data.project_id,
-                                    viewingRecord.data.dispatch_order_id
-                                  );
-                            const targetN = parseFloat(String(targetStr).replace(/,/g, ''));
-                            const todayN = parseFloat(String(w.progress || '').replace(/,/g, ''));
+                              getTargetQuantityForItem(
+                                w.category || viewingRecord.data.work_category,
+                                w.name,
+                                viewingRecord.data.project_id,
+                                viewingRecord.data.dispatch_order_id
+                              ) ||
+                              w.target_quantity ||
+                              '';
+                            const rawTargetN = parseFloat(String(targetStr).replace(/[,%]/g, ''));
+                            const isPctMode = String(targetStr).includes('%') || Number.isNaN(rawTargetN) || rawTargetN <= 0;
+                            const effectiveTargetN = isPctMode ? 100 : rawTargetN;
+                            const todayN = parseFloat(String(w.progress || '').replace(/[,%]/g, ''));
                             const pastN = getPastAccumulatedQty(
                               w.name,
                               viewingRecord.data.project_id,
@@ -2748,10 +2773,8 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                               viewingRecord.data.report_date
                             );
                             const accN = Math.round(((Number.isNaN(todayN) ? 0 : todayN) + pastN) * 100) / 100;
-                            const pct =
-                              !Number.isNaN(targetN) && targetN > 0
-                                ? `${Math.min(100, Math.round((accN / targetN) * 1000) / 10)}%`
-                                : '-';
+                            const pct = `${Math.min(100, Math.round((accN / effectiveTargetN) * 1000) / 10)}%`;
+                            const suffix = isPctMode ? '%' : '';
 
                             return (
                               <tr key={i}>
@@ -2760,13 +2783,13 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                                   {normalizeItemKey(w.name)}
                                 </td>
                                 <td className="border border-slate-300 p-2 text-right font-mono">
-                                  {!Number.isNaN(targetN) && targetN > 0 ? targetN : (targetStr || '-')}
+                                  {isPctMode ? '100%' : effectiveTargetN}
                                 </td>
                                 <td className="border border-slate-300 p-2 text-right font-mono font-bold text-indigo-700">
-                                  {w.progress || '-'}
+                                  {w.progress ? `${w.progress}${suffix}` : '-'}
                                 </td>
                                 <td className="border border-slate-300 p-2 text-right font-mono font-bold">
-                                  {accN}
+                                  {accN}{suffix}
                                 </td>
                                 <td className="border border-slate-300 p-2 text-right font-mono font-extrabold text-emerald-700">
                                   {pct}

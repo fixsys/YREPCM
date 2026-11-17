@@ -353,11 +353,24 @@ router.get('/:id/export', authenticateToken, async (req: AuthRequest, res) => {
         if (legacyMatch) wi.contractQuantity = legacyMatch[1];
       }
       wi.name = cleanName;
-      wi.accumulatedQty = accumulatedItemQtyMap[cleanName] ?? wi.progress ?? '';
-      const targetNum = parseFloat(String(wi.contractQuantity ?? '').replace(/,/g, ''));
-      const accNum = parseFloat(String(wi.accumulatedQty ?? '').replace(/,/g, ''));
-      if (!Number.isNaN(targetNum) && targetNum > 0 && !Number.isNaN(accNum)) {
-        const pct = Math.min(100, Math.round((accNum / targetNum) * 1000) / 10);
+      const rawAcc = accumulatedItemQtyMap[cleanName] ?? wi.progress ?? '';
+      const rawTargetNum = parseFloat(String(wi.contractQuantity ?? '').replace(/[,%]/g, ''));
+      const isPctMode = String(wi.contractQuantity ?? '').includes('%') || Number.isNaN(rawTargetNum) || rawTargetNum <= 0;
+      const effectiveTargetNum = isPctMode ? 100 : rawTargetNum;
+      const accNum = parseFloat(String(rawAcc).replace(/[,%]/g, ''));
+
+      if (isPctMode) {
+        wi.contractQuantity = '100%';
+        if (wi.progress !== undefined && wi.progress !== '' && !String(wi.progress).endsWith('%')) {
+          wi.progress = `${wi.progress}%`;
+        }
+        wi.accumulatedQty = !Number.isNaN(accNum) ? `${accNum}%` : rawAcc;
+      } else {
+        wi.accumulatedQty = rawAcc;
+      }
+
+      if (!Number.isNaN(accNum) && effectiveTargetNum > 0) {
+        const pct = Math.min(100, Math.round((accNum / effectiveTargetNum) * 1000) / 10);
         wi.completionRate = `${pct}%`;
         wi.notes = `${pct}%`;
       }
@@ -911,11 +924,24 @@ router.get('/:id/export-pdf', authenticateToken, async (req: AuthRequest, res) =
         if (legacyMatch) wi.contractQuantity = legacyMatch[1];
       }
       wi.name = cleanName;
-      wi.accumulatedQty = accumulatedItemQtyMap[cleanName] ?? wi.progress ?? '';
-      const targetNum = parseFloat(String(wi.contractQuantity ?? '').replace(/,/g, ''));
-      const accNum = parseFloat(String(wi.accumulatedQty ?? '').replace(/,/g, ''));
-      if (!Number.isNaN(targetNum) && targetNum > 0 && !Number.isNaN(accNum)) {
-        const pct = Math.min(100, Math.round((accNum / targetNum) * 1000) / 10);
+      const rawAcc = accumulatedItemQtyMap[cleanName] ?? wi.progress ?? '';
+      const rawTargetNum = parseFloat(String(wi.contractQuantity ?? '').replace(/[,%]/g, ''));
+      const isPctMode = String(wi.contractQuantity ?? '').includes('%') || Number.isNaN(rawTargetNum) || rawTargetNum <= 0;
+      const effectiveTargetNum = isPctMode ? 100 : rawTargetNum;
+      const accNum = parseFloat(String(rawAcc).replace(/[,%]/g, ''));
+
+      if (isPctMode) {
+        wi.contractQuantity = '100%';
+        if (wi.progress !== undefined && wi.progress !== '' && !String(wi.progress).endsWith('%')) {
+          wi.progress = `${wi.progress}%`;
+        }
+        wi.accumulatedQty = !Number.isNaN(accNum) ? `${accNum}%` : rawAcc;
+      } else {
+        wi.accumulatedQty = rawAcc;
+      }
+
+      if (!Number.isNaN(accNum) && effectiveTargetNum > 0) {
+        const pct = Math.min(100, Math.round((accNum / effectiveTargetNum) * 1000) / 10);
         wi.completionRate = `${pct}%`;
         wi.notes = `${pct}%`;
       }
