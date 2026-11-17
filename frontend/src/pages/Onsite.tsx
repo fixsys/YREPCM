@@ -19,7 +19,7 @@ const TimeInput24 = ({ value, onChange, className }: { value: string, onChange: 
 };
 
 import { useAuthStore } from '../store/authStore';
-import { CheckSquare, Plus, Clock, Search, FolderKanban, Camera, X, Trash2, FileText, Edit2, Printer } from 'lucide-react';
+import { CheckSquare, Plus, Clock, Search, FolderKanban, Camera, X, Trash2, FileText, Edit2, Printer, ZoomIn, ZoomOut, RotateCw, ChevronLeft, ChevronRight, Download } from 'lucide-react';
 
 const safeParseJSON = (data: any, fallback: any = []) => {
   if (!data) return fallback;
@@ -163,6 +163,66 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
     return Math.max(0, parseFloat(diffHours.toFixed(1)));
   };
   const [viewingRecord, setViewingRecord] = useState<{type: 'toolbox' | 'labor', data: any} | null>(null);
+  const [lightbox, setLightbox] = useState<{
+    isOpen: boolean;
+    images: string[];
+    currentIndex: number;
+    title: string;
+    scale: number;
+    rotation: number;
+    offset: { x: number; y: number };
+  }>({
+    isOpen: false,
+    images: [],
+    currentIndex: 0,
+    title: '圖片預覽',
+    scale: 1,
+    rotation: 0,
+    offset: { x: 0, y: 0 },
+  });
+  const [isDraggingImg, setIsDraggingImg] = useState(false);
+  const dragStartRef = useRef<{ x: number; y: number; ox: number; oy: number }>({ x: 0, y: 0, ox: 0, oy: 0 });
+
+  const openImageViewer = useCallback((images: string[], index = 0, title = '圖片預覽') => {
+    const valid = (images || []).filter(Boolean);
+    if (valid.length === 0) return;
+    setLightbox({
+      isOpen: true,
+      images: valid,
+      currentIndex: Math.min(Math.max(0, index), valid.length - 1),
+      title,
+      scale: 1,
+      rotation: 0,
+      offset: { x: 0, y: 0 },
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!lightbox.isOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setLightbox(prev => ({ ...prev, isOpen: false }));
+      } else if (e.key === 'ArrowLeft' && lightbox.images.length > 1) {
+        setLightbox(prev => ({
+          ...prev,
+          currentIndex: (prev.currentIndex - 1 + prev.images.length) % prev.images.length,
+          scale: 1,
+          rotation: 0,
+          offset: { x: 0, y: 0 },
+        }));
+      } else if (e.key === 'ArrowRight' && lightbox.images.length > 1) {
+        setLightbox(prev => ({
+          ...prev,
+          currentIndex: (prev.currentIndex + 1) % prev.images.length,
+          scale: 1,
+          rotation: 0,
+          offset: { x: 0, y: 0 },
+        }));
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [lightbox.isOpen, lightbox.images.length]);
   type WorkItem = {
     category?: string;
     name: string;
@@ -986,8 +1046,15 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                   )}
                   {t.photos && (
                     <div className="mt-3 flex gap-2 overflow-x-auto">
-                      {safeParseJSON(t.photos, []).map((p: string, i: number) => (
-                        <img key={i} src={`${p}`} alt="會議紀錄" className="w-12 h-12 rounded object-cover border" />
+                      {safeParseJSON(t.photos, []).map((p: string, i: number, arr: string[]) => (
+                        <img
+                          key={i}
+                          src={`${p}`}
+                          alt="會議紀錄"
+                          onClick={() => openImageViewer(arr, i, '工具箱會議照片')}
+                          title="點擊檢視原圖與放大縮小"
+                          className="w-12 h-12 rounded object-cover border cursor-zoom-in hover:ring-2 hover:ring-indigo-400 transition-all"
+                        />
                       ))}
                     </div>
                   )}
@@ -1686,7 +1753,13 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                     <div className="flex gap-2 mt-3 overflow-x-auto">
                       {toolboxPreviewUrls.map((url, i) => (
                         <div key={i} className="relative inline-block shrink-0">
-                          <img src={url} alt="preview" className="w-16 h-16 object-cover rounded border border-slate-200" />
+                          <img
+                            src={url}
+                            alt="preview"
+                            onClick={() => openImageViewer(toolboxPreviewUrls, i, '上傳照片預覽')}
+                            title="點擊檢視原圖與放大縮小"
+                            className="w-16 h-16 object-cover rounded border border-slate-200 cursor-zoom-in hover:ring-2 hover:ring-indigo-400 transition-all"
+                          />
                           <button type="button" onClick={() => setToolboxPhotos(prev => prev.filter((_, idx) => idx !== i))} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] shadow z-10 hover:bg-red-600">×</button>
                         </div>
                       ))}
@@ -2874,8 +2947,17 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                       <div>
                         <h4 className="font-bold text-lg mb-2">現場施工人員簽名</h4>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                          {safeParseJSON(viewingRecord.data.signatures, []).map((sig: string, i: number) => (
-                            sig ? <div key={i} className="border border-slate-200 rounded p-2 bg-white flex justify-center items-center h-20 shadow-sm"><img src={sig} alt="簽名" className="max-h-full object-contain" /></div> : null
+                          {safeParseJSON(viewingRecord.data.signatures, []).map((sig: string, i: number, arr: string[]) => (
+                            sig ? (
+                              <div
+                                key={i}
+                                onClick={() => openImageViewer(arr.filter(Boolean), arr.slice(0, i).filter(Boolean).length, `施工人員簽名 (${i + 1})`)}
+                                title="點擊放大檢視簽名"
+                                className="border border-slate-200 rounded p-2 bg-white flex justify-center items-center h-20 shadow-sm cursor-zoom-in hover:ring-2 hover:ring-indigo-400 transition-all"
+                              >
+                                <img src={sig} alt="簽名" className="max-h-full object-contain" />
+                              </div>
+                            ) : null
                           ))}
                         </div>
                       </div>
@@ -2897,10 +2979,25 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                   </div>
                   {viewingRecord.data.photos && safeParseJSON(viewingRecord.data.photos, []).length > 0 && (
                     <div>
-                      <h3 className="text-xl font-bold mb-3 border-l-4 border-indigo-600 pl-3">會議照片</h3>
+                      <h3 className="text-xl font-bold mb-3 border-l-4 border-indigo-600 pl-3 flex items-center gap-2">
+                        <span>會議照片</span>
+                        <span className="text-xs font-normal text-slate-500">(點擊圖片可檢視原圖與放大縮小)</span>
+                      </h3>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        {safeParseJSON(viewingRecord.data.photos, []).map((p: string, i: number) => (
-                          <img key={i} src={`${p}`} alt="會議照片" className="w-full h-48 object-cover rounded-xl border shadow-sm" />
+                        {safeParseJSON(viewingRecord.data.photos, []).map((p: string, i: number, arr: string[]) => (
+                          <div
+                            key={i}
+                            onClick={() => openImageViewer(arr, i, '會議照片')}
+                            title="點擊檢視原圖與放大縮小"
+                            className="group relative overflow-hidden rounded-xl border shadow-sm cursor-zoom-in"
+                          >
+                            <img src={`${p}`} alt="會議照片" className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-200" />
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/25 transition-colors flex items-center justify-center">
+                              <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-black/70 text-white text-xs px-2.5 py-1 rounded-full flex items-center gap-1">
+                                <ZoomIn size={14} /> 檢視原圖
+                              </span>
+                            </div>
+                          </div>
                         ))}
                       </div>
                     </div>
@@ -3118,7 +3215,18 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                             {typeof w.inspection.photo === 'string' && (
                               <div className="mt-4 pt-4 border-t border-slate-200">
                                 <h5 className="font-bold text-slate-700 text-sm mb-2">{INSPECTION_TEMPLATES[w.name]?.photoLabel || '檢查照片'}</h5>
-                                <img src={`${w.inspection.photo}`} alt="檢查照片" className="w-48 h-48 object-cover rounded-xl border shadow-sm" />
+                                <div
+                                  onClick={() => openImageViewer([w.inspection.photo], 0, INSPECTION_TEMPLATES[w.name]?.photoLabel || '檢查照片')}
+                                  title="點擊檢視原圖與放大縮小"
+                                  className="group relative inline-block overflow-hidden rounded-xl border shadow-sm cursor-zoom-in"
+                                >
+                                  <img src={`${w.inspection.photo}`} alt="檢查照片" className="w-48 h-48 object-cover group-hover:scale-105 transition-transform duration-200" />
+                                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/25 transition-colors flex items-center justify-center">
+                                    <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-black/70 text-white text-xs px-2.5 py-1 rounded-full flex items-center gap-1">
+                                      <ZoomIn size={14} /> 檢視原圖
+                                    </span>
+                                  </div>
+                                </div>
                               </div>
                             )}
                           </div>
@@ -3162,14 +3270,29 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
 
                   {viewingRecord.data.photos && (
                     <div>
-                      <h3 className="text-xl font-bold mb-3 border-l-4 border-indigo-600 pl-3">施工照片</h3>
+                      <h3 className="text-xl font-bold mb-3 border-l-4 border-indigo-600 pl-3 flex items-center gap-2">
+                        <span>施工照片</span>
+                        <span className="text-xs font-normal text-slate-500">(點擊圖片可檢視原圖與放大縮小)</span>
+                      </h3>
                       
                       {safeParseJSON(viewingRecord.data.photos, {}).close?.length > 0 && (
                         <div className="mb-4">
                           <h4 className="font-bold text-slate-600 mb-2">近照</h4>
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            {safeParseJSON(viewingRecord.data.photos, {}).close.map((p: string, i: number) => (
-                              <img key={i} src={`${p}`} alt="近照" className="w-full h-48 object-cover rounded-xl border shadow-sm" />
+                            {safeParseJSON(viewingRecord.data.photos, {}).close.map((p: string, i: number, arr: string[]) => (
+                              <div
+                                key={i}
+                                onClick={() => openImageViewer(arr, i, '施工照片 — 近照')}
+                                title="點擊檢視原圖與放大縮小"
+                                className="group relative overflow-hidden rounded-xl border shadow-sm cursor-zoom-in"
+                              >
+                                <img src={`${p}`} alt="近照" className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-200" />
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/25 transition-colors flex items-center justify-center">
+                                  <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-black/70 text-white text-xs px-2.5 py-1 rounded-full flex items-center gap-1">
+                                    <ZoomIn size={14} /> 檢視原圖
+                                  </span>
+                                </div>
+                              </div>
                             ))}
                           </div>
                         </div>
@@ -3178,8 +3301,20 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                         <div className="mb-4">
                           <h4 className="font-bold text-slate-600 mb-2">中距離照</h4>
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            {safeParseJSON(viewingRecord.data.photos, {}).mid.map((p: string, i: number) => (
-                              <img key={i} src={`${p}`} alt="中距離照" className="w-full h-48 object-cover rounded-xl border shadow-sm" />
+                            {safeParseJSON(viewingRecord.data.photos, {}).mid.map((p: string, i: number, arr: string[]) => (
+                              <div
+                                key={i}
+                                onClick={() => openImageViewer(arr, i, '施工照片 — 中距離照')}
+                                title="點擊檢視原圖與放大縮小"
+                                className="group relative overflow-hidden rounded-xl border shadow-sm cursor-zoom-in"
+                              >
+                                <img src={`${p}`} alt="中距離照" className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-200" />
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/25 transition-colors flex items-center justify-center">
+                                  <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-black/70 text-white text-xs px-2.5 py-1 rounded-full flex items-center gap-1">
+                                    <ZoomIn size={14} /> 檢視原圖
+                                  </span>
+                                </div>
+                              </div>
                             ))}
                           </div>
                         </div>
@@ -3188,8 +3323,20 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                         <div className="mb-4">
                           <h4 className="font-bold text-slate-600 mb-2">遠距照</h4>
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            {safeParseJSON(viewingRecord.data.photos, {}).far.map((p: string, i: number) => (
-                              <img key={i} src={`${p}`} alt="遠距照" className="w-full h-48 object-cover rounded-xl border shadow-sm" />
+                            {safeParseJSON(viewingRecord.data.photos, {}).far.map((p: string, i: number, arr: string[]) => (
+                              <div
+                                key={i}
+                                onClick={() => openImageViewer(arr, i, '施工照片 — 遠距照')}
+                                title="點擊檢視原圖與放大縮小"
+                                className="group relative overflow-hidden rounded-xl border shadow-sm cursor-zoom-in"
+                              >
+                                <img src={`${p}`} alt="遠距照" className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-200" />
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/25 transition-colors flex items-center justify-center">
+                                  <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-black/70 text-white text-xs px-2.5 py-1 rounded-full flex items-center gap-1">
+                                    <ZoomIn size={14} /> 檢視原圖
+                                  </span>
+                                </div>
+                              </div>
                             ))}
                           </div>
                         </div>
@@ -3198,8 +3345,41 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                         <div className="mb-4">
                           <h4 className="font-bold text-slate-600 mb-2">其他照片補充</h4>
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            {safeParseJSON(viewingRecord.data.photos, {}).other.map((p: string, i: number) => (
-                              <img key={i} src={`${p}`} alt="其他照片補充" className="w-full h-48 object-cover rounded-xl border shadow-sm" />
+                            {safeParseJSON(viewingRecord.data.photos, {}).other.map((p: string, i: number, arr: string[]) => (
+                              <div
+                                key={i}
+                                onClick={() => openImageViewer(arr, i, '施工照片 — 其他照片補充')}
+                                title="點擊檢視原圖與放大縮小"
+                                className="group relative overflow-hidden rounded-xl border shadow-sm cursor-zoom-in"
+                              >
+                                <img src={`${p}`} alt="其他照片補充" className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-200" />
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/25 transition-colors flex items-center justify-center">
+                                  <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-black/70 text-white text-xs px-2.5 py-1 rounded-full flex items-center gap-1">
+                                    <ZoomIn size={14} /> 檢視原圖
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {Array.isArray(safeParseJSON(viewingRecord.data.photos, [])) && safeParseJSON(viewingRecord.data.photos, []).length > 0 && (
+                        <div className="mb-4">
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            {safeParseJSON(viewingRecord.data.photos, []).map((p: string, i: number, arr: string[]) => (
+                              <div
+                                key={i}
+                                onClick={() => openImageViewer(arr, i, '施工照片')}
+                                title="點擊檢視原圖與放大縮小"
+                                className="group relative overflow-hidden rounded-xl border shadow-sm cursor-zoom-in"
+                              >
+                                <img src={`${p}`} alt="施工照片" className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-200" />
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/25 transition-colors flex items-center justify-center">
+                                  <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-black/70 text-white text-xs px-2.5 py-1 rounded-full flex items-center gap-1">
+                                    <ZoomIn size={14} /> 檢視原圖
+                                  </span>
+                                </div>
+                              </div>
                             ))}
                           </div>
                         </div>
@@ -3224,6 +3404,228 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* 原圖檢視與放大縮小 Lightbox Modal */}
+      {lightbox.isOpen && lightbox.images.length > 0 && (
+        <div
+          className="fixed inset-0 z-[300] bg-black/90 backdrop-blur-sm flex flex-col select-none no-print"
+          onMouseUp={() => setIsDraggingImg(false)}
+          onMouseLeave={() => setIsDraggingImg(false)}
+        >
+          {/* 頂部控制列 */}
+          <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-slate-900/80 border-b border-white/10 text-white shrink-0 z-10">
+            <div className="flex items-center gap-3">
+              <span className="font-bold text-sm md:text-base">{lightbox.title}</span>
+              {lightbox.images.length > 1 && (
+                <span className="text-xs bg-white/15 px-2.5 py-0.5 rounded-full font-mono">
+                  {lightbox.currentIndex + 1} / {lightbox.images.length}
+                </span>
+              )}
+              <span className="hidden sm:inline text-xs text-slate-400">
+                (支援滾輪縮放、雙擊放大、按住拖曳移動圖片)
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  setLightbox(prev => ({
+                    ...prev,
+                    scale: Math.max(0.25, Math.round((prev.scale - 0.25) * 100) / 100),
+                  }))
+                }
+                title="縮小 (-25%)"
+                className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+              >
+                <ZoomOut size={18} />
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  setLightbox(prev => ({
+                    ...prev,
+                    scale: 1,
+                    rotation: 0,
+                    offset: { x: 0, y: 0 },
+                  }))
+                }
+                title="重置比例 (100%)"
+                className="px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-mono font-bold text-white transition-colors cursor-pointer min-w-[58px] text-center"
+              >
+                {Math.round(lightbox.scale * 100)}%
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  setLightbox(prev => ({
+                    ...prev,
+                    scale: Math.min(5, Math.round((prev.scale + 0.25) * 100) / 100),
+                  }))
+                }
+                title="放大 (+25%)"
+                className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+              >
+                <ZoomIn size={18} />
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  setLightbox(prev => ({
+                    ...prev,
+                    rotation: (prev.rotation + 90) % 360,
+                  }))
+                }
+                title="旋轉 90°"
+                className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+              >
+                <RotateCw size={18} />
+              </button>
+              <a
+                href={lightbox.images[lightbox.currentIndex]}
+                target="_blank"
+                rel="noopener noreferrer"
+                download
+                title="開啟 / 下載原圖"
+                className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+              >
+                <Download size={18} />
+              </a>
+              <button
+                type="button"
+                onClick={() => setLightbox(prev => ({ ...prev, isOpen: false }))}
+                title="關閉 (Esc)"
+                className="p-2 rounded-lg bg-red-500/80 hover:bg-red-500 text-white transition-colors cursor-pointer ml-1"
+              >
+                <X size={20} />
+              </button>
+            </div>
+          </div>
+
+          {/* 圖片主檢視區 */}
+          <div
+            className={`relative flex-1 overflow-hidden flex items-center justify-center ${
+              isDraggingImg ? 'cursor-grabbing' : 'cursor-grab'
+            }`}
+            onWheel={e => {
+              e.preventDefault();
+              const delta = e.deltaY < 0 ? 0.2 : -0.2;
+              setLightbox(prev => ({
+                ...prev,
+                scale: Math.min(5, Math.max(0.25, Math.round((prev.scale + delta) * 100) / 100)),
+              }));
+            }}
+            onMouseDown={e => {
+              if (e.button !== 0) return;
+              setIsDraggingImg(true);
+              dragStartRef.current = {
+                x: e.clientX,
+                y: e.clientY,
+                ox: lightbox.offset.x,
+                oy: lightbox.offset.y,
+              };
+            }}
+            onMouseMove={e => {
+              if (!isDraggingImg) return;
+              const dx = e.clientX - dragStartRef.current.x;
+              const dy = e.clientY - dragStartRef.current.y;
+              setLightbox(prev => ({
+                ...prev,
+                offset: {
+                  x: dragStartRef.current.ox + dx,
+                  y: dragStartRef.current.oy + dy,
+                },
+              }));
+            }}
+            onDoubleClick={() => {
+              setLightbox(prev => ({
+                ...prev,
+                scale: prev.scale > 1 ? 1 : 2,
+                offset: { x: 0, y: 0 },
+              }));
+            }}
+          >
+            {lightbox.images.length > 1 && (
+              <button
+                type="button"
+                onClick={e => {
+                  e.stopPropagation();
+                  setLightbox(prev => ({
+                    ...prev,
+                    currentIndex: (prev.currentIndex - 1 + prev.images.length) % prev.images.length,
+                    scale: 1,
+                    rotation: 0,
+                    offset: { x: 0, y: 0 },
+                  }));
+                }}
+                title="上一張"
+                className="absolute left-4 z-20 p-3 rounded-full bg-black/60 hover:bg-black/80 text-white border border-white/20 shadow-lg transition-colors cursor-pointer"
+              >
+                <ChevronLeft size={24} />
+              </button>
+            )}
+
+            <img
+              src={lightbox.images[lightbox.currentIndex]}
+              alt="原圖預覽"
+              draggable={false}
+              style={{
+                transform: `translate(${lightbox.offset.x}px, ${lightbox.offset.y}px) scale(${lightbox.scale}) rotate(${lightbox.rotation}deg)`,
+                transition: isDraggingImg ? 'none' : 'transform 0.15s ease-out',
+              }}
+              className="max-w-[92vw] max-h-[82vh] object-contain pointer-events-none select-none shadow-2xl"
+            />
+
+            {lightbox.images.length > 1 && (
+              <button
+                type="button"
+                onClick={e => {
+                  e.stopPropagation();
+                  setLightbox(prev => ({
+                    ...prev,
+                    currentIndex: (prev.currentIndex + 1) % prev.images.length,
+                    scale: 1,
+                    rotation: 0,
+                    offset: { x: 0, y: 0 },
+                  }));
+                }}
+                title="下一張"
+                className="absolute right-4 z-20 p-3 rounded-full bg-black/60 hover:bg-black/80 text-white border border-white/20 shadow-lg transition-colors cursor-pointer"
+              >
+                <ChevronRight size={24} />
+              </button>
+            )}
+          </div>
+
+          {/* 底部縮圖導覽列 */}
+          {lightbox.images.length > 1 && (
+            <div className="flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900/80 border-t border-white/10 overflow-x-auto shrink-0 z-10">
+              {lightbox.images.map((imgUrl, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() =>
+                    setLightbox(prev => ({
+                      ...prev,
+                      currentIndex: idx,
+                      scale: 1,
+                      rotation: 0,
+                      offset: { x: 0, y: 0 },
+                    }))
+                  }
+                  className={`w-14 h-14 rounded-lg overflow-hidden border-2 transition-all shrink-0 cursor-pointer ${
+                    idx === lightbox.currentIndex
+                      ? 'border-indigo-400 scale-105 shadow-md'
+                      : 'border-transparent opacity-60 hover:opacity-100'
+                  }`}
+                >
+                  <img src={imgUrl} alt={`縮圖 ${idx + 1}`} className="w-full h-full object-cover" />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
