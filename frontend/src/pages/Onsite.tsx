@@ -38,9 +38,11 @@ const TOOLBOX_ELECTRICAL_HAZARDS = ['感電'];
 const TOOLBOX_PPE = ['安全帽', '安全鞋', '施工背心', '全身背負式安全帶', '防墜器', '安全眼鏡', '絕緣手套', '安全面罩', '防護衣', '防塵口罩', '防毒面具', '防化圍裙', '防化手套', '防化鞋'];
 const TOOLBOX_SAFETY_FACILITIES = ['合梯', '爬梯', '施工架', '安全母索', '安全防墜網', '吊籠/護欄', '警示圍籬', '防火毯', '搶救設備', '滅火器', '通風設備', '檢電器', '高壓電防護設備', '接地棒', '漏電斷路器', '照明設備', '通訊設備', '氧乙炔焊防回火裝置', '電焊防電擊裝置'];
 const TOOLBOX_WORK_AREAS = ['浪板屋頂', '建物屋頂', '地面', '圳溝', '蓄水池', '其他'];
+const MFG_TOOLBOX_WORK_AREAS = ['新市廠', '營潮廠', '其他'];
 
 const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
   const isManufacturing = mode === 'MANUFACTURING';
+  const activeToolboxWorkAreas = isManufacturing ? MFG_TOOLBOX_WORK_AREAS : TOOLBOX_WORK_AREAS;
   const pageTitle = isManufacturing ? '製造報工中心' : '現場報工中心';
   const dailyLabel = isManufacturing ? '每日生產回報' : '每日報工';
   const { token, user } = useAuthStore();
@@ -1465,13 +1467,13 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                   <div className="mb-4">
                     <label className="block text-sm font-medium text-slate-700 mb-2">施工區域</label>
                     <div className="flex flex-wrap gap-4">
-                      {TOOLBOX_WORK_AREAS.map(area => (
+                      {activeToolboxWorkAreas.map((area, idx) => (
                          <label key={area} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
-                           <input type="radio" checked={toolboxForm.work_area === area || (area === '其他' && !TOOLBOX_WORK_AREAS.includes(toolboxForm.work_area) && toolboxForm.work_area !== '')} onChange={() => setToolboxForm({...toolboxForm, work_area: area === '其他' ? '其他填寫...' : area})} className="text-indigo-600" />
-                           {area}
+                           <input type="radio" checked={toolboxForm.work_area === area || (area === '其他' && !activeToolboxWorkAreas.includes(toolboxForm.work_area) && toolboxForm.work_area !== '')} onChange={() => setToolboxForm({...toolboxForm, work_area: area === '其他' ? '其他填寫...' : area})} className="text-indigo-600" />
+                           {isManufacturing ? `${idx + 1}. ${area}` : area}
                          </label>
                       ))}
-                      {(!TOOLBOX_WORK_AREAS.includes(toolboxForm.work_area) || toolboxForm.work_area === '其他填寫...') && toolboxForm.work_area !== '' && (
+                      {(!activeToolboxWorkAreas.includes(toolboxForm.work_area) || toolboxForm.work_area === '其他填寫...') && toolboxForm.work_area !== '' && (
                          <input type="text" value={toolboxForm.work_area === '其他填寫...' ? '' : toolboxForm.work_area} onChange={e => setToolboxForm({...toolboxForm, work_area: e.target.value})} placeholder="請註明其他區域" className="border-b border-slate-300 outline-none px-1 text-sm text-slate-700" />
                       )}
                     </div>
@@ -2999,17 +3001,27 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                     <h2 className="text-2xl font-bold mt-2 tracking-widest">勞工安全衛生工具箱會議紀錄表</h2>
                   </div>
                   <div className="grid grid-cols-2 gap-4 text-lg border-b border-slate-200 pb-6">
-                    {!(isManufacturing || viewingRecord.data.module_type === 'MANUFACTURING') && viewingRecord.data.dispatchOrder?.dispatch_no && (
-                      <div className="col-span-2 text-amber-800 bg-amber-50 px-3 py-1.5 rounded border border-amber-200">
-                        <strong>派工單號：</strong> {viewingRecord.data.dispatchOrder.dispatch_no}
-                      </div>
+                    {(isManufacturing || viewingRecord.data.module_type === 'MANUFACTURING') ? (
+                      <>
+                        <div><strong>記錄人：</strong> {viewingRecord.data.recorder?.name}</div>
+                        <div><strong>會議日期：</strong> {new Date(viewingRecord.data.record_date).toLocaleDateString()}</div>
+                        <div><strong>與會人數：</strong> {viewingRecord.data.worker_count} 人</div>
+                      </>
+                    ) : (
+                      <>
+                        {viewingRecord.data.dispatchOrder?.dispatch_no && (
+                          <div className="col-span-2 text-amber-800 bg-amber-50 px-3 py-1.5 rounded border border-amber-200">
+                            <strong>派工單號：</strong> {viewingRecord.data.dispatchOrder.dispatch_no}
+                          </div>
+                        )}
+                        <div><strong>會議日期：</strong> {new Date(viewingRecord.data.record_date).toLocaleDateString()}</div>
+                        <div><strong>工程名稱：</strong> {viewingRecord.data.work_category}工程</div>
+                        <div><strong>工務經理：</strong> {viewingRecord.data.pm?.name || '無'}</div>
+                        <div><strong>記錄人員：</strong> {viewingRecord.data.recorder?.name}</div>
+                        <div><strong>與會人數：</strong> {viewingRecord.data.worker_count} 人</div>
+                        <div className="col-span-2"><strong>參與人員：</strong> {viewingRecord.data.participants ? safeParseJSON(viewingRecord.data.participants, []).join(', ') : '無'}</div>
+                      </>
                     )}
-                    <div><strong>會議日期：</strong> {new Date(viewingRecord.data.record_date).toLocaleDateString()}</div>
-                    <div><strong>工程名稱：</strong> {viewingRecord.data.work_category}工程</div>
-                    <div><strong>工務經理：</strong> {viewingRecord.data.pm?.name || '無'}</div>
-                    <div><strong>記錄人員：</strong> {viewingRecord.data.recorder?.name}</div>
-                    <div><strong>與會人數：</strong> {viewingRecord.data.worker_count} 人</div>
-                    <div className="col-span-2"><strong>參與人員：</strong> {viewingRecord.data.participants ? safeParseJSON(viewingRecord.data.participants, []).join(', ') : '無'}</div>
                   </div>
                   <div>
                     <h3 className="text-xl font-bold mb-3 border-l-4 border-indigo-600 pl-3">會議與宣導內容</h3>

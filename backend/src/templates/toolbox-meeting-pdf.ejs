@@ -127,17 +127,23 @@
       <col style="width: 4.725%;">
     <% } %>
   </colgroup>
+    <%
+      const parsedWorkItems = Array.isArray(meeting.work_items)
+        ? meeting.work_items
+        : (typeof meeting.work_items === 'string' ? (() => { try { return JSON.parse(meeting.work_items); } catch { return []; } })() : []);
+      const isMfg = meeting.module_type === 'MANUFACTURING';
+    %>
+    <% if (isMfg) { %>
+    <tr>
+      <td colspan="2" style="white-space: nowrap; padding: 4px 2px;">記錄人</td>
+      <td colspan="7" class="left-align" style="padding: 4px 6px;"><%= meeting.recorder ? meeting.recorder.name : '' %></td>
+      <td colspan="4" style="padding: 4px 2px;">會議日期</td>
+      <td colspan="8" class="left-align" style="padding: 4px 6px;"><%= new Date(meeting.record_date).toLocaleDateString() %></td>
+    </tr>
+    <% } else { %>
     <tr>
       <td colspan="2" style="white-space: nowrap; padding: 0 1px;">工程名稱</td>
-      <td colspan="7" class="left-align">
-        <%
-          const parsedWorkItems = Array.isArray(meeting.work_items)
-            ? meeting.work_items
-            : (typeof meeting.work_items === 'string' ? (() => { try { return JSON.parse(meeting.work_items); } catch { return []; } })() : []);
-          const isMfg = meeting.module_type === 'MANUFACTURING';
-        %>
-        <%= isMfg && parsedWorkItems.length > 0 ? parsedWorkItems.map(w => w.name).join('、') : (meeting.project ? meeting.project.name : '') %>
-      </td>
+      <td colspan="7" class="left-align"><%= meeting.project ? meeting.project.name : '' %></td>
       <td colspan="4">會議日期</td>
       <td colspan="8" class="left-align"><%= new Date(meeting.record_date).toLocaleDateString() %></td>
     </tr>
@@ -147,11 +153,12 @@
       <td colspan="4">案場負責人</td>
       <td colspan="8" class="left-align"><%= meeting.recorder ? meeting.recorder.name : '' %></td>
     </tr>
+    <% } %>
     <tr>
       <td colspan="2" style="white-space: nowrap; padding: 0 1px;">施工區域</td>
       <td colspan="19" class="left-align">
         <% 
-          const areas = ['浪板屋頂', '建物屋頂', '地面', '圳溝', '蓄水池'];
+          const areas = isMfg ? ['新市廠', '營潮廠'] : ['浪板屋頂', '建物屋頂', '地面', '圳溝', '蓄水池'];
           let otherArea = '';
           if (meeting.work_area && !areas.includes(meeting.work_area)) {
             otherArea = meeting.work_area;
