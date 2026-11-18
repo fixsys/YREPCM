@@ -264,6 +264,27 @@ model SystemSetting {
   updated_at  DateTime @updatedAt
 }
 
+model SystemAuditLog {
+  id            String   @id @default(uuid())
+  user_id       String?
+  user_name     String?
+  user_account  String?
+  department    String?
+  action        String   // CREATE, UPDATE, DELETE, LOGIN, EXPORT, ERROR, OTHER
+  module        String   // 現場報工, 製造報工, 工具箱會議, 生產派工, 專案管理, 業務開發, 預算分析, 個人任務, 帳號與權限, 系統設定
+  target_id     String?
+  summary       String   @db.Text
+  method        String?
+  path          String?
+  status_code   Int      @default(200)
+  level         String   @default("INFO") // INFO, WARN, ERROR
+  ip_address    String?
+  duration_ms   Int?
+  payload       Json?
+  error_message String?  @db.Text
+  created_at    DateTime @default(now())
+}
+
 // ==========================================
 // CRM 業務開發模組 (Business Development)
 // ==========================================

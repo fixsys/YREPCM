@@ -57,90 +57,224 @@ router.get('/', authenticateToken, async (req: AuthRequest, res) => {
   }
 });
 
-// Create toolbox meeting
-router.post('/', authenticateToken, upload.array('photos', 5), async (req: AuthRequest, res) => {
-  if (!req.user) return res.status(401).json({ error: '未授權' });
+const cleanOptionalId = (val: any): string | null => {
+  if (!val || val === 'undefined' || val === 'null' || String(val).trim() === '') return null;
+  return String(val).trim();
+};
 
-  const { project_id, dispatch_order_id, module_type, record_date, recorder_id, worker_count, work_category, work_content, safety_check_1, safety_check_2, safety_check_3, work_area, work_items, hazards, safety_measures, other_risks, signatures, equipments } = req.body;
-  if (!project_id) return res.status(400).json({ error: '必須選擇專案' });
-  
-  const files = req.files as Express.Multer.File[];
-  if (!files || files.length < 2) {
-    return res.status(400).json({ error: '必須上傳至少2張會議照片' });
+const safeJsonParse = (val: any, fallback: any = []) => {
+  if (!val) return fallback;
+  if (typeof val === 'object') return val;
+  try {
+    return JSON.parse(String(val));
+  } catch {
+    return fallback;
+  }
+};
+
+// Create toolbox meeting
+router.post('/', authenticateToken, upload.array('photos', 20), async (req: AuthRequest, res) => {
+  if (!req.user) return res.status(401).json({ error: '登入已過期或未授權，請重新登入後再試' });
+
+  const {
+    project_id,
+    dispatch_order_id,
+    module_type,
+    record_date,
+    recorder_id,
+    worker_count,
+    work_category,
+    work_content,
+    safety_check_1,
+    safety_check_2,
+    safety_check_3,
+    work_area,
+    work_items,
+    hazards,
+    safety_measures,
+    other_risks,
+    signatures,
+    equipments
+  } = req.body;
+
+  const isMfg = module_type === 'MANUFACTURING';
+  const parsedWorkItems = safeJsonParse(work_items, []);
+  const files = (req.files as Express.Multer.File[]) || [];
+  const missing: string[] = [];
+
+  const cleanedProjectId = cleanOptionalId(project_id);
+  const cleanedDispatchId = cleanOptionalId(dispatch_order_id);
+
+  if (isMfg) {
+    if (!Array.isArray(parsedWorkItems) || parsedWorkItems.filter((w: any) => w?.name).length === 0) {
+      missing.push('「工作內容」：請至少選擇一筆今日生產之「專案與派工單號」');
+    }
+  } else if (!cleanedProjectId) {
+    missing.push('「專案代碼」：請選擇所屬專案');
+  }
+
+  if (!record_date || Number.isNaN(new Date(record_date).getTime())) {
+    missing.push('「會議日期」：請選擇有效的會議日期');
+  }
+  if (!worker_count || parseInt(worker_count) <= 0) {
+    missing.push('「上工人數」：請填寫大於 0 的上工人數');
+  }
+  if (!work_category || String(work_category).trim() === '') {
+    missing.push('「工程類別」：請至少勾選一項工程類別');
+  }
+  if (!work_content || String(work_content).trim() === '') {
+    missing.push('「今日工作內容」：請填寫今日工作內容簡述');
+  }
+  if (files.length < 2) {
+    missing.push(`「會議照片」：必須上傳至少 2 張照片（目前已選 ${files.length} 張，還差 ${2 - files.length} 張）`);
+  }
+  const uncheckedSafety: string[] = [];
+  if (safety_check_1 !== 'true' && safety_check_1 !== true) uncheckedSafety.push('第 1 項 (危害告知與安全說明)');
+  if (safety_check_2 !== 'true' && safety_check_2 !== true) uncheckedSafety.push('第 2 項 (禁酒與安全帽/安全鞋確認)');
+  if (safety_check_3 !== 'true' && safety_check_3 !== true) uncheckedSafety.push('第 3 項 (工作內容與緊急應變確認)');
+  if (uncheckedSafety.length > 0) {
+    missing.push(`「工安提醒與確認」：尚未勾選 ${uncheckedSafety.join('、')}`);
+  }
+
+  if (missing.length > 0) {
+    return res.status(400).json({
+      error: `工具箱會議資料尚未完整，請補齊以下項目後再送出：\n• ${missing.join('\n• ')}`,
+      missingFields: missing,
+    });
   }
 
   const photoPaths = files.map(file => `/uploads/toolbox/${file.filename}`);
-
   const isAdmin = Boolean(req.user.level && req.user.level >= 100);
+  const cleanedRecorderId = cleanOptionalId(recorder_id);
 
   try {
     const meeting = await prisma.toolboxMeeting.create({
       data: {
-          project_id,
-          dispatch_order_id: dispatch_order_id || null,
-          module_type: module_type || 'ONSITE',
-          record_date: new Date(record_date),
-          recorder_id: isAdmin && recorder_id ? recorder_id : req.user.id,
-          worker_count: parseInt(worker_count) || 0,
-          work_category,
-          work_content,
-          safety_check_1: safety_check_1 === 'true',
-          safety_check_2: safety_check_2 === 'true',
-          safety_check_3: safety_check_3 === 'true',
-          work_area: work_area || '',
-          other_risks: other_risks || '',
-          work_items: work_items ? JSON.parse(work_items) : [],
-          hazards: hazards ? JSON.parse(hazards) : [],
-          safety_measures: safety_measures ? JSON.parse(safety_measures) : [],
-          equipments: equipments ? JSON.parse(equipments) : [],
-          signatures: signatures ? JSON.parse(signatures) : [],
-          photos: JSON.stringify(photoPaths)
-        }
-    });
-    res.json(meeting);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: '建立會議紀錄失敗' });
-  }
-});
-
-
-// Update toolbox meeting
-router.put('/:id', authenticateToken, upload.array('photos', 5), async (req: AuthRequest, res) => {
-  if (!req.user) return res.status(401).json({ error: '未授權' });
-
-  const { id } = req.params;
-  const { project_id, dispatch_order_id, record_date, recorder_id, worker_count, work_category, work_content, safety_check_1, safety_check_2, safety_check_3, work_area, work_items, hazards, safety_measures, other_risks, signatures, equipments } = req.body;
-  const isAdmin = Boolean(req.user.level && req.user.level >= 100);
-
-  try {
-    const existing = await prisma.toolboxMeeting.findUnique({ where: { id: id as string } });
-    if (!existing) return res.status(404).json({ error: '找不到會議紀錄' });
-    if (!isAdmin && existing.recorder_id !== req.user.id) {
-      return res.status(403).json({ error: '權限不足，僅能編輯本人建立之紀錄' });
-    }
-
-    const dataToUpdate: any = {
-        project_id,
-        dispatch_order_id: dispatch_order_id || null,
+        project_id: cleanedProjectId,
+        dispatch_order_id: cleanedDispatchId,
+        module_type: module_type || 'ONSITE',
         record_date: new Date(record_date),
-        recorder_id: isAdmin && recorder_id ? recorder_id : existing.recorder_id,
+        recorder_id: isAdmin && cleanedRecorderId ? cleanedRecorderId : req.user.id,
         worker_count: parseInt(worker_count) || 0,
-        work_category,
-        work_content,
+        work_category: String(work_category).trim(),
+        work_content: String(work_content).trim(),
         safety_check_1: safety_check_1 === 'true' || safety_check_1 === true,
         safety_check_2: safety_check_2 === 'true' || safety_check_2 === true,
         safety_check_3: safety_check_3 === 'true' || safety_check_3 === true,
         work_area: work_area || '',
         other_risks: other_risks || '',
-        work_items: work_items ? JSON.parse(work_items) : [],
-        hazards: hazards ? JSON.parse(hazards) : [],
-        safety_measures: safety_measures ? JSON.parse(safety_measures) : [],
-        equipments: equipments ? JSON.parse(equipments) : [],
-        signatures: signatures ? JSON.parse(signatures) : []
-      };
+        work_items: parsedWorkItems,
+        hazards: safeJsonParse(hazards, []),
+        safety_measures: safeJsonParse(safety_measures, []),
+        equipments: safeJsonParse(equipments, []),
+        signatures: safeJsonParse(signatures, []),
+        photos: JSON.stringify(photoPaths)
+      }
+    });
+    res.json(meeting);
+  } catch (error: any) {
+    console.error(error);
+    const detail =
+      error?.code === 'P2003'
+        ? '關聯資料（專案、派工單或記錄人員）不存在或已被刪除，請重新選擇後再試'
+        : error?.message || '資料庫寫入異常';
+    res.status(500).json({ error: `建立工具箱會議紀錄失敗：${detail}`, details: error?.message });
+  }
+});
 
-    const files = req.files as Express.Multer.File[];
+
+// Update toolbox meeting
+router.put('/:id', authenticateToken, upload.array('photos', 20), async (req: AuthRequest, res) => {
+  if (!req.user) return res.status(401).json({ error: '登入已過期或未授權，請重新登入後再試' });
+
+  const { id } = req.params;
+  const {
+    project_id,
+    dispatch_order_id,
+    module_type,
+    record_date,
+    recorder_id,
+    worker_count,
+    work_category,
+    work_content,
+    safety_check_1,
+    safety_check_2,
+    safety_check_3,
+    work_area,
+    work_items,
+    hazards,
+    safety_measures,
+    other_risks,
+    signatures,
+    equipments
+  } = req.body;
+  const isAdmin = Boolean(req.user.level && req.user.level >= 100);
+
+  try {
+    const existing = await prisma.toolboxMeeting.findUnique({ where: { id: id as string } });
+    if (!existing) return res.status(404).json({ error: '找不到該筆工具箱會議紀錄，可能已被刪除' });
+    if (!isAdmin && existing.recorder_id !== req.user.id) {
+      return res.status(403).json({ error: '權限不足，僅能編輯本人建立之紀錄' });
+    }
+
+    const isMfg = (module_type || existing.module_type) === 'MANUFACTURING';
+    const parsedWorkItems = safeJsonParse(work_items, []);
+    const cleanedProjectId = cleanOptionalId(project_id);
+    const cleanedDispatchId = cleanOptionalId(dispatch_order_id);
+    const cleanedRecorderId = cleanOptionalId(recorder_id);
+    const missing: string[] = [];
+
+    if (isMfg) {
+      if (!Array.isArray(parsedWorkItems) || parsedWorkItems.filter((w: any) => w?.name).length === 0) {
+        missing.push('「工作內容」：請至少選擇一筆今日生產之「專案與派工單號」');
+      }
+    } else if (!cleanedProjectId) {
+      missing.push('「專案代碼」：請選擇所屬專案');
+    }
+    if (!record_date || Number.isNaN(new Date(record_date).getTime())) {
+      missing.push('「會議日期」：請選擇有效的會議日期');
+    }
+    if (!worker_count || parseInt(worker_count) <= 0) {
+      missing.push('「上工人數」：請填寫大於 0 的上工人數');
+    }
+    if (!work_category || String(work_category).trim() === '') {
+      missing.push('「工程類別」：請至少勾選一項工程類別');
+    }
+    if (!work_content || String(work_content).trim() === '') {
+      missing.push('「今日工作內容」：請填寫今日工作內容簡述');
+    }
+    const files = (req.files as Express.Multer.File[]) || [];
+    if (files.length === 1) {
+      missing.push('「會議照片」：若要重新上傳更新照片，必須上傳至少 2 張（目前已選 1 張）');
+    }
+
+    if (missing.length > 0) {
+      return res.status(400).json({
+        error: `更新工具箱會議資料尚未完整，請修正以下項目：\n• ${missing.join('\n• ')}`,
+        missingFields: missing,
+      });
+    }
+
+    const dataToUpdate: any = {
+      project_id: cleanedProjectId,
+      dispatch_order_id: cleanedDispatchId,
+      record_date: new Date(record_date),
+      recorder_id: isAdmin && cleanedRecorderId ? cleanedRecorderId : existing.recorder_id,
+      worker_count: parseInt(worker_count) || 0,
+      work_category: String(work_category).trim(),
+      work_content: String(work_content).trim(),
+      safety_check_1: safety_check_1 === 'true' || safety_check_1 === true,
+      safety_check_2: safety_check_2 === 'true' || safety_check_2 === true,
+      safety_check_3: safety_check_3 === 'true' || safety_check_3 === true,
+      work_area: work_area || '',
+      other_risks: other_risks || '',
+      work_items: parsedWorkItems,
+      hazards: safeJsonParse(hazards, []),
+      safety_measures: safeJsonParse(safety_measures, []),
+      equipments: safeJsonParse(equipments, []),
+      signatures: safeJsonParse(signatures, [])
+    };
+
     if (files && files.length >= 2) {
       dataToUpdate.photos = JSON.stringify(files.map(file => `/uploads/toolbox/${file.filename}`));
     }
@@ -150,9 +284,13 @@ router.put('/:id', authenticateToken, upload.array('photos', 5), async (req: Aut
       data: dataToUpdate
     });
     res.json(meeting);
-  } catch (error) {
+  } catch (error: any) {
     console.error(error);
-    res.status(500).json({ error: '更新會議紀錄失敗' });
+    const detail =
+      error?.code === 'P2003'
+        ? '關聯資料（專案、派工單或記錄人員）不存在或已被刪除，請重新選擇後再試'
+        : error?.message || '資料庫更新異常';
+    res.status(500).json({ error: `更新工具箱會議紀錄失敗：${detail}`, details: error?.message });
   }
 });
 

@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
-import { LogOut, LayoutDashboard, FolderKanban, Shield, BarChart2, Settings, CheckSquare, Network, Briefcase, Smartphone, Monitor, Menu, Calculator, Lightbulb, ClipboardList, Factory, Key } from 'lucide-react';
+import { LogOut, LayoutDashboard, FolderKanban, Shield, BarChart2, Settings, CheckSquare, Network, Briefcase, Smartphone, Monitor, Menu, Calculator, Lightbulb, ClipboardList, Factory, Key, Terminal } from 'lucide-react';
 import clsx from 'clsx';
 import { useState } from 'react';
 import NotificationCenter from './NotificationCenter';
@@ -38,6 +38,7 @@ const Layout = ({ children }: { children: ReactNode }) => {
     navItems.push({ name: '帳號管理', path: '/users', icon: Shield });
     navItems.push({ name: '系統設定', path: '/settings', icon: Settings });
     navItems.push({ name: '流程引擎', path: '/workflow-builder', icon: Network });
+    navItems.push({ name: '後臺紀錄', path: '/system-logs', icon: Terminal });
   }
 
   if (loginSystem === '2') {

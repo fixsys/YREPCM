@@ -622,18 +622,82 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
   const handleToolboxSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
-    if (!editingToolboxId && toolboxPhotos.length < 2) {
-      return alert('必須上傳至少2張會議照片才能送出！');
-    }
-    if (!toolboxForm.safety_check_1 || !toolboxForm.safety_check_2 || !toolboxForm.safety_check_3) {
-      return alert('請確認所有工安提醒項目皆已勾選！');
-    }
+
+    const missing: string[] = [];
     const validToolboxWorkItems = isManufacturing
       ? (toolboxForm.work_items || []).filter((w: any) => w && w.name && String(w.name).trim() !== '')
-      : toolboxForm.work_items;
+      : (toolboxForm.work_items || []);
 
-    if (isManufacturing && validToolboxWorkItems.length === 0) {
-      return alert('請至少選擇一筆今日參與生產的「專案 / 派工單號」！');
+    if (isManufacturing) {
+      if (validToolboxWorkItems.length === 0) {
+        missing.push('「工作內容」：請至少選擇一筆今日參與生產的「專案與派工單號」');
+      } else {
+        (toolboxForm.work_items || []).forEach((row: any, idx: number) => {
+          if (row?.project_id) {
+            const projOrders = dispatchOrders.filter((o: any) => String(o.project_id) === String(row.project_id));
+            if (projOrders.length > 0 && !row.dispatch_order_id) {
+              missing.push(`「工作內容」第 ${idx + 1} 列：已選擇專案，請接著選擇「該專案派工單號」`);
+            }
+          }
+        });
+      }
+    } else if (!toolboxForm.project_id) {
+      missing.push('「專案代碼」：請選擇所屬專案');
+    }
+
+    if (!toolboxForm.record_date) {
+      missing.push('「會議日期」：請填寫會議日期');
+    }
+
+    const workerCountNum = parseInt(toolboxForm.worker_count || '0', 10);
+    if (!toolboxForm.worker_count || Number.isNaN(workerCountNum) || workerCountNum <= 0) {
+      missing.push('「上工人數」：請填寫大於 0 的上工人數');
+    }
+
+    if (!toolboxForm.work_category || String(toolboxForm.work_category).trim() === '') {
+      missing.push('「工程類別」：請至少勾選一項工程類別');
+    }
+
+    if (!toolboxForm.work_content || String(toolboxForm.work_content).trim() === '') {
+      missing.push('「今日工作內容」：請填寫今日工作內容簡述');
+    }
+
+    if (!toolboxForm.work_area || toolboxForm.work_area === '其他填寫...') {
+      missing.push('「施工區域」：請選擇施工區域（若選「其他」請填寫區域說明）');
+    }
+
+    if (!isManufacturing && validToolboxWorkItems.length === 0) {
+      missing.push('「詳細作業內容 — 工作內容」：請至少勾選一項工作項目');
+    }
+
+    if (workerCountNum > 0) {
+      const missingSigNums: number[] = [];
+      for (let i = 0; i < workerCountNum; i++) {
+        if (!toolboxForm.signatures?.[i]) {
+          missingSigNums.push(i + 1);
+        }
+      }
+      if (missingSigNums.length > 0) {
+        missing.push(`「現場施工人員簽名」：上工人數為 ${workerCountNum} 人，尚缺第 ${missingSigNums.join('、')} 位人員簽名`);
+      }
+    }
+
+    if (!editingToolboxId && toolboxPhotos.length < 2) {
+      missing.push(`「會議照片上傳」：必須上傳至少 2 張照片（目前已選 ${toolboxPhotos.length} 張，還差 ${2 - toolboxPhotos.length} 張）`);
+    } else if (editingToolboxId && toolboxPhotos.length === 1) {
+      missing.push('「會議照片上傳」：若要更新照片，必須上傳至少 2 張（目前已選 1 張，不更新請移除）');
+    }
+
+    const uncheckedSafety: string[] = [];
+    if (!toolboxForm.safety_check_1) uncheckedSafety.push('第 1 項 (危害告知與安全作業說明)');
+    if (!toolboxForm.safety_check_2) uncheckedSafety.push('第 2 項 (禁酒、安全帽及安全鞋確認)');
+    if (!toolboxForm.safety_check_3) uncheckedSafety.push('第 3 項 (了解工作內容與緊急應變)');
+    if (uncheckedSafety.length > 0) {
+      missing.push(`「工安提醒與確認」：請勾選 ${uncheckedSafety.join('、')}`);
+    }
+
+    if (missing.length > 0) {
+      return alert(`⚠️ 工具箱會議尚有欄位未完成，請補齊或修正以下項目：\n\n• ${missing.join('\n• ')}`);
     }
 
     setIsSubmitting(true);
@@ -650,7 +714,7 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
     Object.entries({ ...toolboxForm, project_id: resolvedProjectId, work_items: validToolboxWorkItems }).forEach(([key, val]) => {
       if (key === 'equipments') {
         formData.append(key, JSON.stringify((val as any[]).filter(e => e.name && e.quantity > 0)));
-      } else {
+      } else if (val !== null && val !== undefined) {
         formData.append(key, typeof val === 'object' ? JSON.stringify(val) : String(val));
       }
     });
@@ -666,8 +730,9 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
       setToolboxPhotos([]);
       fetchData();
       alert('工具箱會議紀錄已成功送出！');
-    } catch (err) {
-      alert(editingToolboxId ? '更新工具箱會議失敗' : '新增工具箱會議失敗');
+    } catch (err: any) {
+      const serverMsg = err?.response?.data?.error;
+      alert(serverMsg || `${editingToolboxId ? '更新工具箱會議失敗' : '新增工具箱會議失敗'}：${err?.message || '請檢查網路連線或聯絡管理員'}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -753,11 +818,72 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
   const handleLaborSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
-    if (!laborForm.drawing_check_confirmed) {
-      return alert('未確認不得正式保存施工日報');
+
+    const missing: string[] = [];
+
+    if (isManufacturing && !laborForm.dispatch_order_id) {
+      missing.push('「派工單號」：請選擇製造生產派工單號');
     }
-    if ((laborPhotosClose.length < 2 || laborPhotosMid.length < 2 || laborPhotosFar.length < 2) && !editingLaborId) {
-      return alert('近照、中距離照、遠距照皆須至少上傳 2 張');
+    if (!laborForm.project_id) {
+      missing.push('「專案代碼」：請選擇所屬專案');
+    }
+    if (!laborForm.report_date) {
+      missing.push('「報工日期」：請選擇報工日期');
+    }
+    if (!laborForm.weather) {
+      missing.push('「天氣狀況」：請選擇天氣狀況');
+    }
+
+    const filledWorkItems = workItems.filter(w => w.name && String(w.progress || '').trim() !== '');
+    if (filledWorkItems.length === 0) {
+      missing.push(
+        `「工作類別與工項進度」：請至少選擇一項施工工項並填寫「${
+          isManufacturing ? '今日生產數量 / 今日完成度' : '今日完成數量 / 今日完成度'
+        }」`
+      );
+    } else {
+      workItems.forEach((w, idx) => {
+        if (w.name && String(w.progress || '').trim() === '') {
+          missing.push(
+            `「工作類別與工項進度」第 ${idx + 1} 列（${normalizeItemKey(w.name)}）：尚未填寫今日數量或完成度（若今日未施作請移除該列）`
+          );
+        }
+      });
+    }
+
+    if (!laborForm.drawing_number || String(laborForm.drawing_number).trim() === '') {
+      missing.push('「圖說確認 — 圖號」：請勾選或填寫核對之圖號 / BOM表檔名');
+    }
+    if (!laborForm.drawing_check_confirmed) {
+      missing.push('「圖說確認」：請勾選底部「我已核對核准圖號、最新版次、尺寸、高程及施工位置，確認結果如上」');
+    }
+
+    if (!editingLaborId) {
+      if (laborPhotosClose.length < 2) {
+        missing.push(`「施工照片 — 近照」：至少需上傳 2 張（目前已選 ${laborPhotosClose.length} 張，還差 ${2 - laborPhotosClose.length} 張）`);
+      }
+      if (laborPhotosMid.length < 2) {
+        missing.push(`「施工照片 — 中距離照」：至少需上傳 2 張（目前已選 ${laborPhotosMid.length} 張，還差 ${2 - laborPhotosMid.length} 張）`);
+      }
+      if (laborPhotosFar.length < 2) {
+        missing.push(`「施工照片 — 遠距照」：至少需上傳 2 張（目前已選 ${laborPhotosFar.length} 張，還差 ${2 - laborPhotosFar.length} 張）`);
+      }
+    }
+
+    const uncheckedSafety: string[] = [];
+    if (!laborForm.safety_check_1) uncheckedSafety.push('第 1 項 (已落實勤前教育、危害告知與工具箱會議)');
+    if (!laborForm.safety_check_2) uncheckedSafety.push('第 2 項 (人員已確實配戴個人防護具)');
+    if (!laborForm.safety_check_3) uncheckedSafety.push('第 3 項 (施工環境安全檢查無虞，動線及防護設施已就位)');
+    if (uncheckedSafety.length > 0) {
+      missing.push(`「工安確認」：請勾選 ${uncheckedSafety.join('、')}`);
+    }
+
+    if (!laborForm.tomorrow_plan || String(laborForm.tomorrow_plan).trim() === '') {
+      missing.push('「明日工作規劃」：請填寫明日預計進行的工作內容與派工規劃');
+    }
+
+    if (missing.length > 0) {
+      return alert(`⚠️ ${dailyLabel}尚有欄位未完成，請補齊或修正以下項目：\n\n• ${missing.join('\n• ')}`);
     }
 
     // 檢查是否有任何工項累計完成數量超過目標數量 (若無目標數量則以目標完成度 100% 為上限)
@@ -795,7 +921,9 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
       const formData = new FormData();
       formData.append('module_type', mode);
       Object.entries(laborForm).forEach(([key, value]) => {
-        formData.append(key, String(value));
+        if (value !== null && value !== undefined) {
+          formData.append(key, String(value));
+        }
       });
       formData.append('engineers', JSON.stringify(engineers.filter(e => e)));
       formData.append('dispatch_workers', JSON.stringify(dispatchWorkers.filter(w => w.name && w.start_time && w.end_time)));
@@ -843,8 +971,9 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
       setIsLaborModalOpen(false);
       fetchData();
       alert(`${dailyLabel}紀錄已成功送出！`);
-    } catch (err) {
-      alert(editingLaborId ? `更新${dailyLabel}失敗` : `新增${dailyLabel}失敗`);
+    } catch (err: any) {
+      const serverMsg = err?.response?.data?.error;
+      alert(serverMsg || `${editingLaborId ? `更新${dailyLabel}失敗` : `新增${dailyLabel}失敗`}：${err?.message || '請檢查網路連線或聯絡管理員'}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -1252,7 +1381,7 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
               <button onClick={() => setIsToolboxModalOpen(false)} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
             </div>
             <div className="p-6 overflow-y-auto flex-1">
-              <form id="toolboxForm" onSubmit={handleToolboxSubmit} className="space-y-4">
+              <form id="toolboxForm" noValidate onSubmit={handleToolboxSubmit} className="space-y-4">
                 <div className="grid grid-cols-1 gap-4">
                   {!isManufacturing && (
                     <div>
@@ -1804,7 +1933,7 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
               <button onClick={() => setIsLaborModalOpen(false)} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
             </div>
             <div className="p-6 overflow-y-auto flex-1">
-              <form id="laborForm" onSubmit={handleLaborSubmit} className="space-y-4">
+              <form id="laborForm" noValidate onSubmit={handleLaborSubmit} className="space-y-4">
                 <div className="grid grid-cols-1 gap-4">
                   {isManufacturing && (
                     <div className="bg-amber-50/70 border border-amber-200 p-3.5 rounded-lg">

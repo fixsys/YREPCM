@@ -17,6 +17,7 @@ import budgetRoutes from './routes/budget';
 import toolboxMeetingsRoutes from './routes/toolboxMeetings';
 import laborReportsRoutes from './routes/laborReports';
 import dispatchOrdersRoutes from './routes/dispatchOrders';
+import systemLogsRoutes, { systemAuditMiddleware } from './routes/systemLogs';
 import path from 'path';
 
 dotenv.config();
@@ -26,6 +27,7 @@ const port = process.env.PORT || 3001;
 
 app.use(cors());
 app.use(express.json());
+app.use(systemAuditMiddleware);
 
 // 靜態檔案服務 (供前端讀取上傳的圖片)
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
@@ -47,6 +49,7 @@ app.use('/api/budget', budgetRoutes);
 app.use('/api/toolbox-meetings', toolboxMeetingsRoutes);
 app.use('/api/labor-reports', laborReportsRoutes);
 app.use('/api/dispatch-orders', dispatchOrdersRoutes);
+app.use('/api/system-logs', systemLogsRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });

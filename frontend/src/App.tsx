@@ -18,6 +18,7 @@ import LeadDetail from './pages/crm/LeadDetail';
 import SimulatorsDashboard from './pages/SimulatorsDashboard';
 import SolarModuleSim from './pages/SolarModuleSim';
 import Onsite from './pages/Onsite';
+import SystemLogs from './pages/SystemLogs';
 
 const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
   const { token, requirePasswordChange } = useAuthStore();
@@ -57,6 +58,7 @@ function App() {
                 <Route path="/simulators" element={<SimulatorsDashboard />} />
                 <Route path="/simulators/solar" element={<SolarModuleSim />} />
                 <Route path="/workflow-builder" element={(user?.level && user.level >= 100) ? <WorkflowBuilder /> : <Navigate to="/" />} />
+                <Route path="/system-logs" element={(user?.level && user.level >= 100) ? <SystemLogs /> : <Navigate to="/" />} />
                 <Route path="*" element={<Navigate to="/" />} />
               </Routes>
             </Layout>

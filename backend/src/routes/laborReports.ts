@@ -59,22 +59,64 @@ router.get('/', authenticateToken, async (req: AuthRequest, res) => {
   }
 });
 
+const cleanOptionalId = (val: any): string | null => {
+  if (!val || val === 'undefined' || val === 'null' || String(val).trim() === '') return null;
+  return String(val).trim();
+};
+
+const safeJsonParse = (val: any, fallback: any = null) => {
+  if (!val) return fallback;
+  if (typeof val === 'object') return val;
+  try {
+    return JSON.parse(String(val));
+  } catch {
+    return fallback;
+  }
+};
+
 // Create daily labor report
 router.post('/', authenticateToken, upload.any(), async (req: AuthRequest, res) => {
-  if (!req.user) return res.status(401).json({ error: '未授權' });
+  if (!req.user) return res.status(401).json({ error: '登入已過期或未授權，請重新登入後再試' });
 
-  const { project_id, dispatch_order_id, module_type, report_date, weather, recorder_id, pm_id, engineers, dispatch_workers, equipments, work_category, work_items, drawing_number, drawing_revision, construction_location, drawing_check_result, drawing_check_confirmed, safety_check_1, safety_check_2, safety_check_3, tomorrow_plan, additional_notes } = req.body;
-  if (!project_id) return res.status(400).json({ error: '必須選擇專案' });
+  const {
+    project_id,
+    dispatch_order_id,
+    module_type,
+    report_date,
+    weather,
+    recorder_id,
+    pm_id,
+    engineers,
+    dispatch_workers,
+    equipments,
+    work_category,
+    work_items,
+    drawing_number,
+    drawing_revision,
+    construction_location,
+    drawing_check_result,
+    drawing_check_confirmed,
+    safety_check_1,
+    safety_check_2,
+    safety_check_3,
+    tomorrow_plan,
+    additional_notes
+  } = req.body;
 
-  let parsedWorkItems = work_items ? JSON.parse(work_items) : null;
-  
+  const isMfg = module_type === 'MANUFACTURING';
+  const cleanedProjectId = cleanOptionalId(project_id);
+  const cleanedDispatchId = cleanOptionalId(dispatch_order_id);
+  const cleanedPmId = cleanOptionalId(pm_id);
+  const cleanedRecorderId = cleanOptionalId(recorder_id);
+  let parsedWorkItems = safeJsonParse(work_items, []);
+
   let photosObj: any = { close: [], mid: [], far: [], other: [] };
   let hasPhotos = false;
   if (req.files) {
     const files = req.files as Express.Multer.File[];
     files.forEach(file => {
       const match = file.fieldname.match(/^inspection_photo_(\d+)$/);
-      if (match && parsedWorkItems) {
+      if (match && Array.isArray(parsedWorkItems)) {
         const idx = parseInt(match[1]);
         if (parsedWorkItems[idx] && parsedWorkItems[idx].inspection) {
           parsedWorkItems[idx].inspection.photo = `/uploads/labor/${file.filename}`;
@@ -97,60 +139,137 @@ router.post('/', authenticateToken, upload.any(), async (req: AuthRequest, res) 
     });
   }
 
+  const missing: string[] = [];
+  if (isMfg && !cleanedDispatchId) {
+    missing.push('「派工單號」：請選擇製造生產派工單號');
+  }
+  if (!cleanedProjectId) {
+    missing.push('「專案代碼」：請選擇所屬專案');
+  }
+  if (!report_date || Number.isNaN(new Date(report_date).getTime())) {
+    missing.push('「報工日期」：請選擇有效的報工日期');
+  }
+  if (!weather || String(weather).trim() === '') {
+    missing.push('「天氣狀況」：請選擇天氣狀況');
+  }
+  if (!Array.isArray(parsedWorkItems) || parsedWorkItems.length === 0) {
+    missing.push('「工作類別與工項進度」：請至少新增一項施工工項並填寫今日完成數量/完成度');
+  }
+  if (drawing_check_confirmed !== true && drawing_check_confirmed !== 'true') {
+    missing.push('「圖說確認」：請勾選「我已核對核准圖號、最新版次、尺寸、高程及施工位置，確認結果如上」');
+  }
+  if (photosObj.close.length < 2) {
+    missing.push(`「施工照片 — 近照」：至少需上傳 2 張（目前已選 ${photosObj.close.length} 張，還差 ${2 - photosObj.close.length} 張）`);
+  }
+  if (photosObj.mid.length < 2) {
+    missing.push(`「施工照片 — 中距離照」：至少需上傳 2 張（目前已選 ${photosObj.mid.length} 張，還差 ${2 - photosObj.mid.length} 張）`);
+  }
+  if (photosObj.far.length < 2) {
+    missing.push(`「施工照片 — 遠距照」：至少需上傳 2 張（目前已選 ${photosObj.far.length} 張，還差 ${2 - photosObj.far.length} 張）`);
+  }
+  const uncheckedSafety: string[] = [];
+  if (safety_check_1 !== true && safety_check_1 !== 'true') uncheckedSafety.push('第 1 項 (勤前教育與工具箱會議)');
+  if (safety_check_2 !== true && safety_check_2 !== 'true') uncheckedSafety.push('第 2 項 (個人防護具配戴)');
+  if (safety_check_3 !== true && safety_check_3 !== 'true') uncheckedSafety.push('第 3 項 (施工環境安全與防護設施)');
+  if (uncheckedSafety.length > 0) {
+    missing.push(`「工安確認」：尚未勾選 ${uncheckedSafety.join('、')}`);
+  }
+  if (!tomorrow_plan || String(tomorrow_plan).trim() === '') {
+    missing.push('「明日工作規劃」：請填寫明日預計進行的工作內容');
+  }
+
+  if (missing.length > 0) {
+    return res.status(400).json({
+      error: `報工資料尚未完整，請補齊以下項目後再送出：\n• ${missing.join('\n• ')}`,
+      missingFields: missing,
+    });
+  }
+
   const isAdmin = Boolean(req.user.level && req.user.level >= 100);
 
   try {
     const report = await prisma.dailyLaborReport.create({
       data: {
-        project_id,
-        dispatch_order_id: dispatch_order_id || null,
+        project_id: cleanedProjectId,
+        dispatch_order_id: cleanedDispatchId,
         module_type: module_type || 'ONSITE',
         report_date: new Date(report_date),
-        weather,
-        recorder_id: isAdmin && recorder_id ? recorder_id : req.user.id,
-        pm_id,
-        engineers: engineers ? JSON.parse(engineers) : null,
-        dispatch_workers: dispatch_workers ? JSON.parse(dispatch_workers) : null,
-        equipments: equipments ? JSON.parse(equipments) : null,
-        work_category,
+        weather: String(weather).trim(),
+        recorder_id: isAdmin && cleanedRecorderId ? cleanedRecorderId : req.user.id,
+        pm_id: cleanedPmId,
+        engineers: safeJsonParse(engineers, []),
+        dispatch_workers: safeJsonParse(dispatch_workers, []),
+        equipments: safeJsonParse(equipments, []),
+        work_category: work_category || '一般工程',
         work_items: parsedWorkItems,
-        drawing_number,
-        drawing_revision,
-        construction_location,
-        drawing_check_result,
+        drawing_number: drawing_number || '',
+        drawing_revision: drawing_revision || '',
+        construction_location: construction_location || '',
+        drawing_check_result: drawing_check_result || '符合圖說',
         drawing_check_confirmed: drawing_check_confirmed === true || drawing_check_confirmed === 'true',
         safety_check_1: safety_check_1 === true || safety_check_1 === 'true',
         safety_check_2: safety_check_2 === true || safety_check_2 === 'true',
         safety_check_3: safety_check_3 === true || safety_check_3 === 'true',
-        tomorrow_plan,
-        additional_notes,
+        tomorrow_plan: String(tomorrow_plan).trim(),
+        additional_notes: additional_notes || '',
         photos: hasPhotos ? JSON.stringify(photosObj) : undefined
       }
     });
     res.json(report);
-  } catch (error) {
+  } catch (error: any) {
     console.error(error);
-    res.status(500).json({ error: '建立報工紀錄失敗' });
+    const detail =
+      error?.code === 'P2003'
+        ? '關聯資料（專案、派工單、工務經理或記錄人員）不存在或已被刪除，請重新選擇後再試'
+        : error?.message || '資料庫寫入異常';
+    res.status(500).json({ error: `建立報工紀錄失敗：${detail}`, details: error?.message });
   }
 });
 
 
 // Update labor report
 router.put('/:id', authenticateToken, upload.any(), async (req: AuthRequest, res) => {
-  if (!req.user) return res.status(401).json({ error: '未授權' });
+  if (!req.user) return res.status(401).json({ error: '登入已過期或未授權，請重新登入後再試' });
 
   const { id } = req.params;
-  const { project_id, dispatch_order_id, report_date, weather, recorder_id, pm_id, engineers, dispatch_workers, equipments, work_category, work_items, drawing_number, drawing_revision, construction_location, drawing_check_result, drawing_check_confirmed, safety_check_1, safety_check_2, safety_check_3, tomorrow_plan, additional_notes } = req.body;
+  const {
+    project_id,
+    dispatch_order_id,
+    module_type,
+    report_date,
+    weather,
+    recorder_id,
+    pm_id,
+    engineers,
+    dispatch_workers,
+    equipments,
+    work_category,
+    work_items,
+    drawing_number,
+    drawing_revision,
+    construction_location,
+    drawing_check_result,
+    drawing_check_confirmed,
+    safety_check_1,
+    safety_check_2,
+    safety_check_3,
+    tomorrow_plan,
+    additional_notes
+  } = req.body;
 
-  let parsedWorkItems = work_items ? JSON.parse(work_items) : null;
-  
+  const cleanedProjectId = cleanOptionalId(project_id);
+  const cleanedDispatchId = cleanOptionalId(dispatch_order_id);
+  const cleanedPmId = cleanOptionalId(pm_id);
+  const cleanedRecorderId = cleanOptionalId(recorder_id);
+  let parsedWorkItems = safeJsonParse(work_items, []);
+
   let photosObj: any = { close: [], mid: [], far: [], other: [] };
   let hasPhotos = false;
   if (req.files) {
     const files = req.files as Express.Multer.File[];
     files.forEach(file => {
       const match = file.fieldname.match(/^inspection_photo_(\d+)$/);
-      if (match && parsedWorkItems) {
+      if (match && Array.isArray(parsedWorkItems)) {
         const idx = parseInt(match[1]);
         if (parsedWorkItems[idx] && parsedWorkItems[idx].inspection) {
           parsedWorkItems[idx].inspection.photo = `/uploads/labor/${file.filename}`;
@@ -177,49 +296,81 @@ router.put('/:id', authenticateToken, upload.any(), async (req: AuthRequest, res
 
   try {
     const existing = await prisma.dailyLaborReport.findUnique({ where: { id: id as string } });
-    if (!existing) return res.status(404).json({ error: '找不到報工紀錄' });
+    if (!existing) return res.status(404).json({ error: '找不到該筆報工紀錄，可能已被刪除' });
     if (!isAdmin && existing.recorder_id !== req.user.id) {
       return res.status(403).json({ error: '權限不足，僅能編輯本人建立之紀錄' });
+    }
+
+    const isMfg = (module_type || existing.module_type) === 'MANUFACTURING';
+    const missing: string[] = [];
+    if (isMfg && !cleanedDispatchId) {
+      missing.push('「派工單號」：請選擇製造生產派工單號');
+    }
+    if (!cleanedProjectId) {
+      missing.push('「專案代碼」：請選擇所屬專案');
+    }
+    if (!report_date || Number.isNaN(new Date(report_date).getTime())) {
+      missing.push('「報工日期」：請選擇有效的報工日期');
+    }
+    if (!Array.isArray(parsedWorkItems) || parsedWorkItems.length === 0) {
+      missing.push('「工作類別與工項進度」：請至少保留一項施工工項並填寫今日完成數量/完成度');
+    }
+    if (drawing_check_confirmed !== true && drawing_check_confirmed !== 'true') {
+      missing.push('「圖說確認」：請勾選「我已核對核准圖號、最新版次、尺寸、高程及施工位置，確認結果如上」');
+    }
+    if (!tomorrow_plan || String(tomorrow_plan).trim() === '') {
+      missing.push('「明日工作規劃」：請填寫明日預計進行的工作內容');
+    }
+
+    if (missing.length > 0) {
+      return res.status(400).json({
+        error: `更新報工資料尚未完整，請修正以下項目：\n• ${missing.join('\n• ')}`,
+        missingFields: missing,
+      });
     }
 
     const report = await prisma.dailyLaborReport.update({
       where: { id: id as string },
       data: {
-        project_id,
-        dispatch_order_id: dispatch_order_id || null,
+        project_id: cleanedProjectId,
+        dispatch_order_id: cleanedDispatchId,
         report_date: new Date(report_date),
-        weather,
-        recorder_id: isAdmin && recorder_id ? recorder_id : existing.recorder_id,
-        pm_id,
-        engineers: engineers ? JSON.parse(engineers) : null,
-        dispatch_workers: dispatch_workers ? JSON.parse(dispatch_workers) : null,
-        equipments: equipments ? JSON.parse(equipments) : null,
-        work_category,
+        weather: weather || existing.weather,
+        recorder_id: isAdmin && cleanedRecorderId ? cleanedRecorderId : existing.recorder_id,
+        pm_id: cleanedPmId,
+        engineers: safeJsonParse(engineers, []),
+        dispatch_workers: safeJsonParse(dispatch_workers, []),
+        equipments: safeJsonParse(equipments, []),
+        work_category: work_category || existing.work_category,
         work_items: parsedWorkItems,
-        drawing_number,
-        drawing_revision,
-        construction_location,
-        drawing_check_result,
+        drawing_number: drawing_number || '',
+        drawing_revision: drawing_revision || '',
+        construction_location: construction_location || '',
+        drawing_check_result: drawing_check_result || '符合圖說',
         drawing_check_confirmed: drawing_check_confirmed === true || drawing_check_confirmed === 'true',
         safety_check_1: safety_check_1 === true || safety_check_1 === 'true',
         safety_check_2: safety_check_2 === true || safety_check_2 === 'true',
         safety_check_3: safety_check_3 === true || safety_check_3 === 'true',
-        tomorrow_plan,
-        additional_notes
+        tomorrow_plan: String(tomorrow_plan).trim(),
+        additional_notes: additional_notes || ''
       } as any
     });
-    
+
     if (hasPhotos) {
       await prisma.dailyLaborReport.update({
         where: { id: id as string },
         data: { photos: JSON.stringify(photosObj) }
       });
     }
-    
+
     res.json(report);
-  } catch (error) {
+  } catch (error: any) {
     console.error(error);
-    res.status(500).json({ error: '更新報工紀錄失敗' });
+    const detail =
+      error?.code === 'P2003'
+        ? '關聯資料（專案、派工單、工務經理或記錄人員）不存在或已被刪除，請重新選擇後再試'
+        : error?.message || '資料庫更新異常';
+    res.status(500).json({ error: `更新報工紀錄失敗：${detail}`, details: error?.message });
   }
 });
 
