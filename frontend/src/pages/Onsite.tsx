@@ -2883,26 +2883,8 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                 </div>
 
                 {isOutsourcedMode ? (
-                  <div className="space-y-4 mt-6">
-                    <div className="bg-teal-50 border border-teal-200 rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-2">
-                      <div>
-                        <h4 className="font-bold text-teal-900 text-base">
-                          施工日誌照片 — 依工程分區上傳 (目前共 {distinctWorkCategories.length} 個工程，必填至少 {distinctWorkCategories.length * 6} 張)
-                        </h4>
-                        <p className="text-xs text-teal-700 mt-0.5">
-                          每個工程區塊各自上傳：近照 2 張＋中距離照 2 張＋遠距照 2 張（共 {distinctWorkCategories.length} 個工程 → 近照*{distinctWorkCategories.length * 2}、中距*{distinctWorkCategories.length * 2}、遠距*{distinctWorkCategories.length * 2}，合計至少 {distinctWorkCategories.length * 6} 張）
-                        </p>
-                      </div>
-                      <div className="bg-orange-100 text-orange-800 font-bold px-3 py-1 rounded-full text-sm shrink-0">
-                        {distinctWorkCategories.reduce((sum, cat) => {
-                          const cp = categoryPhotos[cat] || { close: [], mid: [], far: [] };
-                          return sum + cp.close.length + cp.mid.length + cp.far.length;
-                        }, 0)}{' '}
-                        / {distinctWorkCategories.length * 6} 張
-                      </div>
-                    </div>
-
-                    {distinctWorkCategories.map((cat, catIdx) => {
+                  <div className="space-y-6 mt-6">
+                    {distinctWorkCategories.map((cat) => {
                       const catTitle = cat.endsWith('工程') ? cat : `${cat}工程`;
                       const cp = categoryPhotos[cat] || { close: [], mid: [], far: [] };
                       const catTotal = cp.close.length + cp.mid.length + cp.far.length;
@@ -2921,151 +2903,145 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                       };
 
                       return (
-                        <div key={cat} className="border-2 border-teal-300 bg-teal-50/15 rounded-xl p-4 shadow-sm relative">
-                          <div className={`absolute top-4 right-4 font-bold px-3 py-1 rounded-full text-xs ${
-                            cp.close.length >= 2 && cp.mid.length >= 2 && cp.far.length >= 2
-                              ? 'bg-emerald-100 text-emerald-800'
-                              : 'bg-orange-100 text-orange-800'
-                          }`}>
-                            {catTitle}：{catTotal} / 6 張
+                        <div key={cat} className="border border-teal-200 bg-teal-50/10 rounded-xl p-4 shadow-sm relative">
+                          <div className="absolute top-4 right-4 bg-orange-100 text-orange-800 font-bold px-3 py-1 rounded-full text-sm">
+                            {catTotal} / 6 張
                           </div>
-                          <h4 className="font-bold text-teal-800 mb-1 text-base flex items-center gap-2">
-                            <span className="px-2 py-0.5 bg-teal-600 text-white rounded text-xs">工程區塊 {catIdx + 1}</span>
-                            <span>【{catTitle}】施工日誌照片</span>
-                            <span className="text-xs font-bold text-teal-600">(必填至少 6 張)</span>
+                          <h4 className="font-bold text-teal-800 mb-4 text-lg flex items-center gap-2">
+                            {catTitle} — 施工日誌照片 <span className="text-sm font-bold text-teal-600">(必填至少 6 張)</span>
                           </h4>
-                          <p className="text-xs text-slate-500 mb-3">【{catTitle}】近照至少 2 張＋中距離照至少 2 張＋遠距照至少 2 張</p>
+                          <p className="text-xs text-slate-500 font-normal mb-4">近照 2 張＋中距離 2 張＋遠距離 2 張</p>
 
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                            {/* 該工程近照 */}
-                            <div className="border border-dashed border-teal-300 bg-white rounded-xl p-3">
-                              <h5 className="font-bold text-slate-700 text-sm">【{catTitle}】近照 <span className="text-slate-500 font-normal text-xs">(至少 2 張)</span></h5>
-                              <p className="text-[11px] text-slate-400 mb-2">細部、接點、尺寸或施工品質</p>
-                              <div className="flex gap-1.5">
-                                <label className="flex-1 cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-1.5 px-2 rounded-lg border border-slate-200 text-center text-xs flex items-center justify-center gap-1">
+                          <div className="space-y-4">
+                            {/* 近照 */}
+                            <div className="border border-dashed border-teal-300 bg-white rounded-xl p-4">
+                              <h5 className="font-bold text-slate-700">近照 <span className="text-slate-500 font-normal text-sm">(至少 2 張)</span></h5>
+                              <p className="text-xs text-slate-400 mb-3">細部、接點、尺寸或施工品質</p>
+                              <div className="flex gap-2">
+                                <label className="flex-1 cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg border border-slate-200 text-center text-sm flex items-center justify-center gap-1">
                                   <span>📸</span> 拍照
                                   <input type="file" accept="image/*" capture="environment" onChange={e => {
                                     if (e.target.files) {
                                       const filesArr = Array.from(e.target.files);
                                       updateCatPhotos('close', prev => {
                                         const next = [...prev, ...filesArr];
-                                        if (next.length > 4) { alert(`【${catTitle}】近照最多只能上傳 4 張`); return next.slice(0, 4); }
+                                        if (next.length > 4) { alert('近照最多只能上傳 4 張'); return next.slice(0, 4); }
                                         return next;
                                       });
                                     }
                                   }} className="hidden" />
                                 </label>
-                                <label className="flex-1 cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-1.5 px-2 rounded-lg border border-slate-200 text-center text-xs flex items-center justify-center gap-1">
-                                  <span>🖼️</span> 相簿
+                                <label className="flex-1 cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg border border-slate-200 text-center text-sm flex items-center justify-center gap-1">
+                                  <span>🖼️</span> 從相簿選擇
                                   <input type="file" multiple accept="image/*" onChange={e => {
                                     if (e.target.files) {
                                       const filesArr = Array.from(e.target.files);
                                       updateCatPhotos('close', prev => {
                                         const next = [...prev, ...filesArr];
-                                        if (next.length > 4) { alert(`【${catTitle}】近照最多只能上傳 4 張`); return next.slice(0, 4); }
+                                        if (next.length > 4) { alert('近照最多只能上傳 4 張'); return next.slice(0, 4); }
                                         return next;
                                       });
                                     }
                                   }} className="hidden" />
                                 </label>
                               </div>
-                              <div className={`mt-2 font-bold text-xs ${cp.close.length >= 2 ? 'text-teal-600' : 'text-red-500'}`}>{cp.close.length} / 2 張</div>
+                              <div className={`mt-2 font-bold text-sm ${cp.close.length >= 2 ? 'text-teal-600' : 'text-red-500'}`}>{cp.close.length} / 2 張</div>
                               {cp.close.length > 0 && (
-                                <div className="mt-1.5 flex gap-1.5 flex-wrap">
+                                <div className="mt-2 flex gap-2 flex-wrap">
                                   {cp.close.map((f, i) => (
-                                    <div key={i} className="flex items-center gap-1 text-[11px] px-2 py-0.5 bg-slate-100 rounded text-slate-600">
-                                      <span className="truncate max-w-[90px]">{f.name}</span>
-                                      <button type="button" onClick={() => updateCatPhotos('close', prev => prev.filter((_, idx) => idx !== i))} className="text-red-500 font-bold hover:text-red-700 ml-0.5">×</button>
+                                    <div key={i} className="flex items-center gap-1 text-xs px-2 py-1 bg-slate-100 rounded text-slate-600">
+                                      <span className="truncate max-w-[120px]">{f.name}</span>
+                                      <button type="button" onClick={() => updateCatPhotos('close', prev => prev.filter((_, idx) => idx !== i))} className="text-red-500 font-bold hover:text-red-700 ml-1">×</button>
                                     </div>
                                   ))}
                                 </div>
                               )}
                             </div>
 
-                            {/* 該工程中距離照 */}
-                            <div className="border border-dashed border-teal-300 bg-white rounded-xl p-3">
-                              <h5 className="font-bold text-slate-700 text-sm">【{catTitle}】中距離照 <span className="text-slate-500 font-normal text-xs">(至少 2 張)</span></h5>
-                              <p className="text-[11px] text-slate-400 mb-2">施工人員、工作面與工項範圍</p>
-                              <div className="flex gap-1.5">
-                                <label className="flex-1 cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-1.5 px-2 rounded-lg border border-slate-200 text-center text-xs flex items-center justify-center gap-1">
+                            {/* 中距離照 */}
+                            <div className="border border-dashed border-teal-300 bg-white rounded-xl p-4">
+                              <h5 className="font-bold text-slate-700">中距離照 <span className="text-slate-500 font-normal text-sm">(至少 2 張)</span></h5>
+                              <p className="text-xs text-slate-400 mb-3">施工人員、工作面與工項範圍</p>
+                              <div className="flex gap-2">
+                                <label className="flex-1 cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg border border-slate-200 text-center text-sm flex items-center justify-center gap-1">
                                   <span>📸</span> 拍照
                                   <input type="file" accept="image/*" capture="environment" onChange={e => {
                                     if (e.target.files) {
                                       const filesArr = Array.from(e.target.files);
                                       updateCatPhotos('mid', prev => {
                                         const next = [...prev, ...filesArr];
-                                        if (next.length > 4) { alert(`【${catTitle}】中距離照最多只能上傳 4 張`); return next.slice(0, 4); }
+                                        if (next.length > 4) { alert('中距離照最多只能上傳 4 張'); return next.slice(0, 4); }
                                         return next;
                                       });
                                     }
                                   }} className="hidden" />
                                 </label>
-                                <label className="flex-1 cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-1.5 px-2 rounded-lg border border-slate-200 text-center text-xs flex items-center justify-center gap-1">
-                                  <span>🖼️</span> 相簿
+                                <label className="flex-1 cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg border border-slate-200 text-center text-sm flex items-center justify-center gap-1">
+                                  <span>🖼️</span> 從相簿選擇
                                   <input type="file" multiple accept="image/*" onChange={e => {
                                     if (e.target.files) {
                                       const filesArr = Array.from(e.target.files);
                                       updateCatPhotos('mid', prev => {
                                         const next = [...prev, ...filesArr];
-                                        if (next.length > 4) { alert(`【${catTitle}】中距離照最多只能上傳 4 張`); return next.slice(0, 4); }
+                                        if (next.length > 4) { alert('中距離照最多只能上傳 4 張'); return next.slice(0, 4); }
                                         return next;
                                       });
                                     }
                                   }} className="hidden" />
                                 </label>
                               </div>
-                              <div className={`mt-2 font-bold text-xs ${cp.mid.length >= 2 ? 'text-teal-600' : 'text-red-500'}`}>{cp.mid.length} / 2 張</div>
+                              <div className={`mt-2 font-bold text-sm ${cp.mid.length >= 2 ? 'text-teal-600' : 'text-red-500'}`}>{cp.mid.length} / 2 張</div>
                               {cp.mid.length > 0 && (
-                                <div className="mt-1.5 flex gap-1.5 flex-wrap">
+                                <div className="mt-2 flex gap-2 flex-wrap">
                                   {cp.mid.map((f, i) => (
-                                    <div key={i} className="flex items-center gap-1 text-[11px] px-2 py-0.5 bg-slate-100 rounded text-slate-600">
-                                      <span className="truncate max-w-[90px]">{f.name}</span>
-                                      <button type="button" onClick={() => updateCatPhotos('mid', prev => prev.filter((_, idx) => idx !== i))} className="text-red-500 font-bold hover:text-red-700 ml-0.5">×</button>
+                                    <div key={i} className="flex items-center gap-1 text-xs px-2 py-1 bg-slate-100 rounded text-slate-600">
+                                      <span className="truncate max-w-[120px]">{f.name}</span>
+                                      <button type="button" onClick={() => updateCatPhotos('mid', prev => prev.filter((_, idx) => idx !== i))} className="text-red-500 font-bold hover:text-red-700 ml-1">×</button>
                                     </div>
                                   ))}
                                 </div>
                               )}
                             </div>
 
-                            {/* 該工程遠距照 */}
-                            <div className="border border-dashed border-teal-300 bg-white rounded-xl p-3">
-                              <h5 className="font-bold text-slate-700 text-sm">【{catTitle}】遠距照 <span className="text-slate-500 font-normal text-xs">(至少 2 張)</span></h5>
-                              <p className="text-[11px] text-slate-400 mb-2">案場全景、區域位置與整體進度</p>
-                              <div className="flex gap-1.5">
-                                <label className="flex-1 cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-1.5 px-2 rounded-lg border border-slate-200 text-center text-xs flex items-center justify-center gap-1">
+                            {/* 遠距照 */}
+                            <div className="border border-dashed border-teal-300 bg-white rounded-xl p-4">
+                              <h5 className="font-bold text-slate-700">遠距照 <span className="text-slate-500 font-normal text-sm">(至少 2 張)</span></h5>
+                              <p className="text-xs text-slate-400 mb-3">案場全景、區域位置與整體進度</p>
+                              <div className="flex gap-2">
+                                <label className="flex-1 cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg border border-slate-200 text-center text-sm flex items-center justify-center gap-1">
                                   <span>📸</span> 拍照
                                   <input type="file" accept="image/*" capture="environment" onChange={e => {
                                     if (e.target.files) {
                                       const filesArr = Array.from(e.target.files);
                                       updateCatPhotos('far', prev => {
                                         const next = [...prev, ...filesArr];
-                                        if (next.length > 4) { alert(`【${catTitle}】遠距照最多只能上傳 4 張`); return next.slice(0, 4); }
+                                        if (next.length > 4) { alert('遠距照最多只能上傳 4 張'); return next.slice(0, 4); }
                                         return next;
                                       });
                                     }
                                   }} className="hidden" />
                                 </label>
-                                <label className="flex-1 cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-1.5 px-2 rounded-lg border border-slate-200 text-center text-xs flex items-center justify-center gap-1">
-                                  <span>🖼️</span> 相簿
+                                <label className="flex-1 cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg border border-slate-200 text-center text-sm flex items-center justify-center gap-1">
+                                  <span>🖼️</span> 從相簿選擇
                                   <input type="file" multiple accept="image/*" onChange={e => {
                                     if (e.target.files) {
                                       const filesArr = Array.from(e.target.files);
                                       updateCatPhotos('far', prev => {
                                         const next = [...prev, ...filesArr];
-                                        if (next.length > 4) { alert(`【${catTitle}】遠距照最多只能上傳 4 張`); return next.slice(0, 4); }
+                                        if (next.length > 4) { alert('遠距照最多只能上傳 4 張'); return next.slice(0, 4); }
                                         return next;
                                       });
                                     }
                                   }} className="hidden" />
                                 </label>
                               </div>
-                              <div className={`mt-2 font-bold text-xs ${cp.far.length >= 2 ? 'text-teal-600' : 'text-red-500'}`}>{cp.far.length} / 2 張</div>
+                              <div className={`mt-2 font-bold text-sm ${cp.far.length >= 2 ? 'text-teal-600' : 'text-red-500'}`}>{cp.far.length} / 2 張</div>
                               {cp.far.length > 0 && (
-                                <div className="mt-1.5 flex gap-1.5 flex-wrap">
+                                <div className="mt-2 flex gap-2 flex-wrap">
                                   {cp.far.map((f, i) => (
-                                    <div key={i} className="flex items-center gap-1 text-[11px] px-2 py-0.5 bg-slate-100 rounded text-slate-600">
-                                      <span className="truncate max-w-[90px]">{f.name}</span>
-                                      <button type="button" onClick={() => updateCatPhotos('far', prev => prev.filter((_, idx) => idx !== i))} className="text-red-500 font-bold hover:text-red-700 ml-0.5">×</button>
+                                    <div key={i} className="flex items-center gap-1 text-xs px-2 py-1 bg-slate-100 rounded text-slate-600">
+                                      <span className="truncate max-w-[120px]">{f.name}</span>
+                                      <button type="button" onClick={() => updateCatPhotos('far', prev => prev.filter((_, idx) => idx !== i))} className="text-red-500 font-bold hover:text-red-700 ml-1">×</button>
                                     </div>
                                   ))}
                                 </div>
