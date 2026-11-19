@@ -2758,17 +2758,34 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                         const bomFiles = projectExecFiles.filter(f =>
                           ['Bom表', 'BOM表', '七、Bom表'].includes((f.category || '').trim())
                         );
-                        const selectedNames = (laborForm.drawing_number || '')
-                          .split('、')
-                          .map(s => s.trim())
+                        const allExecFileNames = [...drawingFiles, ...bomFiles]
+                          .map(f => (f.file_name || '').trim())
                           .filter(Boolean);
 
+                        const currentDrawingStr = laborForm.drawing_number || '';
+                        const isFileSelected = (fileName: string) =>
+                          Boolean(fileName && currentDrawingStr.includes(fileName));
+
                         const toggleFileName = (fileName: string) => {
-                          const exists = selectedNames.includes(fileName);
-                          const next = exists
-                            ? selectedNames.filter(n => n !== fileName)
-                            : [...selectedNames, fileName];
-                          setLaborForm({ ...laborForm, drawing_number: next.join('、') });
+                          const currentlySelectedKnown = allExecFileNames.filter(name =>
+                            currentDrawingStr.includes(name)
+                          );
+                          let remainingCustom = currentDrawingStr;
+                          currentlySelectedKnown.forEach(name => {
+                            remainingCustom = remainingCustom.split(name).join('');
+                          });
+                          const customParts = remainingCustom
+                            .split(/\s*(?:｜|\||;|、|,)\s*/)
+                            .map(s => s.trim())
+                            .filter(Boolean);
+
+                          const exists = currentlySelectedKnown.includes(fileName);
+                          const nextKnown = exists
+                            ? currentlySelectedKnown.filter(n => n !== fileName)
+                            : [...currentlySelectedKnown, fileName];
+
+                          const nextAll = [...nextKnown, ...customParts];
+                          setLaborForm({ ...laborForm, drawing_number: nextAll.join(' ｜ ') });
                         };
 
                         if (drawingFiles.length === 0 && bomFiles.length === 0) {
@@ -2780,7 +2797,7 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                         }
 
                         const renderFileRow = (f: any, badgeLabel: string, badgeClass: string) => {
-                          const isChecked = selectedNames.includes(f.file_name);
+                          const isChecked = isFileSelected(f.file_name);
                           return (
                             <div
                               key={f.id}
