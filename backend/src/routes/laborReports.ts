@@ -100,27 +100,50 @@ router.post('/', authenticateToken, upload.any(), async (req: AuthRequest, res) 
     safety_check_2,
     safety_check_3,
     tomorrow_plan,
-    additional_notes
+    additional_notes,
+    report_mode,
+    photo_categories
   } = req.body;
 
   const isMfg = module_type === 'MANUFACTURING';
+  const isOutsourced = !isMfg && report_mode === 'OUTSOURCED';
+  const parsedPhotoCategories: string[] = safeJsonParse(photo_categories, []);
   const cleanedProjectId = cleanOptionalId(project_id);
   const cleanedDispatchId = cleanOptionalId(dispatch_order_id);
   const cleanedPmId = cleanOptionalId(pm_id);
   const cleanedRecorderId = cleanOptionalId(recorder_id);
   let parsedWorkItems = safeJsonParse(work_items, []);
 
-  let photosObj: any = { close: [], mid: [], far: [], other: [] };
-  let hasPhotos = false;
+  let photosObj: any = {
+    report_mode: isOutsourced ? 'OUTSOURCED' : 'STANDARD',
+    close: [],
+    mid: [],
+    far: [],
+    other: [],
+    byCategory: isOutsourced
+      ? parsedPhotoCategories.map((cat: string) => ({ category: cat, close: [], mid: [], far: [] }))
+      : undefined,
+  };
+  let hasPhotos = isOutsourced;
   if (req.files) {
     const files = req.files as Express.Multer.File[];
     files.forEach(file => {
       const match = file.fieldname.match(/^inspection_photo_(\d+)$/);
+      const catMatch = file.fieldname.match(/^cat_photos_(close|mid|far)_(\d+)$/);
       if (match && Array.isArray(parsedWorkItems)) {
         const idx = parseInt(match[1]);
         if (parsedWorkItems[idx] && parsedWorkItems[idx].inspection) {
           parsedWorkItems[idx].inspection.photo = `/uploads/labor/${file.filename}`;
         }
+      } else if (catMatch && photosObj.byCategory) {
+        const pType = catMatch[1] as 'close' | 'mid' | 'far';
+        const cIdx = parseInt(catMatch[2], 10);
+        const url = `/uploads/labor/${file.filename}`;
+        if (photosObj.byCategory[cIdx]) {
+          photosObj.byCategory[cIdx][pType].push(url);
+        }
+        photosObj[pType].push(url);
+        hasPhotos = true;
       } else if (file.fieldname === 'photos_close') {
         photosObj.close.push(`/uploads/labor/${file.filename}`);
         hasPhotos = true;
@@ -158,14 +181,29 @@ router.post('/', authenticateToken, upload.any(), async (req: AuthRequest, res) 
   if (drawing_check_confirmed !== true && drawing_check_confirmed !== 'true') {
     missing.push('「圖說確認」：請勾選「我已核對核准圖號、最新版次、尺寸、高程及施工位置，確認結果如上」');
   }
-  if (photosObj.close.length < 2) {
-    missing.push(`「施工照片 — 近照」：至少需上傳 2 張（目前已選 ${photosObj.close.length} 張，還差 ${2 - photosObj.close.length} 張）`);
-  }
-  if (photosObj.mid.length < 2) {
-    missing.push(`「施工照片 — 中距離照」：至少需上傳 2 張（目前已選 ${photosObj.mid.length} 張，還差 ${2 - photosObj.mid.length} 張）`);
-  }
-  if (photosObj.far.length < 2) {
-    missing.push(`「施工照片 — 遠距照」：至少需上傳 2 張（目前已選 ${photosObj.far.length} 張，還差 ${2 - photosObj.far.length} 張）`);
+  if (isOutsourced && Array.isArray(photosObj.byCategory) && photosObj.byCategory.length > 0) {
+    photosObj.byCategory.forEach((cb: any) => {
+      const catTitle = String(cb.category || '').endsWith('工程') ? cb.category : `${cb.category}工程`;
+      if (cb.close.length < 2) {
+        missing.push(`「【${catTitle}】施工照片 — 近照」：至少需上傳 2 張（目前已選 ${cb.close.length} 張，還差 ${2 - cb.close.length} 張）`);
+      }
+      if (cb.mid.length < 2) {
+        missing.push(`「【${catTitle}】施工照片 — 中距離照」：至少需上傳 2 張（目前已選 ${cb.mid.length} 張，還差 ${2 - cb.mid.length} 張）`);
+      }
+      if (cb.far.length < 2) {
+        missing.push(`「【${catTitle}】施工照片 — 遠距照」：至少需上傳 2 張（目前已選 ${cb.far.length} 張，還差 ${2 - cb.far.length} 張）`);
+      }
+    });
+  } else {
+    if (photosObj.close.length < 2) {
+      missing.push(`「施工照片 — 近照」：至少需上傳 2 張（目前已選 ${photosObj.close.length} 張，還差 ${2 - photosObj.close.length} 張）`);
+    }
+    if (photosObj.mid.length < 2) {
+      missing.push(`「施工照片 — 中距離照」：至少需上傳 2 張（目前已選 ${photosObj.mid.length} 張，還差 ${2 - photosObj.mid.length} 張）`);
+    }
+    if (photosObj.far.length < 2) {
+      missing.push(`「施工照片 — 遠距照」：至少需上傳 2 張（目前已選 ${photosObj.far.length} 張，還差 ${2 - photosObj.far.length} 張）`);
+    }
   }
   const uncheckedSafety: string[] = [];
   if (safety_check_1 !== true && safety_check_1 !== 'true') uncheckedSafety.push('第 1 項 (勤前教育與工具箱會議)');
@@ -254,26 +292,49 @@ router.put('/:id', authenticateToken, upload.any(), async (req: AuthRequest, res
     safety_check_2,
     safety_check_3,
     tomorrow_plan,
-    additional_notes
+    additional_notes,
+    report_mode,
+    photo_categories
   } = req.body;
 
+  const isOutsourced = report_mode === 'OUTSOURCED';
+  const parsedPhotoCategories: string[] = safeJsonParse(photo_categories, []);
   const cleanedProjectId = cleanOptionalId(project_id);
   const cleanedDispatchId = cleanOptionalId(dispatch_order_id);
   const cleanedPmId = cleanOptionalId(pm_id);
   const cleanedRecorderId = cleanOptionalId(recorder_id);
   let parsedWorkItems = safeJsonParse(work_items, []);
 
-  let photosObj: any = { close: [], mid: [], far: [], other: [] };
+  let photosObj: any = {
+    report_mode: isOutsourced ? 'OUTSOURCED' : 'STANDARD',
+    close: [],
+    mid: [],
+    far: [],
+    other: [],
+    byCategory: isOutsourced
+      ? parsedPhotoCategories.map((cat: string) => ({ category: cat, close: [], mid: [], far: [] }))
+      : undefined,
+  };
   let hasPhotos = false;
   if (req.files) {
     const files = req.files as Express.Multer.File[];
     files.forEach(file => {
       const match = file.fieldname.match(/^inspection_photo_(\d+)$/);
+      const catMatch = file.fieldname.match(/^cat_photos_(close|mid|far)_(\d+)$/);
       if (match && Array.isArray(parsedWorkItems)) {
         const idx = parseInt(match[1]);
         if (parsedWorkItems[idx] && parsedWorkItems[idx].inspection) {
           parsedWorkItems[idx].inspection.photo = `/uploads/labor/${file.filename}`;
         }
+      } else if (catMatch && photosObj.byCategory) {
+        const pType = catMatch[1] as 'close' | 'mid' | 'far';
+        const cIdx = parseInt(catMatch[2], 10);
+        const url = `/uploads/labor/${file.filename}`;
+        if (photosObj.byCategory[cIdx]) {
+          photosObj.byCategory[cIdx][pType].push(url);
+        }
+        photosObj[pType].push(url);
+        hasPhotos = true;
       } else if (file.fieldname === 'photos_close') {
         photosObj.close.push(`/uploads/labor/${file.filename}`);
         hasPhotos = true;
@@ -361,6 +422,15 @@ router.put('/:id', authenticateToken, upload.any(), async (req: AuthRequest, res
         where: { id: id as string },
         data: { photos: JSON.stringify(photosObj) }
       });
+    } else if (report_mode) {
+      const prevPhotos = safeJsonParse(existing.photos, {});
+      if (prevPhotos && typeof prevPhotos === 'object' && !Array.isArray(prevPhotos)) {
+        prevPhotos.report_mode = isOutsourced ? 'OUTSOURCED' : 'STANDARD';
+        await prisma.dailyLaborReport.update({
+          where: { id: id as string },
+          data: { photos: JSON.stringify(prevPhotos) }
+        });
+      }
     }
 
     res.json(report);
@@ -586,9 +656,18 @@ router.get('/:id/export', authenticateToken, async (req: AuthRequest, res) => {
     let parsedPhotos: any = {};
     try { parsedPhotos = typeof report.photos === 'string' ? JSON.parse(report.photos) : (report.photos || {}); } catch(e){}
 
-    if (parsedPhotos.close) parsedPhotos.close.forEach((url: string, i: number) => allPhotos.push({ url, title: `施工近照 ${i+1}` }));
-    if (parsedPhotos.mid) parsedPhotos.mid.forEach((url: string, i: number) => allPhotos.push({ url, title: `施工中距離照 ${i+1}` }));
-    if (parsedPhotos.far) parsedPhotos.far.forEach((url: string, i: number) => allPhotos.push({ url, title: `施工遠距照 ${i+1}` }));
+    if (Array.isArray(parsedPhotos.byCategory) && parsedPhotos.byCategory.length > 0) {
+      parsedPhotos.byCategory.forEach((cb: any) => {
+        const catTitle = String(cb.category || '').endsWith('工程') ? cb.category : `${cb.category}工程`;
+        if (cb.close) cb.close.forEach((url: string, i: number) => allPhotos.push({ url, title: `【${catTitle}】施工近照 ${i+1}` }));
+        if (cb.mid) cb.mid.forEach((url: string, i: number) => allPhotos.push({ url, title: `【${catTitle}】施工中距離照 ${i+1}` }));
+        if (cb.far) cb.far.forEach((url: string, i: number) => allPhotos.push({ url, title: `【${catTitle}】施工遠距照 ${i+1}` }));
+      });
+    } else {
+      if (parsedPhotos.close) parsedPhotos.close.forEach((url: string, i: number) => allPhotos.push({ url, title: `施工近照 ${i+1}` }));
+      if (parsedPhotos.mid) parsedPhotos.mid.forEach((url: string, i: number) => allPhotos.push({ url, title: `施工中距離照 ${i+1}` }));
+      if (parsedPhotos.far) parsedPhotos.far.forEach((url: string, i: number) => allPhotos.push({ url, title: `施工遠距照 ${i+1}` }));
+    }
     if (parsedPhotos.other) parsedPhotos.other.forEach((url: string, i: number) => allPhotos.push({ url, title: `其他照片補充 ${i+1}` }));
 
     workItems.forEach((item: any, idx: number) => {
@@ -1144,9 +1223,18 @@ router.get('/:id/export-pdf', authenticateToken, async (req: AuthRequest, res) =
     let parsedPhotos: any = {};
     try { parsedPhotos = typeof report.photos === 'string' ? JSON.parse(report.photos) : (report.photos || {}); } catch(e){}
 
-    if (parsedPhotos.close) parsedPhotos.close.forEach((url: string, i: number) => allPhotos.push({ url, title: `施工近照 ${i+1}` }));
-    if (parsedPhotos.mid) parsedPhotos.mid.forEach((url: string, i: number) => allPhotos.push({ url, title: `施工中距離照 ${i+1}` }));
-    if (parsedPhotos.far) parsedPhotos.far.forEach((url: string, i: number) => allPhotos.push({ url, title: `施工遠距照 ${i+1}` }));
+    if (Array.isArray(parsedPhotos.byCategory) && parsedPhotos.byCategory.length > 0) {
+      parsedPhotos.byCategory.forEach((cb: any) => {
+        const catTitle = String(cb.category || '').endsWith('工程') ? cb.category : `${cb.category}工程`;
+        if (cb.close) cb.close.forEach((url: string, i: number) => allPhotos.push({ url, title: `【${catTitle}】施工近照 ${i+1}` }));
+        if (cb.mid) cb.mid.forEach((url: string, i: number) => allPhotos.push({ url, title: `【${catTitle}】施工中距離照 ${i+1}` }));
+        if (cb.far) cb.far.forEach((url: string, i: number) => allPhotos.push({ url, title: `【${catTitle}】施工遠距照 ${i+1}` }));
+      });
+    } else {
+      if (parsedPhotos.close) parsedPhotos.close.forEach((url: string, i: number) => allPhotos.push({ url, title: `施工近照 ${i+1}` }));
+      if (parsedPhotos.mid) parsedPhotos.mid.forEach((url: string, i: number) => allPhotos.push({ url, title: `施工中距離照 ${i+1}` }));
+      if (parsedPhotos.far) parsedPhotos.far.forEach((url: string, i: number) => allPhotos.push({ url, title: `施工遠距照 ${i+1}` }));
+    }
     if (parsedPhotos.other) parsedPhotos.other.forEach((url: string, i: number) => allPhotos.push({ url, title: `其他照片補充 ${i+1}` }));
 
     workItems.forEach((item: any, idx: number) => {

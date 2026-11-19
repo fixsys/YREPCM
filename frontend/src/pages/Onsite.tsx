@@ -134,10 +134,13 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
     tomorrow_plan: '',
     additional_notes: ''
   });
+  const [laborSubMode, setLaborSubMode] = useState<'STANDARD' | 'OUTSOURCED'>('STANDARD');
+  const isOutsourcedMode = !isManufacturing && laborSubMode === 'OUTSOURCED';
   const [laborPhotosClose, setLaborPhotosClose] = useState<File[]>([]);
   const [laborPhotosMid, setLaborPhotosMid] = useState<File[]>([]);
   const [laborPhotosFar, setLaborPhotosFar] = useState<File[]>([]);
   const [laborPhotosOther, setLaborPhotosOther] = useState<File[]>([]);
+  const [categoryPhotos, setCategoryPhotos] = useState<Record<string, { close: File[]; mid: File[]; far: File[] }>>({});
   const [engineers, setEngineers] = useState<string[]>(['']);
   type DispatchWorker = {
     name: string;
@@ -429,6 +432,33 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
     const cats = Object.keys(categoryToItems);
     return cats.length > 0 ? cats : DEFAULT_WORK_CATEGORIES;
   }, [categoryToItems]);
+
+  // 發包模式下：依「工作類別與工項進度」目前選取的所有不重複工程類別，決定要顯示幾個工程照片上傳區塊
+  const distinctWorkCategories = useMemo(() => {
+    const list: string[] = [];
+    workItems.forEach(w => {
+      const cat = (w.category || (laborForm.work_category || '').split('、')[0] || WORK_CATEGORIES[0] || '土木').trim();
+      if (cat && !list.includes(cat)) list.push(cat);
+    });
+    if (list.length === 0) {
+      list.push((laborForm.work_category || '').split('、')[0] || WORK_CATEGORIES[0] || '土木');
+    }
+    return list;
+  }, [workItems, laborForm.work_category, WORK_CATEGORIES]);
+
+  // 發包模式下：現場工程師指派自動帶入紀錄者
+  useEffect(() => {
+    if (!isLaborModalOpen || !isOutsourcedMode) return;
+    const recUser = users.find((u: any) => u.id === laborForm.recorder_id);
+    const recName = (recUser?.name || user?.name || '').trim();
+    if (!recName) return;
+    setEngineers(prev => {
+      const clean = prev.map(s => s.trim()).filter(Boolean);
+      if (clean.length === 0) return [recName];
+      if (!clean.includes(recName)) return [recName, ...clean];
+      return prev;
+    });
+  }, [isLaborModalOpen, isOutsourcedMode, laborForm.recorder_id, users, user?.name]);
 
   const toolboxCategories = useMemo(() => {
     if (isManufacturing) {
@@ -861,14 +891,30 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
     }
 
     if (!editingLaborId) {
-      if (laborPhotosClose.length < 2) {
-        missing.push(`「施工照片 — 近照」：至少需上傳 2 張（目前已選 ${laborPhotosClose.length} 張，還差 ${2 - laborPhotosClose.length} 張）`);
-      }
-      if (laborPhotosMid.length < 2) {
-        missing.push(`「施工照片 — 中距離照」：至少需上傳 2 張（目前已選 ${laborPhotosMid.length} 張，還差 ${2 - laborPhotosMid.length} 張）`);
-      }
-      if (laborPhotosFar.length < 2) {
-        missing.push(`「施工照片 — 遠距照」：至少需上傳 2 張（目前已選 ${laborPhotosFar.length} 張，還差 ${2 - laborPhotosFar.length} 張）`);
+      if (isOutsourcedMode) {
+        distinctWorkCategories.forEach(cat => {
+          const catTitle = cat.endsWith('工程') ? cat : `${cat}工程`;
+          const cp = categoryPhotos[cat] || { close: [], mid: [], far: [] };
+          if (cp.close.length < 2) {
+            missing.push(`「【${catTitle}】施工照片 — 近照」：至少需上傳 2 張（目前已選 ${cp.close.length} 張，還差 ${2 - cp.close.length} 張）`);
+          }
+          if (cp.mid.length < 2) {
+            missing.push(`「【${catTitle}】施工照片 — 中距離照」：至少需上傳 2 張（目前已選 ${cp.mid.length} 張，還差 ${2 - cp.mid.length} 張）`);
+          }
+          if (cp.far.length < 2) {
+            missing.push(`「【${catTitle}】施工照片 — 遠距照」：至少需上傳 2 張（目前已選 ${cp.far.length} 張，還差 ${2 - cp.far.length} 張）`);
+          }
+        });
+      } else {
+        if (laborPhotosClose.length < 2) {
+          missing.push(`「施工照片 — 近照」：至少需上傳 2 張（目前已選 ${laborPhotosClose.length} 張，還差 ${2 - laborPhotosClose.length} 張）`);
+        }
+        if (laborPhotosMid.length < 2) {
+          missing.push(`「施工照片 — 中距離照」：至少需上傳 2 張（目前已選 ${laborPhotosMid.length} 張，還差 ${2 - laborPhotosMid.length} 張）`);
+        }
+        if (laborPhotosFar.length < 2) {
+          missing.push(`「施工照片 — 遠距照」：至少需上傳 2 張（目前已選 ${laborPhotosFar.length} 張，還差 ${2 - laborPhotosFar.length} 張）`);
+        }
       }
     }
 
@@ -922,17 +968,34 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
     try {
       const formData = new FormData();
       formData.append('module_type', mode);
+      formData.append('report_mode', isOutsourcedMode ? 'OUTSOURCED' : 'STANDARD');
       Object.entries(laborForm).forEach(([key, value]) => {
         if (value !== null && value !== undefined) {
           formData.append(key, String(value));
         }
       });
       formData.append('engineers', JSON.stringify(engineers.filter(e => e)));
-      formData.append('dispatch_workers', JSON.stringify(dispatchWorkers.filter(w => w.name && w.start_time && w.end_time)));
-      formData.append('equipments', JSON.stringify(equipments.filter(e => e.name && e.quantity > 0)));
-      laborPhotosClose.forEach(file => formData.append('photos_close', file));
-      laborPhotosMid.forEach(file => formData.append('photos_mid', file));
-      laborPhotosFar.forEach(file => formData.append('photos_far', file));
+      formData.append(
+        'dispatch_workers',
+        JSON.stringify(isOutsourcedMode ? [] : dispatchWorkers.filter(w => w.name && w.start_time && w.end_time))
+      );
+      formData.append(
+        'equipments',
+        JSON.stringify(isOutsourcedMode ? [] : equipments.filter(e => e.name && e.quantity > 0))
+      );
+      if (isOutsourcedMode) {
+        formData.append('photo_categories', JSON.stringify(distinctWorkCategories));
+        distinctWorkCategories.forEach((cat, cIdx) => {
+          const cp = categoryPhotos[cat] || { close: [], mid: [], far: [] };
+          cp.close.forEach(file => formData.append(`cat_photos_close_${cIdx}`, file));
+          cp.mid.forEach(file => formData.append(`cat_photos_mid_${cIdx}`, file));
+          cp.far.forEach(file => formData.append(`cat_photos_far_${cIdx}`, file));
+        });
+      } else {
+        laborPhotosClose.forEach(file => formData.append('photos_close', file));
+        laborPhotosMid.forEach(file => formData.append('photos_mid', file));
+        laborPhotosFar.forEach(file => formData.append('photos_far', file));
+      }
       laborPhotosOther.forEach(file => formData.append('photos_other', file));
       
       const workItemsToSave = workItems.filter(w => w.name && w.progress).map((w, idx) => {
@@ -946,6 +1009,8 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
           name: normalizeItemKey(w.name),
           category: cat,
           target_quantity: resolvedTarget,
+          worker_count: isOutsourcedMode ? '' : w.worker_count,
+          work_hours: isOutsourcedMode ? '' : w.work_hours,
         };
         if (itemCopy.inspection && itemCopy.inspection.photo instanceof File) {
           formData.append(`inspection_photo_${idx}`, itemCopy.inspection.photo);
@@ -981,15 +1046,17 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
     }
   };
 
-  const handleAddLabor = () => {
+  const handleAddLabor = (initialSubMode: 'STANDARD' | 'OUTSOURCED' = 'STANDARD') => {
     setEditingLaborId(null);
+    setLaborSubMode(isManufacturing ? 'STANDARD' : initialSubMode);
     const defaultCat = WORK_CATEGORIES[0] || (isManufacturing ? 'RH鋼/柱' : '土木');
     setLaborForm({ project_id: '', dispatch_order_id: '', report_date: new Date().toISOString().slice(0, 10), weather: '晴', recorder_id: user?.id || '', pm_id: '', work_category: defaultCat, drawing_number: '', drawing_revision: '', construction_location: '', drawing_check_result: '符合圖說', drawing_check_confirmed: false, safety_check_1: false, safety_check_2: false, safety_check_3: false, tomorrow_plan: '', additional_notes: '' });
     setLaborPhotosClose([]);
     setLaborPhotosMid([]);
     setLaborPhotosFar([]);
     setLaborPhotosOther([]);
-    setEngineers(['']);
+    setCategoryPhotos({});
+    setEngineers(!isManufacturing && initialSubMode === 'OUTSOURCED' ? [user?.name || ''] : ['']);
     setDispatchWorkers([{ name: '', start_time: '08:00', end_time: '17:00', work_category: defaultCat, work_item: categoryToItems[defaultCat]?.[0] || '', work_hours: 8 }]);
     setEquipments([]);
     setWorkItems([{ category: defaultCat, name: categoryToItems[defaultCat]?.[0] || '', progress: '', worker_count: '', work_hours: '' }]);
@@ -998,6 +1065,12 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
 
   const handleEditLabor = (l: any) => {
     const fallbackCat = (l.work_category || '').split('、')[0] || WORK_CATEGORIES[0] || '土木';
+    const parsedPhotos = safeParseJSON(l.photos, {});
+    const detectedSubMode: 'STANDARD' | 'OUTSOURCED' =
+      !isManufacturing && (parsedPhotos?.report_mode === 'OUTSOURCED' || Array.isArray(parsedPhotos?.byCategory))
+        ? 'OUTSOURCED'
+        : 'STANDARD';
+    setLaborSubMode(detectedSubMode);
     setEditingLaborId(l.id);
     setLaborForm({
       project_id: l.project_id,
@@ -1022,6 +1095,7 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
     setLaborPhotosMid([]);
     setLaborPhotosFar([]);
     setLaborPhotosOther([]);
+    setCategoryPhotos({});
     if (l.engineers) setEngineers(safeParseJSON(l.engineers, ['']));
     else setEngineers(['']);
     if (l.dispatch_workers) setDispatchWorkers(safeParseJSON(l.dispatch_workers, []));
@@ -1936,6 +2010,49 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
             </div>
             <div className="p-6 overflow-y-auto flex-1">
               <form id="laborForm" noValidate onSubmit={handleLaborSubmit} className="space-y-4">
+                {!isManufacturing && (
+                  <div className="bg-indigo-50/70 border border-indigo-200 p-3.5 rounded-xl">
+                    <label className="block text-xs font-bold text-indigo-900 mb-2">
+                      報工模式選擇 *
+                    </label>
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <button
+                        type="button"
+                        onClick={() => setLaborSubMode('STANDARD')}
+                        className={`py-2.5 px-3 rounded-lg text-sm font-bold border transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                          laborSubMode === 'STANDARD'
+                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                            : 'bg-white text-slate-700 border-slate-300 hover:border-indigo-400'
+                        }`}
+                      >
+                        <span>選項 1：現場報工</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLaborSubMode('OUTSOURCED');
+                          const recUser = users.find((u: any) => u.id === laborForm.recorder_id);
+                          const recName = (recUser?.name || user?.name || '').trim();
+                          if (recName) {
+                            setEngineers(prev => {
+                              const clean = prev.map(s => s.trim()).filter(Boolean);
+                              if (clean.length === 0) return [recName];
+                              if (!clean.includes(recName)) return [recName, ...clean];
+                              return prev;
+                            });
+                          }
+                        }}
+                        className={`py-2.5 px-3 rounded-lg text-sm font-bold border transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                          laborSubMode === 'OUTSOURCED'
+                            ? 'bg-teal-600 text-white border-teal-600 shadow-sm'
+                            : 'bg-white text-slate-700 border-slate-300 hover:border-teal-400'
+                        }`}
+                      >
+                        <span>選項 2：發包模式</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
                 <div className="grid grid-cols-1 gap-4">
                   {isManufacturing && (
                     <div className="bg-amber-50/70 border border-amber-200 p-3.5 rounded-lg">
@@ -2027,7 +2144,14 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                 </div>
 
                 <div className="pt-2">
-                  <label className="block text-sm font-bold text-slate-700 mb-2">現場工程師指派</label>
+                  <label className="block text-sm font-bold text-slate-700 mb-2">
+                    現場工程師指派
+                    {isOutsourcedMode && (
+                      <span className="ml-2 text-xs font-normal text-teal-700 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
+                        發包模式：已自動帶入紀錄者
+                      </span>
+                    )}
+                  </label>
                   {engineers.map((eng, idx) => (
                     <div key={idx} className="flex gap-2 mb-2">
                       <input type="text" value={eng} onChange={e => {
@@ -2041,6 +2165,8 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                   <button type="button" onClick={() => setEngineers([...engineers, ''])} className="text-sm text-indigo-600 font-medium hover:underline">+ 新增一位現場工程師</button>
                 </div>
 
+                {!isOutsourcedMode && (
+                <>
                 <div className="border-t border-slate-200 pt-4 mt-4">
                   <label className="block text-sm font-bold text-slate-700 mb-2">現場派工人員</label>
                   {dispatchWorkers.map((worker, idx) => (
@@ -2140,6 +2266,8 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                   ))}
                   <button type="button" onClick={() => setEquipments([...equipments, {name: '', quantity: 1, hours: 8}])} className="text-sm text-indigo-600 font-medium hover:underline">+ 新增機具</button>
                 </div>
+                </>
+                )}
 
                 <div className="border-t border-slate-200 pt-4 mt-4">
                   <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
@@ -2257,20 +2385,24 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                               />
                             )}
 
-                            <input
-                              type="text"
-                              readOnly
-                              value={item.worker_count ? `${item.worker_count} 人` : ''}
-                              placeholder="人數"
-                              className="w-20 px-2 py-2 border rounded-lg outline-none bg-slate-100 text-slate-500 cursor-not-allowed text-center text-sm font-medium shrink-0"
-                            />
-                            <input
-                              type="text"
-                              readOnly
-                              value={item.work_hours ? `${item.work_hours} hr` : ''}
-                              placeholder="工時"
-                              className="w-20 px-2 py-2 border rounded-lg outline-none bg-slate-100 text-slate-500 cursor-not-allowed text-center text-sm font-medium shrink-0"
-                            />
+                            {!isOutsourcedMode && (
+                              <>
+                                <input
+                                  type="text"
+                                  readOnly
+                                  value={item.worker_count ? `${item.worker_count} 人` : ''}
+                                  placeholder="人數"
+                                  className="w-20 px-2 py-2 border rounded-lg outline-none bg-slate-100 text-slate-500 cursor-not-allowed text-center text-sm font-medium shrink-0"
+                                />
+                                <input
+                                  type="text"
+                                  readOnly
+                                  value={item.work_hours ? `${item.work_hours} hr` : ''}
+                                  placeholder="工時"
+                                  className="w-20 px-2 py-2 border rounded-lg outline-none bg-slate-100 text-slate-500 cursor-not-allowed text-center text-sm font-medium shrink-0"
+                                />
+                              </>
+                            )}
                             <button
                               type="button"
                               onClick={() => setWorkItems(workItems.filter((_, i) => i !== idx))}
@@ -2662,6 +2794,202 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                   </div>
                 </div>
 
+                {isOutsourcedMode ? (
+                  <div className="space-y-4 mt-6">
+                    <div className="bg-teal-50 border border-teal-200 rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <h4 className="font-bold text-teal-900 text-base">
+                          施工日誌照片 — 依工程分區上傳 (目前共 {distinctWorkCategories.length} 個工程，必填至少 {distinctWorkCategories.length * 6} 張)
+                        </h4>
+                        <p className="text-xs text-teal-700 mt-0.5">
+                          每個工程區塊各自上傳：近照 2 張＋中距離照 2 張＋遠距照 2 張（共 {distinctWorkCategories.length} 個工程 → 近照*{distinctWorkCategories.length * 2}、中距*{distinctWorkCategories.length * 2}、遠距*{distinctWorkCategories.length * 2}，合計至少 {distinctWorkCategories.length * 6} 張）
+                        </p>
+                      </div>
+                      <div className="bg-orange-100 text-orange-800 font-bold px-3 py-1 rounded-full text-sm shrink-0">
+                        {distinctWorkCategories.reduce((sum, cat) => {
+                          const cp = categoryPhotos[cat] || { close: [], mid: [], far: [] };
+                          return sum + cp.close.length + cp.mid.length + cp.far.length;
+                        }, 0)}{' '}
+                        / {distinctWorkCategories.length * 6} 張
+                      </div>
+                    </div>
+
+                    {distinctWorkCategories.map((cat, catIdx) => {
+                      const catTitle = cat.endsWith('工程') ? cat : `${cat}工程`;
+                      const cp = categoryPhotos[cat] || { close: [], mid: [], far: [] };
+                      const catTotal = cp.close.length + cp.mid.length + cp.far.length;
+
+                      const updateCatPhotos = (type: 'close' | 'mid' | 'far', updater: (prev: File[]) => File[]) => {
+                        setCategoryPhotos(prev => {
+                          const current = prev[cat] || { close: [], mid: [], far: [] };
+                          return {
+                            ...prev,
+                            [cat]: {
+                              ...current,
+                              [type]: updater(current[type]),
+                            },
+                          };
+                        });
+                      };
+
+                      return (
+                        <div key={cat} className="border-2 border-teal-300 bg-teal-50/15 rounded-xl p-4 shadow-sm relative">
+                          <div className={`absolute top-4 right-4 font-bold px-3 py-1 rounded-full text-xs ${
+                            cp.close.length >= 2 && cp.mid.length >= 2 && cp.far.length >= 2
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : 'bg-orange-100 text-orange-800'
+                          }`}>
+                            {catTitle}：{catTotal} / 6 張
+                          </div>
+                          <h4 className="font-bold text-teal-800 mb-1 text-base flex items-center gap-2">
+                            <span className="px-2 py-0.5 bg-teal-600 text-white rounded text-xs">工程區塊 {catIdx + 1}</span>
+                            <span>【{catTitle}】施工日誌照片</span>
+                            <span className="text-xs font-bold text-teal-600">(必填至少 6 張)</span>
+                          </h4>
+                          <p className="text-xs text-slate-500 mb-3">【{catTitle}】近照至少 2 張＋中距離照至少 2 張＋遠距照至少 2 張</p>
+
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            {/* 該工程近照 */}
+                            <div className="border border-dashed border-teal-300 bg-white rounded-xl p-3">
+                              <h5 className="font-bold text-slate-700 text-sm">【{catTitle}】近照 <span className="text-slate-500 font-normal text-xs">(至少 2 張)</span></h5>
+                              <p className="text-[11px] text-slate-400 mb-2">細部、接點、尺寸或施工品質</p>
+                              <div className="flex gap-1.5">
+                                <label className="flex-1 cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-1.5 px-2 rounded-lg border border-slate-200 text-center text-xs flex items-center justify-center gap-1">
+                                  <span>📸</span> 拍照
+                                  <input type="file" accept="image/*" capture="environment" onChange={e => {
+                                    if (e.target.files) {
+                                      const filesArr = Array.from(e.target.files);
+                                      updateCatPhotos('close', prev => {
+                                        const next = [...prev, ...filesArr];
+                                        if (next.length > 4) { alert(`【${catTitle}】近照最多只能上傳 4 張`); return next.slice(0, 4); }
+                                        return next;
+                                      });
+                                    }
+                                  }} className="hidden" />
+                                </label>
+                                <label className="flex-1 cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-1.5 px-2 rounded-lg border border-slate-200 text-center text-xs flex items-center justify-center gap-1">
+                                  <span>🖼️</span> 相簿
+                                  <input type="file" multiple accept="image/*" onChange={e => {
+                                    if (e.target.files) {
+                                      const filesArr = Array.from(e.target.files);
+                                      updateCatPhotos('close', prev => {
+                                        const next = [...prev, ...filesArr];
+                                        if (next.length > 4) { alert(`【${catTitle}】近照最多只能上傳 4 張`); return next.slice(0, 4); }
+                                        return next;
+                                      });
+                                    }
+                                  }} className="hidden" />
+                                </label>
+                              </div>
+                              <div className={`mt-2 font-bold text-xs ${cp.close.length >= 2 ? 'text-teal-600' : 'text-red-500'}`}>{cp.close.length} / 2 張</div>
+                              {cp.close.length > 0 && (
+                                <div className="mt-1.5 flex gap-1.5 flex-wrap">
+                                  {cp.close.map((f, i) => (
+                                    <div key={i} className="flex items-center gap-1 text-[11px] px-2 py-0.5 bg-slate-100 rounded text-slate-600">
+                                      <span className="truncate max-w-[90px]">{f.name}</span>
+                                      <button type="button" onClick={() => updateCatPhotos('close', prev => prev.filter((_, idx) => idx !== i))} className="text-red-500 font-bold hover:text-red-700 ml-0.5">×</button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* 該工程中距離照 */}
+                            <div className="border border-dashed border-teal-300 bg-white rounded-xl p-3">
+                              <h5 className="font-bold text-slate-700 text-sm">【{catTitle}】中距離照 <span className="text-slate-500 font-normal text-xs">(至少 2 張)</span></h5>
+                              <p className="text-[11px] text-slate-400 mb-2">施工人員、工作面與工項範圍</p>
+                              <div className="flex gap-1.5">
+                                <label className="flex-1 cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-1.5 px-2 rounded-lg border border-slate-200 text-center text-xs flex items-center justify-center gap-1">
+                                  <span>📸</span> 拍照
+                                  <input type="file" accept="image/*" capture="environment" onChange={e => {
+                                    if (e.target.files) {
+                                      const filesArr = Array.from(e.target.files);
+                                      updateCatPhotos('mid', prev => {
+                                        const next = [...prev, ...filesArr];
+                                        if (next.length > 4) { alert(`【${catTitle}】中距離照最多只能上傳 4 張`); return next.slice(0, 4); }
+                                        return next;
+                                      });
+                                    }
+                                  }} className="hidden" />
+                                </label>
+                                <label className="flex-1 cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-1.5 px-2 rounded-lg border border-slate-200 text-center text-xs flex items-center justify-center gap-1">
+                                  <span>🖼️</span> 相簿
+                                  <input type="file" multiple accept="image/*" onChange={e => {
+                                    if (e.target.files) {
+                                      const filesArr = Array.from(e.target.files);
+                                      updateCatPhotos('mid', prev => {
+                                        const next = [...prev, ...filesArr];
+                                        if (next.length > 4) { alert(`【${catTitle}】中距離照最多只能上傳 4 張`); return next.slice(0, 4); }
+                                        return next;
+                                      });
+                                    }
+                                  }} className="hidden" />
+                                </label>
+                              </div>
+                              <div className={`mt-2 font-bold text-xs ${cp.mid.length >= 2 ? 'text-teal-600' : 'text-red-500'}`}>{cp.mid.length} / 2 張</div>
+                              {cp.mid.length > 0 && (
+                                <div className="mt-1.5 flex gap-1.5 flex-wrap">
+                                  {cp.mid.map((f, i) => (
+                                    <div key={i} className="flex items-center gap-1 text-[11px] px-2 py-0.5 bg-slate-100 rounded text-slate-600">
+                                      <span className="truncate max-w-[90px]">{f.name}</span>
+                                      <button type="button" onClick={() => updateCatPhotos('mid', prev => prev.filter((_, idx) => idx !== i))} className="text-red-500 font-bold hover:text-red-700 ml-0.5">×</button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* 該工程遠距照 */}
+                            <div className="border border-dashed border-teal-300 bg-white rounded-xl p-3">
+                              <h5 className="font-bold text-slate-700 text-sm">【{catTitle}】遠距照 <span className="text-slate-500 font-normal text-xs">(至少 2 張)</span></h5>
+                              <p className="text-[11px] text-slate-400 mb-2">案場全景、區域位置與整體進度</p>
+                              <div className="flex gap-1.5">
+                                <label className="flex-1 cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-1.5 px-2 rounded-lg border border-slate-200 text-center text-xs flex items-center justify-center gap-1">
+                                  <span>📸</span> 拍照
+                                  <input type="file" accept="image/*" capture="environment" onChange={e => {
+                                    if (e.target.files) {
+                                      const filesArr = Array.from(e.target.files);
+                                      updateCatPhotos('far', prev => {
+                                        const next = [...prev, ...filesArr];
+                                        if (next.length > 4) { alert(`【${catTitle}】遠距照最多只能上傳 4 張`); return next.slice(0, 4); }
+                                        return next;
+                                      });
+                                    }
+                                  }} className="hidden" />
+                                </label>
+                                <label className="flex-1 cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-1.5 px-2 rounded-lg border border-slate-200 text-center text-xs flex items-center justify-center gap-1">
+                                  <span>🖼️</span> 相簿
+                                  <input type="file" multiple accept="image/*" onChange={e => {
+                                    if (e.target.files) {
+                                      const filesArr = Array.from(e.target.files);
+                                      updateCatPhotos('far', prev => {
+                                        const next = [...prev, ...filesArr];
+                                        if (next.length > 4) { alert(`【${catTitle}】遠距照最多只能上傳 4 張`); return next.slice(0, 4); }
+                                        return next;
+                                      });
+                                    }
+                                  }} className="hidden" />
+                                </label>
+                              </div>
+                              <div className={`mt-2 font-bold text-xs ${cp.far.length >= 2 ? 'text-teal-600' : 'text-red-500'}`}>{cp.far.length} / 2 張</div>
+                              {cp.far.length > 0 && (
+                                <div className="mt-1.5 flex gap-1.5 flex-wrap">
+                                  {cp.far.map((f, i) => (
+                                    <div key={i} className="flex items-center gap-1 text-[11px] px-2 py-0.5 bg-slate-100 rounded text-slate-600">
+                                      <span className="truncate max-w-[90px]">{f.name}</span>
+                                      <button type="button" onClick={() => updateCatPhotos('far', prev => prev.filter((_, idx) => idx !== i))} className="text-red-500 font-bold hover:text-red-700 ml-0.5">×</button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {editingLaborId && <p className="text-xs text-orange-500 mt-1 text-center">重新上傳會完全覆蓋舊有照片</p>}
+                  </div>
+                ) : (
                 <div className="border border-teal-200 bg-teal-50/10 rounded-xl p-4 mt-6 shadow-sm relative">
                   <div className="absolute top-4 right-4 bg-orange-100 text-orange-800 font-bold px-3 py-1 rounded-full text-sm">
                     {laborPhotosClose.length + laborPhotosMid.length + laborPhotosFar.length} / 6 張
@@ -2803,6 +3131,7 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                   </div>
                   {editingLaborId && <p className="text-xs text-orange-500 mt-3 text-center">重新上傳會完全覆蓋舊有照片</p>}
                 </div>
+                )}
 
                 {/* 其他照片補充 */}
                 <div className="border border-dashed border-teal-300 bg-white rounded-xl p-4 mt-6 shadow-sm">
@@ -2875,13 +3204,15 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                   <textarea value={laborForm.additional_notes} onChange={e => setLaborForm({...laborForm, additional_notes: e.target.value})} placeholder="填寫其他需紀錄之事項、異常狀況或協調內容..." className="w-full px-3 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 h-24 resize-none"></textarea>
                 </div>
 
-                <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-xl mt-6 flex justify-between items-center">
-                  <span className="font-bold text-indigo-900">總計</span>
-                  <div className="flex gap-4 text-sm font-medium">
-                    <span className="text-indigo-800">總人數: <span className="text-indigo-600 text-lg">{workItems.reduce((acc, w) => acc + (Number(w.worker_count) || 0), 0)}</span> 人</span>
-                    <span className="text-indigo-800">總工時: <span className="text-indigo-600 text-lg">{workItems.reduce((acc, w) => acc + (Number(w.work_hours) || 0), 0)}</span> 小時</span>
+                {!isOutsourcedMode && (
+                  <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-xl mt-6 flex justify-between items-center">
+                    <span className="font-bold text-indigo-900">總計</span>
+                    <div className="flex gap-4 text-sm font-medium">
+                      <span className="text-indigo-800">總人數: <span className="text-indigo-600 text-lg">{workItems.reduce((acc, w) => acc + (Number(w.worker_count) || 0), 0)}</span> 人</span>
+                      <span className="text-indigo-800">總工時: <span className="text-indigo-600 text-lg">{workItems.reduce((acc, w) => acc + (Number(w.work_hours) || 0), 0)}</span> 小時</span>
+                    </div>
                   </div>
-                </div>
+                )}
               </form>
             </div>
             <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3 shrink-0 pb-safe">
@@ -3243,81 +3574,105 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                     </div>
                   )}
                   
-                  <div>
-                    <h3 className="text-xl font-bold mb-3 border-l-4 border-indigo-600 pl-3">施工項目與完成進度統計</h3>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left border-collapse border border-slate-300 text-sm">
-                        <thead>
-                          <tr className="bg-slate-100">
-                            <th className="border border-slate-300 p-2">工項名稱</th>
-                            <th className="border border-slate-300 p-2 text-right">目標數量</th>
-                            <th className="border border-slate-300 p-2 text-right">今日完成數量</th>
-                            <th className="border border-slate-300 p-2 text-right">累計完成數量</th>
-                            <th className="border border-slate-300 p-2 text-right">目前完成進度</th>
-                            <th className="border border-slate-300 p-2 text-right">出工人數</th>
-                            <th className="border border-slate-300 p-2 text-right">施工時數</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {safeParseJSON(viewingRecord.data.work_items, []).map((w: any, i: number) => {
-                            const targetStr =
-                              getTargetQuantityForItem(
-                                w.category || viewingRecord.data.work_category,
-                                w.name,
-                                viewingRecord.data.project_id,
-                                viewingRecord.data.dispatch_order_id
-                              ) ||
-                              w.target_quantity ||
-                              '';
-                            const rawTargetN = parseFloat(String(targetStr).replace(/[,%]/g, ''));
-                            const isPctMode = String(targetStr).includes('%') || Number.isNaN(rawTargetN) || rawTargetN <= 0;
-                            const effectiveTargetN = isPctMode ? 100 : rawTargetN;
-                            const todayN = parseFloat(String(w.progress || '').replace(/[,%]/g, ''));
-                            const pastN = getPastAccumulatedQty(
-                              w.name,
-                              viewingRecord.data.project_id,
-                              viewingRecord.data.dispatch_order_id || '',
-                              viewingRecord.data.id,
-                              viewingRecord.data.report_date
-                            );
-                            const accN = Math.round(((Number.isNaN(todayN) ? 0 : todayN) + pastN) * 100) / 100;
-                            const pct = `${Math.min(100, Math.round((accN / effectiveTargetN) * 1000) / 10)}%`;
-                            const suffix = isPctMode ? '%' : '';
-
-                            return (
-                              <tr key={i}>
-                                <td className="border border-slate-300 p-2">
-                                  {w.category ? <span className="font-bold text-indigo-700 mr-1.5">[{w.category}]</span> : null}
-                                  {normalizeItemKey(w.name)}
-                                </td>
-                                <td className="border border-slate-300 p-2 text-right font-mono">
-                                  {isPctMode ? '100%' : effectiveTargetN}
-                                </td>
-                                <td className="border border-slate-300 p-2 text-right font-mono font-bold text-indigo-700">
-                                  {w.progress ? `${w.progress}${suffix}` : '-'}
-                                </td>
-                                <td className="border border-slate-300 p-2 text-right font-mono font-bold">
-                                  {accN}{suffix}
-                                </td>
-                                <td className="border border-slate-300 p-2 text-right font-mono font-extrabold text-emerald-700">
-                                  {pct}
-                                </td>
-                                <td className="border border-slate-300 p-2 text-right">{w.worker_count || 0}</td>
-                                <td className="border border-slate-300 p-2 text-right">{w.work_hours || 0}</td>
+                  {(() => {
+                    const isViewingOutsourced =
+                      safeParseJSON(viewingRecord.data.photos, {})?.report_mode === 'OUTSOURCED' ||
+                      Array.isArray(safeParseJSON(viewingRecord.data.photos, {})?.byCategory);
+                    return (
+                      <div>
+                        <h3 className="text-xl font-bold mb-3 border-l-4 border-indigo-600 pl-3 flex items-center gap-2">
+                          <span>施工項目與完成進度統計</span>
+                          {isViewingOutsourced && (
+                            <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-teal-100 text-teal-800 border border-teal-200">
+                              發包模式
+                            </span>
+                          )}
+                        </h3>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left border-collapse border border-slate-300 text-sm">
+                            <thead>
+                              <tr className="bg-slate-100">
+                                <th className="border border-slate-300 p-2">工項名稱</th>
+                                <th className="border border-slate-300 p-2 text-right">目標數量</th>
+                                <th className="border border-slate-300 p-2 text-right">今日完成數量</th>
+                                <th className="border border-slate-300 p-2 text-right">累計完成數量</th>
+                                <th className="border border-slate-300 p-2 text-right">目前完成進度</th>
+                                {!isViewingOutsourced && (
+                                  <>
+                                    <th className="border border-slate-300 p-2 text-right">出工人數</th>
+                                    <th className="border border-slate-300 p-2 text-right">施工時數</th>
+                                  </>
+                                )}
                               </tr>
-                            );
-                          })}
-                        </tbody>
-                        <tfoot>
-                          <tr className="bg-indigo-50 font-bold">
-                            <td colSpan={5} className="border border-slate-300 p-2 text-right">總計：</td>
-                            <td className="border border-slate-300 p-2 text-right text-indigo-700">{safeParseJSON(viewingRecord.data.work_items, []).reduce((acc: number, w: any) => acc + (Number(w.worker_count) || 0), 0)} 人</td>
-                            <td className="border border-slate-300 p-2 text-right text-indigo-700">{safeParseJSON(viewingRecord.data.work_items, []).reduce((acc: number, w: any) => acc + (Number(w.work_hours) || 0), 0)} 小時</td>
-                          </tr>
-                        </tfoot>
-                      </table>
-                    </div>
-                  </div>
+                            </thead>
+                            <tbody>
+                              {safeParseJSON(viewingRecord.data.work_items, []).map((w: any, i: number) => {
+                                const targetStr =
+                                  getTargetQuantityForItem(
+                                    w.category || viewingRecord.data.work_category,
+                                    w.name,
+                                    viewingRecord.data.project_id,
+                                    viewingRecord.data.dispatch_order_id
+                                  ) ||
+                                  w.target_quantity ||
+                                  '';
+                                const rawTargetN = parseFloat(String(targetStr).replace(/[,%]/g, ''));
+                                const isPctMode = String(targetStr).includes('%') || Number.isNaN(rawTargetN) || rawTargetN <= 0;
+                                const effectiveTargetN = isPctMode ? 100 : rawTargetN;
+                                const todayN = parseFloat(String(w.progress || '').replace(/[,%]/g, ''));
+                                const pastN = getPastAccumulatedQty(
+                                  w.name,
+                                  viewingRecord.data.project_id,
+                                  viewingRecord.data.dispatch_order_id || '',
+                                  viewingRecord.data.id,
+                                  viewingRecord.data.report_date
+                                );
+                                const accN = Math.round(((Number.isNaN(todayN) ? 0 : todayN) + pastN) * 100) / 100;
+                                const pct = `${Math.min(100, Math.round((accN / effectiveTargetN) * 1000) / 10)}%`;
+                                const suffix = isPctMode ? '%' : '';
+
+                                return (
+                                  <tr key={i}>
+                                    <td className="border border-slate-300 p-2">
+                                      {w.category ? <span className="font-bold text-indigo-700 mr-1.5">[{w.category}]</span> : null}
+                                      {normalizeItemKey(w.name)}
+                                    </td>
+                                    <td className="border border-slate-300 p-2 text-right font-mono">
+                                      {isPctMode ? '100%' : effectiveTargetN}
+                                    </td>
+                                    <td className="border border-slate-300 p-2 text-right font-mono font-bold text-indigo-700">
+                                      {w.progress ? `${w.progress}${suffix}` : '-'}
+                                    </td>
+                                    <td className="border border-slate-300 p-2 text-right font-mono font-bold">
+                                      {accN}{suffix}
+                                    </td>
+                                    <td className="border border-slate-300 p-2 text-right font-mono font-extrabold text-emerald-700">
+                                      {pct}
+                                    </td>
+                                    {!isViewingOutsourced && (
+                                      <>
+                                        <td className="border border-slate-300 p-2 text-right">{w.worker_count || 0}</td>
+                                        <td className="border border-slate-300 p-2 text-right">{w.work_hours || 0}</td>
+                                      </>
+                                    )}
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                            {!isViewingOutsourced && (
+                              <tfoot>
+                                <tr className="bg-indigo-50 font-bold">
+                                  <td colSpan={5} className="border border-slate-300 p-2 text-right">總計：</td>
+                                  <td className="border border-slate-300 p-2 text-right text-indigo-700">{safeParseJSON(viewingRecord.data.work_items, []).reduce((acc: number, w: any) => acc + (Number(w.worker_count) || 0), 0)} 人</td>
+                                  <td className="border border-slate-300 p-2 text-right text-indigo-700">{safeParseJSON(viewingRecord.data.work_items, []).reduce((acc: number, w: any) => acc + (Number(w.work_hours) || 0), 0)} 小時</td>
+                                </tr>
+                              </tfoot>
+                            )}
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {safeParseJSON(viewingRecord.data.work_items, []).some((w: any) => w.inspection) && (
                     <div className="mt-8">
@@ -3415,72 +3770,138 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                         <span>施工照片</span>
                         <span className="text-xs font-normal text-slate-500">(點擊圖片可檢視原圖與放大縮小)</span>
                       </h3>
-                      
-                      {safeParseJSON(viewingRecord.data.photos, {}).close?.length > 0 && (
-                        <div className="mb-4">
-                          <h4 className="font-bold text-slate-600 mb-2">近照</h4>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            {safeParseJSON(viewingRecord.data.photos, {}).close.map((p: string, i: number, arr: string[]) => (
-                              <div
-                                key={i}
-                                onClick={() => openImageViewer(arr, i, '施工照片 — 近照')}
-                                title="點擊檢視原圖與放大縮小"
-                                className="group relative overflow-hidden rounded-xl border shadow-sm cursor-zoom-in"
-                              >
-                                <img src={`${p}`} alt="近照" className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-200" />
-                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/25 transition-colors flex items-center justify-center">
-                                  <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-black/70 text-white text-xs px-2.5 py-1 rounded-full flex items-center gap-1">
-                                    <ZoomIn size={14} /> 檢視原圖
-                                  </span>
-                                </div>
+
+                      {Array.isArray(safeParseJSON(viewingRecord.data.photos, {})?.byCategory) &&
+                      safeParseJSON(viewingRecord.data.photos, {}).byCategory.length > 0 ? (
+                        <div className="space-y-6 mb-4">
+                          {safeParseJSON(viewingRecord.data.photos, {}).byCategory.map((cb: any, cbIdx: number) => {
+                            const catTitle = String(cb.category || '').endsWith('工程') ? cb.category : `${cb.category}工程`;
+                            return (
+                              <div key={cbIdx} className="p-4 rounded-xl border border-teal-200 bg-teal-50/20 space-y-4">
+                                <h4 className="font-bold text-teal-800 text-base border-b border-teal-200 pb-2">
+                                  工程區塊 {cbIdx + 1}：【{catTitle}】施工照片
+                                </h4>
+                                {cb.close?.length > 0 && (
+                                  <div>
+                                    <h5 className="font-bold text-slate-600 text-sm mb-2">【{catTitle}】近照</h5>
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                      {cb.close.map((p: string, i: number, arr: string[]) => (
+                                        <div
+                                          key={i}
+                                          onClick={() => openImageViewer(arr, i, `【${catTitle}】施工照片 — 近照`)}
+                                          className="group relative overflow-hidden rounded-xl border shadow-sm cursor-zoom-in"
+                                        >
+                                          <img src={`${p}`} alt="近照" className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-200" />
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                                {cb.mid?.length > 0 && (
+                                  <div>
+                                    <h5 className="font-bold text-slate-600 text-sm mb-2">【{catTitle}】中距離照</h5>
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                      {cb.mid.map((p: string, i: number, arr: string[]) => (
+                                        <div
+                                          key={i}
+                                          onClick={() => openImageViewer(arr, i, `【${catTitle}】施工照片 — 中距離照`)}
+                                          className="group relative overflow-hidden rounded-xl border shadow-sm cursor-zoom-in"
+                                        >
+                                          <img src={`${p}`} alt="中距離照" className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-200" />
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                                {cb.far?.length > 0 && (
+                                  <div>
+                                    <h5 className="font-bold text-slate-600 text-sm mb-2">【{catTitle}】遠距照</h5>
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                      {cb.far.map((p: string, i: number, arr: string[]) => (
+                                        <div
+                                          key={i}
+                                          onClick={() => openImageViewer(arr, i, `【${catTitle}】施工照片 — 遠距照`)}
+                                          className="group relative overflow-hidden rounded-xl border shadow-sm cursor-zoom-in"
+                                        >
+                                          <img src={`${p}`} alt="遠距照" className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-200" />
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
                               </div>
-                            ))}
-                          </div>
+                            );
+                          })}
                         </div>
-                      )}
-                      {safeParseJSON(viewingRecord.data.photos, {}).mid?.length > 0 && (
-                        <div className="mb-4">
-                          <h4 className="font-bold text-slate-600 mb-2">中距離照</h4>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            {safeParseJSON(viewingRecord.data.photos, {}).mid.map((p: string, i: number, arr: string[]) => (
-                              <div
-                                key={i}
-                                onClick={() => openImageViewer(arr, i, '施工照片 — 中距離照')}
-                                title="點擊檢視原圖與放大縮小"
-                                className="group relative overflow-hidden rounded-xl border shadow-sm cursor-zoom-in"
-                              >
-                                <img src={`${p}`} alt="中距離照" className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-200" />
-                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/25 transition-colors flex items-center justify-center">
-                                  <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-black/70 text-white text-xs px-2.5 py-1 rounded-full flex items-center gap-1">
-                                    <ZoomIn size={14} /> 檢視原圖
-                                  </span>
-                                </div>
+                      ) : (
+                        <>
+                          {safeParseJSON(viewingRecord.data.photos, {}).close?.length > 0 && (
+                            <div className="mb-4">
+                              <h4 className="font-bold text-slate-600 mb-2">近照</h4>
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                {safeParseJSON(viewingRecord.data.photos, {}).close.map((p: string, i: number, arr: string[]) => (
+                                  <div
+                                    key={i}
+                                    onClick={() => openImageViewer(arr, i, '施工照片 — 近照')}
+                                    title="點擊檢視原圖與放大縮小"
+                                    className="group relative overflow-hidden rounded-xl border shadow-sm cursor-zoom-in"
+                                  >
+                                    <img src={`${p}`} alt="近照" className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-200" />
+                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/25 transition-colors flex items-center justify-center">
+                                      <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-black/70 text-white text-xs px-2.5 py-1 rounded-full flex items-center gap-1">
+                                        <ZoomIn size={14} /> 檢視原圖
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
                               </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      {safeParseJSON(viewingRecord.data.photos, {}).far?.length > 0 && (
-                        <div className="mb-4">
-                          <h4 className="font-bold text-slate-600 mb-2">遠距照</h4>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            {safeParseJSON(viewingRecord.data.photos, {}).far.map((p: string, i: number, arr: string[]) => (
-                              <div
-                                key={i}
-                                onClick={() => openImageViewer(arr, i, '施工照片 — 遠距照')}
-                                title="點擊檢視原圖與放大縮小"
-                                className="group relative overflow-hidden rounded-xl border shadow-sm cursor-zoom-in"
-                              >
-                                <img src={`${p}`} alt="遠距照" className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-200" />
-                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/25 transition-colors flex items-center justify-center">
-                                  <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-black/70 text-white text-xs px-2.5 py-1 rounded-full flex items-center gap-1">
-                                    <ZoomIn size={14} /> 檢視原圖
-                                  </span>
-                                </div>
+                            </div>
+                          )}
+                          {safeParseJSON(viewingRecord.data.photos, {}).mid?.length > 0 && (
+                            <div className="mb-4">
+                              <h4 className="font-bold text-slate-600 mb-2">中距離照</h4>
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                {safeParseJSON(viewingRecord.data.photos, {}).mid.map((p: string, i: number, arr: string[]) => (
+                                  <div
+                                    key={i}
+                                    onClick={() => openImageViewer(arr, i, '施工照片 — 中距離照')}
+                                    title="點擊檢視原圖與放大縮小"
+                                    className="group relative overflow-hidden rounded-xl border shadow-sm cursor-zoom-in"
+                                  >
+                                    <img src={`${p}`} alt="中距離照" className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-200" />
+                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/25 transition-colors flex items-center justify-center">
+                                      <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-black/70 text-white text-xs px-2.5 py-1 rounded-full flex items-center gap-1">
+                                        <ZoomIn size={14} /> 檢視原圖
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
                               </div>
-                            ))}
-                          </div>
-                        </div>
+                            </div>
+                          )}
+                          {safeParseJSON(viewingRecord.data.photos, {}).far?.length > 0 && (
+                            <div className="mb-4">
+                              <h4 className="font-bold text-slate-600 mb-2">遠距照</h4>
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                {safeParseJSON(viewingRecord.data.photos, {}).far.map((p: string, i: number, arr: string[]) => (
+                                  <div
+                                    key={i}
+                                    onClick={() => openImageViewer(arr, i, '施工照片 — 遠距照')}
+                                    title="點擊檢視原圖與放大縮小"
+                                    className="group relative overflow-hidden rounded-xl border shadow-sm cursor-zoom-in"
+                                  >
+                                    <img src={`${p}`} alt="遠距照" className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-200" />
+                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/25 transition-colors flex items-center justify-center">
+                                      <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-black/70 text-white text-xs px-2.5 py-1 rounded-full flex items-center gap-1">
+                                        <ZoomIn size={14} /> 檢視原圖
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </>
                       )}
                       {safeParseJSON(viewingRecord.data.photos, {}).other?.length > 0 && (
                         <div className="mb-4">
