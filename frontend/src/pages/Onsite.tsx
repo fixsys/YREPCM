@@ -446,7 +446,7 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
     return list;
   }, [workItems, laborForm.work_category, WORK_CATEGORIES]);
 
-  // 發包模式下：現場工程師指派自動帶入紀錄者
+  // 發包模式下：現場工程師指派與現場派工人員姓名皆自動帶入紀錄者並記錄工時
   useEffect(() => {
     if (!isLaborModalOpen || !isOutsourcedMode) return;
     const recUser = users.find((u: any) => u.id === laborForm.recorder_id);
@@ -457,6 +457,22 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
       if (clean.length === 0) return [recName];
       if (!clean.includes(recName)) return [recName, ...clean];
       return prev;
+    });
+    setDispatchWorkers(prev => {
+      const first = prev[0];
+      const st = first?.start_time || '08:00';
+      const et = first?.end_time || '17:00';
+      const hrs = calculateWorkHours(st, et);
+      return [
+        {
+          name: recName,
+          start_time: st,
+          end_time: et,
+          work_category: first?.work_category || '駐場監工',
+          work_item: first?.work_item || '現場管理',
+          work_hours: hrs,
+        },
+      ];
     });
   }, [isLaborModalOpen, isOutsourcedMode, laborForm.recorder_id, users, user?.name]);
 
@@ -508,7 +524,7 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
   }, [isLaborModalOpen, WORK_CATEGORIES, categoryToItems]);
 
   useEffect(() => {
-    if (!isLaborModalOpen) return;
+    if (!isLaborModalOpen || isOutsourcedMode) return;
     
     const aggregated = dispatchWorkers
       .filter(w => w.name.trim() !== '' && w.work_item)
@@ -977,7 +993,7 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
       formData.append('engineers', JSON.stringify(engineers.filter(e => e)));
       formData.append(
         'dispatch_workers',
-        JSON.stringify(isOutsourcedMode ? [] : dispatchWorkers.filter(w => w.name && w.start_time && w.end_time))
+        JSON.stringify(dispatchWorkers.filter(w => w.name && w.start_time && w.end_time))
       );
       formData.append(
         'equipments',
@@ -2165,7 +2181,79 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                   <button type="button" onClick={() => setEngineers([...engineers, ''])} className="text-sm text-indigo-600 font-medium hover:underline">+ 新增一位現場工程師</button>
                 </div>
 
-                {!isOutsourcedMode && (
+                {isOutsourcedMode ? (
+                  <div className="border-t border-slate-200 pt-4 mt-4">
+                    <label className="block text-sm font-bold text-slate-700 mb-2">
+                      現場派工人員
+                      <span className="ml-2 text-xs font-normal text-teal-700 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
+                        發包模式：自動帶入該員並記錄工時
+                      </span>
+                    </label>
+                    {(() => {
+                      const recUser = users.find((u: any) => u.id === laborForm.recorder_id);
+                      const recName = (recUser?.name || user?.name || '').trim();
+                      const w = dispatchWorkers[0] || {
+                        name: recName,
+                        start_time: '08:00',
+                        end_time: '17:00',
+                        work_category: '駐場監工',
+                        work_item: '現場管理',
+                        work_hours: 8,
+                      };
+                      return (
+                        <div className="p-3 bg-slate-50 border rounded-lg">
+                          <div className="flex flex-wrap gap-2 items-center">
+                            <input
+                              type="text"
+                              value={w.name}
+                              onChange={e => {
+                                const next = [...dispatchWorkers];
+                                next[0] = { ...w, name: e.target.value };
+                                setDispatchWorkers(next);
+                              }}
+                              placeholder="姓名"
+                              className="flex-1 min-w-[80px] px-3 py-1.5 text-sm border rounded outline-none bg-white font-medium text-slate-800"
+                            />
+
+                            <TimeInput24
+                              value={w.start_time}
+                              onChange={val => {
+                                const next = [...dispatchWorkers];
+                                next[0] = {
+                                  ...w,
+                                  start_time: val,
+                                  work_hours: calculateWorkHours(val, w.end_time),
+                                };
+                                setDispatchWorkers(next);
+                              }}
+                              className="text-sm"
+                            />
+
+                            <span className="text-slate-500">-</span>
+
+                            <TimeInput24
+                              value={w.end_time}
+                              onChange={val => {
+                                const next = [...dispatchWorkers];
+                                next[0] = {
+                                  ...w,
+                                  end_time: val,
+                                  work_hours: calculateWorkHours(w.start_time, val),
+                                };
+                                setDispatchWorkers(next);
+                              }}
+                              className="text-sm"
+                            />
+
+                            <div className="w-16 text-center text-sm font-bold text-indigo-700 shrink-0">
+                              {w.work_hours} hr
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                ) : (
                 <>
                 <div className="border-t border-slate-200 pt-4 mt-4">
                   <label className="block text-sm font-bold text-slate-700 mb-2">現場派工人員</label>
