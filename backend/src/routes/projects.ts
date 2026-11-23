@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import multer from 'multer';
 import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { authenticateToken, AuthRequest } from '../middleware/authMiddleware';
 
 const router = Router();
@@ -697,6 +698,215 @@ router.put('/:id', authenticateToken, async (req: AuthRequest, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: '更新專案失敗' });
+  }
+});
+
+// Export Project Timeline Gantt Chart as styled Excel (.xlsx)
+router.post('/:id/timeline-excel', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const projectId = String(req.params.id);
+    const project = await prisma.project.findUnique({ where: { id: projectId } });
+    if (!project) {
+      return res.status(404).json({ error: '找不到專案' });
+    }
+
+    const { title, legendText, buckets = [], rows = [] } = req.body;
+
+    const wb = new ExcelJS.Workbook();
+    wb.creator = '元融集團專案管理系統';
+    wb.created = new Date();
+
+    const ws = wb.addWorksheet('專案工程甘特圖', {
+      views: [{ state: 'frozen', xSplit: 4, ySplit: 3 }],
+    });
+
+    const totalCols = 4 + buckets.length + 2; // 項次, 工程階段, 工作模組/施工工項, 預計起訖/目標, ...buckets, 進度%, 備註
+
+    // Row 1: Title Banner
+    const bannerTitle =
+      title ||
+      `${project.project_code || ''} ${project.name || ''} — 專案工程甘特圖與進度檢核表`.trim();
+    const row1 = ws.addRow([bannerTitle]);
+    row1.height = 34;
+    ws.mergeCells(1, 1, 1, totalCols);
+    const titleCell = row1.getCell(1);
+    titleCell.font = { name: 'Microsoft JhengHei', size: 15, bold: true, color: { argb: 'FFFFFFFF' } };
+    titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F4E78' } };
+    titleCell.alignment = { vertical: 'middle', horizontal: 'center' };
+
+    // Row 2: Legend Row
+    const legend =
+      legendText ||
+      '圖例說明：【綠底 ■ 已完工 (100%)】 ｜ 【深藍底 ● 正式執行 / 施工中】 ｜ 【橘底 ▲ 排程預定 / 待開工】 ｜ 【紅底 ★ 延遲警示 (逾期未完成)】';
+    const row2 = ws.addRow([legend]);
+    row2.height = 24;
+    ws.mergeCells(2, 1, 2, totalCols);
+    const legendCell = row2.getCell(1);
+    legendCell.font = { name: 'Microsoft JhengHei', size: 10, bold: true, color: { argb: 'FF1F4E78' } };
+    legendCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } };
+    legendCell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+
+    // Row 3: Table Headers
+    const headerValues = [
+      '項次',
+      '工程階段',
+      '工作模組 / 施工工項',
+      '預計起訖與檢核目標',
+      ...buckets.map((b: any) => `${b.topLabel}\n${b.subLabel}`),
+      '進度%',
+      '備註 / 狀態',
+    ];
+    const row3 = ws.addRow(headerValues);
+    row3.height = 34;
+    row3.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+      if (colNumber <= totalCols) {
+        cell.font = { name: 'Microsoft JhengHei', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2F5597' } };
+        cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FFB4C6E7' } },
+          left: { style: 'thin', color: { argb: 'FFB4C6E7' } },
+          bottom: { style: 'medium', color: { argb: 'FF1F4E78' } },
+          right: { style: 'thin', color: { argb: 'FFB4C6E7' } },
+        };
+      }
+    });
+
+    const COLOR_MAP: Record<string, { bg: string; fg: string }> = {
+      COMPLETED: { bg: 'FF70AD47', fg: 'FFFFFFFF' }, // 綠底
+      ACTIVE: { bg: 'FF2F5597', fg: 'FFFFFFFF' },    // 深藍底
+      PLANNED: { bg: 'FFED7D31', fg: 'FFFFFFFF' },   // 橘底
+      DELAYED: { bg: 'FFC00000', fg: 'FFFFFFFF' },   // 紅底
+    };
+
+    // Data Rows
+    rows.forEach((r: any, idx: number) => {
+      const seqStr = String(idx + 1).padStart(2, '0');
+      const cellValues = [
+        seqStr,
+        r.category || '',
+        r.name || '',
+        r.gateText || '',
+        ...buckets.map((b: any) => {
+          const hit = Array.isArray(r.activeBucketIds) && r.activeBucketIds.includes(b.id);
+          return hit ? r.blockLabel || '● 正式執行' : '';
+        }),
+        `${r.actualProgress ?? 0}%`,
+        r.remark || '',
+      ];
+
+      const excelRow = ws.addRow(cellValues);
+      excelRow.height = 28;
+
+      const isDelayed = r.statusKey === 'DELAYED';
+      const colorStyle = COLOR_MAP[r.statusKey] || COLOR_MAP.ACTIVE;
+
+      excelRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+        if (colNumber > totalCols) return;
+
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+          left: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+          bottom: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+          right: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+        };
+
+        if (colNumber === 1 || colNumber === 2) {
+          cell.font = {
+            name: 'Microsoft JhengHei',
+            size: 10,
+            bold: true,
+            color: { argb: isDelayed && colNumber === 1 ? 'FFC00000' : 'FF1E293B' },
+          };
+          cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+        } else if (colNumber === 3) {
+          cell.font = {
+            name: 'Microsoft JhengHei',
+            size: 10,
+            bold: true,
+            color: { argb: isDelayed ? 'FFC00000' : 'FF0F172A' },
+          };
+          cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+        } else if (colNumber === 4) {
+          cell.font = {
+            name: 'Microsoft JhengHei',
+            size: 9.5,
+            bold: isDelayed,
+            color: { argb: isDelayed ? 'FFC00000' : 'FF334155' },
+          };
+          cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+        } else if (colNumber >= 5 && colNumber < 5 + buckets.length) {
+          const bIdx = colNumber - 5;
+          const b = buckets[bIdx];
+          const hit = b && Array.isArray(r.activeBucketIds) && r.activeBucketIds.includes(b.id);
+          if (hit) {
+            cell.fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: colorStyle.bg },
+            };
+            cell.font = {
+              name: 'Microsoft JhengHei',
+              size: 9.5,
+              bold: true,
+              color: { argb: colorStyle.fg },
+            };
+            cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+          } else {
+            cell.alignment = { vertical: 'middle', horizontal: 'center' };
+          }
+        } else if (colNumber === 5 + buckets.length) {
+          // 進度%
+          cell.font = {
+            name: 'Microsoft JhengHei',
+            size: 10,
+            bold: true,
+            color: {
+              argb:
+                r.actualProgress >= 100
+                  ? 'FF38761D'
+                  : isDelayed
+                  ? 'FFC00000'
+                  : 'FF1E293B',
+            },
+          };
+          cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        } else if (colNumber === 6 + buckets.length) {
+          // 備註
+          cell.font = {
+            name: 'Microsoft JhengHei',
+            size: 9.5,
+            bold: isDelayed,
+            color: { argb: isDelayed ? 'FFC00000' : 'FF334155' },
+          };
+          cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+        }
+      });
+    });
+
+    // Column Widths
+    ws.getColumn(1).width = 7;   // 項次
+    ws.getColumn(2).width = 13;  // 工程階段
+    ws.getColumn(3).width = 30;  // 工作模組/施工工項
+    ws.getColumn(4).width = 28;  // 預計起訖與檢核目標
+    for (let i = 0; i < buckets.length; i++) {
+      ws.getColumn(5 + i).width = 13;
+    }
+    ws.getColumn(5 + buckets.length).width = 10; // 進度%
+    ws.getColumn(6 + buckets.length).width = 24; // 備註
+
+    const buf = await wb.xlsx.writeBuffer();
+    const safeFileName = `${project.project_code || ''}_${project.name || '專案'}_甘特圖與進度檢核表.xlsx`.replace(
+      /[\\/:*?"<>|]/g,
+      '_'
+    );
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(safeFileName)}`);
+    res.send(Buffer.from(buf));
+  } catch (error) {
+    console.error('Export timeline excel error:', error);
+    res.status(500).json({ error: '匯出甘特圖 Excel 失敗' });
   }
 });
 

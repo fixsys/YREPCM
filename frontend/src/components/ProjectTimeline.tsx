@@ -1,5 +1,7 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { ZoomIn, ZoomOut } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import axios from 'axios';
+import { Download, Calendar, Filter } from 'lucide-react';
+import { useAuthStore } from '../store/authStore';
 
 interface ProjectTimelineProps {
   project: any;
@@ -7,8 +9,18 @@ interface ProjectTimelineProps {
   logs: any[];
 }
 
+type Granularity = 'WEEK' | 'BIWEEK' | 'MONTH';
 
-class ErrorBoundary extends React.Component<any, { hasError: boolean, error: any }> {
+interface TimeBucket {
+  id: string;
+  topLabel: string;
+  subLabel: string;
+  startTs: number;
+  endTs: number;
+  isCurrent: boolean;
+}
+
+class ErrorBoundary extends React.Component<any, { hasError: boolean; error: any }> {
   constructor(props: any) {
     super(props);
     this.state = { hasError: false, error: null };
@@ -18,31 +30,71 @@ class ErrorBoundary extends React.Component<any, { hasError: boolean, error: any
   }
   render() {
     if (this.state.hasError) {
-      return <div className="p-10 bg-red-100 text-red-900 font-bold whitespace-pre-wrap">{this.state.error && this.state.error.toString()}
-{this.state.error && this.state.error.stack}</div>;
+      return (
+        <div className="p-10 bg-red-100 text-red-900 font-bold whitespace-pre-wrap">
+          {this.state.error && this.state.error.toString()}
+          {'\n'}
+          {this.state.error && this.state.error.stack}
+        </div>
+      );
     }
     return this.props.children;
   }
 }
 
-const ProjectTimelineInner: React.FC<ProjectTimelineProps> = ({ project, workItemsConfig, logs }) => {
-  const [zoomLevel, setZoomLevel] = useState(100);
-  const containerRef = useRef<HTMLDivElement>(null);
+const pad2 = (n: number) => String(n).padStart(2, '0');
 
-  // Parse actual progress from logs
-  // logs are labor reports containing work_items JSON string
+const formatYMD = (d: Date) =>
+  `${d.getFullYear()}/${pad2(d.getMonth() + 1)}/${pad2(d.getDate())}`;
+
+const formatMD = (d: Date) =>
+  `${pad2(d.getMonth() + 1)}/${pad2(d.getDate())}`;
+
+const toDayStart = (input: string | number | Date): number => {
+  const d = new Date(input);
+  if (Number.isNaN(d.getTime())) return NaN;
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0).getTime();
+};
+
+const toDayEnd = (input: string | number | Date): number => {
+  const d = new Date(input);
+  if (Number.isNaN(d.getTime())) return NaN;
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999).getTime();
+};
+
+const ProjectTimelineInner: React.FC<ProjectTimelineProps> = ({
+  project,
+  workItemsConfig,
+  logs,
+}) => {
+  const { token } = useAuthStore();
+  const [granularity, setGranularity] = useState<Granularity>('WEEK');
+  const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
+  const [isExporting, setIsExporting] = useState(false);
+
+  // 統計各工項在施工日誌累計完成之進度/數量
   const accumulatedProgressMap = useMemo(() => {
     const map = new Map<string, number>();
-    logs.forEach(log => {
-      if (log._logType === 'labor' && log.work_items) {
+    (logs || []).forEach(log => {
+      if ((log._logType === 'labor' || !log._logType) && log.work_items) {
         try {
-          const items = typeof log.work_items === 'string' ? JSON.parse(log.work_items) : log.work_items;
+          const items =
+            typeof log.work_items === 'string'
+              ? JSON.parse(log.work_items)
+              : log.work_items;
           if (Array.isArray(items)) {
             items.forEach((item: any) => {
-              const currentSum = map.get(item.name) || 0;
-              const parsedVal = parseInt(item.progress?.toString().replace('%', '') || '0', 10);
-              if (!isNaN(parsedVal)) {
-                map.set(item.name, currentSum + parsedVal);
+              const rawName = String(item?.name || '').trim();
+              if (!rawName) return;
+              const cleanKey = rawName.split(/\s*\((?:圖號:|規格:|長度:|材質:)/)[0].trim();
+              const parsedVal = parseFloat(
+                String(item.progress ?? '0').replace(/%/g, '').replace(/,/g, '')
+              );
+              if (!Number.isNaN(parsedVal) && parsedVal > 0) {
+                map.set(rawName, (map.get(rawName) || 0) + parsedVal);
+                if (cleanKey && cleanKey !== rawName) {
+                  map.set(cleanKey, (map.get(cleanKey) || 0) + parsedVal);
+                }
               }
             });
           }
@@ -54,336 +106,622 @@ const ProjectTimelineInner: React.FC<ProjectTimelineProps> = ({ project, workIte
     return map;
   }, [logs]);
 
-  // Filter valid items (must have start and end date)
-  const timelineData = useMemo(() => {
-    const data: { category: string; items: any[] }[] = [];
-    let minDate = new Date('2099-01-01').getTime();
-    let maxDate = new Date('1970-01-01').getTime();
-    let hasItems = false;
+  const now = new Date();
+  const todayStartTs = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+    0,
+    0,
+    0,
+    0
+  ).getTime();
+  const todayEndTs = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+    23,
+    59,
+    59,
+    999
+  ).getTime();
+
+  // 整理所有具備起訖日期的工項與時間範圍
+  const { allRows, categories, minTs, maxTs, hasItems } = useMemo(() => {
+    const rowsList: any[] = [];
+    const catList: string[] = [];
+    let minDateTs = Infinity;
+    let maxDateTs = -Infinity;
 
     Object.keys(workItemsConfig || {}).forEach(category => {
-      const items = (workItemsConfig[category] || []).filter((i: any) => {
-        if (!i.startDate || !i.endDate || !i.name) return false;
-        const sTs = new Date(i.startDate).getTime();
-        const eTs = new Date(i.endDate).getTime();
-        return !isNaN(sTs) && !isNaN(eTs);
+      const rawItems = Array.isArray(workItemsConfig[category])
+        ? workItemsConfig[category]
+        : [];
+      const validItems = rawItems.filter((i: any) => {
+        if (!i?.startDate || !i?.endDate || !i?.name) return false;
+        const s = toDayStart(i.startDate);
+        const e = toDayEnd(i.endDate);
+        return !Number.isNaN(s) && !Number.isNaN(e) && s <= e;
       });
-      if (items.length > 0) {
-        const enrichedItems = items.map((i: any) => {
-          const sDate = new Date(i.startDate).getTime();
-          const eDate = new Date(i.endDate).getTime();
-          if (sDate < minDate) minDate = sDate;
-          if (eDate > maxDate) maxDate = eDate;
-          
-          const accumulated = accumulatedProgressMap.get(i.name) || 0;
-          let actualPercentage = 0;
-          
-          if (i.contractQuantity && i.contractQuantity > 0) {
-            actualPercentage = Math.min(100, Math.round((accumulated / i.contractQuantity) * 100));
+
+      if (validItems.length > 0) {
+        catList.push(category);
+        const enriched = validItems.map((i: any) => {
+          const startTs = toDayStart(i.startDate);
+          const endTs = toDayEnd(i.endDate);
+          if (startTs < minDateTs) minDateTs = startTs;
+          if (endTs > maxDateTs) maxDateTs = endTs;
+
+          const contractQty = Number(i.contractQuantity) || 0;
+          const unit = i.unit || '式';
+          const accumulated =
+            Math.round((accumulatedProgressMap.get(String(i.name).trim()) || 0) * 100) /
+            100;
+
+          let actualProgress = 0;
+          if (contractQty > 0) {
+            actualProgress = Math.min(100, Math.round((accumulated / contractQty) * 100));
           } else {
-            actualPercentage = Math.min(100, accumulated);
+            actualProgress = Math.min(100, Math.round(accumulated));
           }
+
+          // 判斷色塊狀態：
+          // 1. 已完工 (100%) -> 綠底 ■ 已完工
+          // 2. 逾期未完工 (endTs < todayStartTs && actualProgress < 100) -> 紅底 ★ 延遲警示
+          // 3. 正式執行 / 施工中 (actualProgress > 0 || (startTs <= todayEndTs && endTs >= todayStartTs)) -> 深藍底 ● 正式執行
+          // 4. 排程預定 / 待開工 (startTs > todayEndTs && actualProgress === 0) -> 橘底 ▲ 排程預定
+          let statusKey: 'COMPLETED' | 'DELAYED' | 'ACTIVE' | 'PLANNED' = 'ACTIVE';
+          let blockLabel = '● 正式執行';
+          let remark = '';
+
+          if (actualProgress >= 100) {
+            statusKey = 'COMPLETED';
+            blockLabel = '■ 已完工';
+            remark = contractQty > 0 ? `已完工 (${accumulated}/${contractQty} ${unit})` : '100% 已完工';
+          } else if (endTs < todayStartTs && actualProgress < 100) {
+            statusKey = 'DELAYED';
+            blockLabel = '★ 延遲警示';
+            remark =
+              contractQty > 0
+                ? `進度落後 (${accumulated}/${contractQty} ${unit})`
+                : `逾期未完成 (目前 ${actualProgress}%)`;
+          } else if (actualProgress > 0 || (startTs <= todayEndTs && endTs >= todayStartTs)) {
+            statusKey = 'ACTIVE';
+            blockLabel = '● 正式執行';
+            remark =
+              contractQty > 0
+                ? `執行中 (${accumulated}/${contractQty} ${unit})`
+                : '依排程執行中';
+          } else {
+            statusKey = 'PLANNED';
+            blockLabel = '▲ 排程預定';
+            remark =
+              contractQty > 0
+                ? `預定排程 (目標 ${contractQty} ${unit})`
+                : '預定排程待開工';
+          }
+
+          const startStr = formatYMD(new Date(startTs));
+          const endStr = formatYMD(new Date(endTs));
+          const gateText = `${endStr.slice(5)} 前完成${
+            contractQty > 0 ? `（目標：${contractQty} ${unit}）` : ''
+          }`;
 
           return {
             ...i,
-            startTs: sDate,
-            endTs: eDate,
-            actualProgress: actualPercentage
+            category,
+            startTs,
+            endTs,
+            startStr,
+            endStr,
+            contractQty,
+            unit,
+            accumulated,
+            actualProgress,
+            statusKey,
+            blockLabel,
+            gateText,
+            remark,
           };
         });
-        // Sort items by start date
-        enrichedItems.sort((a: any, b: any) => a.startTs - b.startTs);
-        data.push({ category, items: enrichedItems });
-        hasItems = true;
+
+        enriched.sort((a: any, b: any) => a.startTs - b.startTs);
+        rowsList.push(...enriched);
       }
     });
 
-    if (!hasItems) {
-      return { data: [], minDate: 0, maxDate: 0, totalDays: 0, hasItems: false };
+    if (rowsList.length === 0) {
+      return {
+        allRows: [],
+        categories: [],
+        minTs: 0,
+        maxTs: 0,
+        hasItems: false,
+      };
     }
 
-    // Add 1 month padding
-    const paddedMin = new Date(minDate);
-    paddedMin.setMonth(paddedMin.getMonth() - 1);
-    paddedMin.setDate(1);
-
-    const paddedMax = new Date(maxDate);
-    paddedMax.setMonth(paddedMax.getMonth() + 2);
-    paddedMax.setDate(0);
-
-    const totalDays = Math.ceil((paddedMax.getTime() - paddedMin.getTime()) / (1000 * 60 * 60 * 24));
-
-    return { data, minDate: paddedMin.getTime(), maxDate: paddedMax.getTime(), totalDays, hasItems: true };
-  }, [workItemsConfig, accumulatedProgressMap]);
-
-  // Handle Ctrl + Scroll to Zoom
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    const handleWheel = (e: WheelEvent) => {
-      if (e.ctrlKey) {
-        e.preventDefault();
-        setZoomLevel(prev => {
-          let newZoom = prev + (e.deltaY < 0 ? 25 : -25);
-          return Math.max(100, Math.min(600, newZoom));
-        });
-      }
+    return {
+      allRows: rowsList,
+      categories: catList,
+      minTs: minDateTs,
+      maxTs: maxDateTs,
+      hasItems: true,
     };
+  }, [workItemsConfig, accumulatedProgressMap, todayStartTs, todayEndTs]);
 
-    container.addEventListener('wheel', handleWheel, { passive: false });
-    return () => container.removeEventListener('wheel', handleWheel);
-  }, []);
+  // 依據篩選後的工項決定時間區間欄位 (週別 W1~W5 / 雙週 / 月別)
+  const filteredRows = useMemo(() => {
+    if (selectedCategory === 'ALL') return allRows;
+    return allRows.filter(r => r.category === selectedCategory);
+  }, [allRows, selectedCategory]);
 
-  if (!timelineData.hasItems) {
+  const { buckets, rangeStartStr, rangeEndStr } = useMemo(() => {
+    const targetRows = filteredRows.length > 0 ? filteredRows : allRows;
+    if (targetRows.length === 0) {
+      return { buckets: [] as TimeBucket[], rangeStartStr: '', rangeEndStr: '' };
+    }
+
+    let rMin = Infinity;
+    let rMax = -Infinity;
+    targetRows.forEach(r => {
+      if (r.startTs < rMin) rMin = r.startTs;
+      if (r.endTs > rMax) rMax = r.endTs;
+    });
+
+    const minD = new Date(rMin);
+    const maxD = new Date(rMax);
+    const spanYears = maxD.getFullYear() !== minD.getFullYear();
+    const list: TimeBucket[] = [];
+
+    if (granularity === 'WEEK') {
+      // 將每個月份切分為月內週別 W1 ~ W5（與參考圖完全一致：例如 11月 W4 11/23-11/30, 12月 W1 12/01-12/06）
+      let cur = new Date(minD.getFullYear(), minD.getMonth(), 1);
+      const endMonth = new Date(maxD.getFullYear(), maxD.getMonth() + 1, 0);
+
+      while (cur <= endMonth) {
+        const y = cur.getFullYear();
+        const m = cur.getMonth(); // 0..11
+        const daysInMonth = new Date(y, m + 1, 0).getDate();
+
+        let dayCursor = 1;
+        let weekNum = 1;
+        while (dayCursor <= daysInMonth) {
+          const startDateObj = new Date(y, m, dayCursor, 0, 0, 0, 0);
+          // 找出該週的週日（若週日超過月底，或月底剩餘天數 <= 2 天則合併到月底）
+          const dow = startDateObj.getDay(); // 0(Sun) .. 6(Sat)
+          const daysUntilSunday = dow === 0 ? 0 : 7 - dow;
+          let endDay = Math.min(daysInMonth, dayCursor + daysUntilSunday);
+          // 若第一週只有 1 天(週日)，往後延伸到下週日
+          if (endDay === dayCursor && dayCursor === 1 && daysInMonth > 7) {
+            endDay = Math.min(daysInMonth, dayCursor + 7);
+          }
+          // 若距離月底只剩 1~2 天，直接併入本週避免碎片欄位
+          if (daysInMonth - endDay <= 2) {
+            endDay = daysInMonth;
+          }
+
+          const endDateObj = new Date(y, m, endDay, 23, 59, 59, 999);
+          const bStart = startDateObj.getTime();
+          const bEnd = endDateObj.getTime();
+
+          // 只保留與專案顯示範圍有交集的週次（前後保留1週緩衝）
+          if (bEnd >= rMin - 7 * 86400000 && bStart <= rMax + 7 * 86400000) {
+            const monthPrefix = spanYears ? `${String(y).slice(2)}/${m + 1}月` : `${m + 1}月`;
+            list.push({
+              id: `W-${y}-${m + 1}-${weekNum}`,
+              topLabel: `${monthPrefix} W${weekNum}`,
+              subLabel: `${pad2(m + 1)}/${pad2(dayCursor)}-${pad2(m + 1)}/${pad2(endDay)}`,
+              startTs: bStart,
+              endTs: bEnd,
+              isCurrent: todayStartTs >= bStart && todayStartTs <= bEnd,
+            });
+          }
+
+          dayCursor = endDay + 1;
+          weekNum++;
+        }
+
+        cur = new Date(y, m + 1, 1);
+      }
+    } else if (granularity === 'BIWEEK') {
+      // 上半月 (01~15) / 下半月 (16~月底)
+      let cur = new Date(minD.getFullYear(), minD.getMonth(), 1);
+      const endMonth = new Date(maxD.getFullYear(), maxD.getMonth() + 1, 0);
+
+      while (cur <= endMonth) {
+        const y = cur.getFullYear();
+        const m = cur.getMonth();
+        const daysInMonth = new Date(y, m + 1, 0).getDate();
+        const monthPrefix = spanYears ? `${String(y).slice(2)}/${m + 1}月` : `${m + 1}月`;
+
+        const h1Start = new Date(y, m, 1, 0, 0, 0, 0).getTime();
+        const h1End = new Date(y, m, 15, 23, 59, 59, 999).getTime();
+        if (h1End >= rMin && h1Start <= rMax) {
+          list.push({
+            id: `BW-${y}-${m + 1}-1`,
+            topLabel: `${monthPrefix} 上半`,
+            subLabel: `${pad2(m + 1)}/01-${pad2(m + 1)}/15`,
+            startTs: h1Start,
+            endTs: h1End,
+            isCurrent: todayStartTs >= h1Start && todayStartTs <= h1End,
+          });
+        }
+
+        const h2Start = new Date(y, m, 16, 0, 0, 0, 0).getTime();
+        const h2End = new Date(y, m, daysInMonth, 23, 59, 59, 999).getTime();
+        if (h2End >= rMin && h2Start <= rMax) {
+          list.push({
+            id: `BW-${y}-${m + 1}-2`,
+            topLabel: `${monthPrefix} 下半`,
+            subLabel: `${pad2(m + 1)}/16-${pad2(m + 1)}/${pad2(daysInMonth)}`,
+            startTs: h2Start,
+            endTs: h2End,
+            isCurrent: todayStartTs >= h2Start && todayStartTs <= h2End,
+          });
+        }
+
+        cur = new Date(y, m + 1, 1);
+      }
+    } else {
+      // 月別
+      let cur = new Date(minD.getFullYear(), minD.getMonth(), 1);
+      const endMonth = new Date(maxD.getFullYear(), maxD.getMonth() + 1, 0);
+
+      while (cur <= endMonth) {
+        const y = cur.getFullYear();
+        const m = cur.getMonth();
+        const daysInMonth = new Date(y, m + 1, 0).getDate();
+        const mStart = new Date(y, m, 1, 0, 0, 0, 0).getTime();
+        const mEnd = new Date(y, m, daysInMonth, 23, 59, 59, 999).getTime();
+
+        list.push({
+          id: `M-${y}-${m + 1}`,
+          topLabel: `${y}年 ${m + 1}月`,
+          subLabel: `${pad2(m + 1)}/01-${pad2(m + 1)}/${pad2(daysInMonth)}`,
+          startTs: mStart,
+          endTs: mEnd,
+          isCurrent: todayStartTs >= mStart && todayStartTs <= mEnd,
+        });
+
+        cur = new Date(y, m + 1, 1);
+      }
+    }
+
+    return {
+      buckets: list,
+      rangeStartStr: formatYMD(minD),
+      rangeEndStr: formatYMD(maxD),
+    };
+  }, [filteredRows, allRows, granularity, todayStartTs]);
+
+  // 計算每一列命中的時間區間 ID
+  const rowsWithBuckets = useMemo(() => {
+    return filteredRows.map(r => {
+      const activeBucketIds = buckets
+        .filter(b => r.startTs <= b.endTs && r.endTs >= b.startTs)
+        .map(b => b.id);
+      return {
+        ...r,
+        activeBucketIds,
+      };
+    });
+  }, [filteredRows, buckets]);
+
+  if (!hasItems) {
     return (
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-12 text-center">
         <h3 className="text-xl font-bold text-slate-700 mb-2">尚未設定具備日期的工項</h3>
-        <p className="text-slate-500">請先至「施工細項設定」頁籤，為工項輸入「開始日期」與「結束日期」，才能在時間軸中顯示。</p>
+        <p className="text-slate-500">
+          請先至「施工細項設定」頁籤，為工項輸入「開始日期」與「結束日期」，才能在專案時間軸中以甘特圖色塊顯示。
+        </p>
       </div>
     );
   }
 
-  const { data, minDate, maxDate, totalDays } = timelineData;
-  const todayTs = new Date().getTime();
-  
-  // Base day width is 2px at 100% zoom.
-  // At 600%, it is 12px per day.
-  const dayWidth = 2 * (zoomLevel / 100);
-  const totalWidth = totalDays * dayWidth;
+  const bannerTitle = `${project?.project_code || ''} ${
+    project?.name || '專案'
+  } — 專案工程甘特圖與進度檢核表 (${rangeStartStr} ~ ${rangeEndStr})`.trim();
 
-  const getX = (ts: number) => {
-    if (isNaN(ts) || isNaN(minDate)) return 0;
-    const days = (ts - minDate) / (1000 * 60 * 60 * 24);
-    return Math.max(0, days * dayWidth) || 0;
-  };
+  const legendText =
+    '圖例說明：【綠底 ■ 已完工 (100%)】 ｜ 【深藍底 ● 正式執行 / 施工中】 ｜ 【橘底 ▲ 排程預定 / 待開工】 ｜ 【紅底 ★ 延遲警示 (逾期未完成)】';
 
-  const getWidth = (startTs: number, endTs: number) => {
-    if (isNaN(startTs) || isNaN(endTs)) return 0;
-    const days = (endTs - startTs) / (1000 * 60 * 60 * 24) + 1; // +1 to include end day
-    return Math.max(0, days * dayWidth) || 0;
-  };
-
-  const todayX = getX(todayTs);
-
-  // Generate headers based on zoom level
-  const renderTimeHeaders = () => {
-    const headers = [];
-    const current = new Date(minDate);
-    current.setHours(0,0,0,0);
-    const end = new Date(maxDate);
-
-    if (zoomLevel < 150) {
-      // Quarters
-      while (current <= end) {
-        const year = current.getFullYear();
-        const quarter = Math.floor(current.getMonth() / 3) + 1;
-        const qStart = new Date(year, (quarter - 1) * 3, 1);
-        const qEnd = new Date(year, quarter * 3, 0);
-        
-        let actualStart = qStart.getTime() < minDate ? minDate : qStart.getTime();
-        let actualEnd = qEnd.getTime() > maxDate ? maxDate : qEnd.getTime();
-        
-        if (actualStart <= actualEnd) {
-          headers.push(
-            <div key={`q-${year}-${quarter}`} 
-                 className="absolute border-r border-slate-200 h-full flex items-center justify-center text-xs font-bold text-slate-600 bg-slate-50"
-                 style={{ left: getX(actualStart), width: getWidth(actualStart, actualEnd) }}>
-              Q{quarter} ({year})
-            </div>
-          );
+  const handleExportExcel = async () => {
+    if (!project?.id) return;
+    setIsExporting(true);
+    try {
+      const res = await axios.post(
+        `/api/projects/${project.id}/timeline-excel`,
+        {
+          title: bannerTitle,
+          legendText,
+          buckets,
+          rows: rowsWithBuckets,
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          responseType: 'blob',
         }
-        current.setMonth(current.getMonth() + 3);
-      }
-    } else if (zoomLevel < 300) {
-      // Months
-      while (current <= end) {
-        const year = current.getFullYear();
-        const month = current.getMonth();
-        const mStart = new Date(year, month, 1);
-        const mEnd = new Date(year, month + 1, 0);
-        
-        let actualStart = mStart.getTime() < minDate ? minDate : mStart.getTime();
-        let actualEnd = mEnd.getTime() > maxDate ? maxDate : mEnd.getTime();
+      );
 
-        if (actualStart <= actualEnd) {
-          headers.push(
-            <div key={`m-${year}-${month}`} 
-                 className="absolute border-r border-slate-200 h-full flex items-center justify-center text-xs font-bold text-slate-600 bg-slate-50"
-                 style={{ left: getX(actualStart), width: getWidth(actualStart, actualEnd) }}>
-              {month + 1}月
-            </div>
-          );
-        }
-        current.setMonth(current.getMonth() + 1);
-      }
-    } else {
-      // Days (simplified to show tick marks or week blocks to avoid thousands of divs)
-      // We will show Months on top half, days on bottom half
-      while (current <= end) {
-        const year = current.getFullYear();
-        const month = current.getMonth();
-        const date = current.getDate();
-        
-        // Only render text for 1st, 10th, 20th if width allows, otherwise just a tick
-        const showText = date === 1 || date === 10 || date === 20;
-        
-        headers.push(
-          <div key={`d-${year}-${month}-${date}`} 
-               className={`absolute border-r border-slate-200 h-full flex items-end justify-center text-[10px] text-slate-500 pb-1 ${date === 1 ? 'bg-slate-100 border-l border-slate-300' : ''}`}
-               style={{ left: getX(current.getTime()), width: dayWidth }}>
-            {showText ? date : ''}
-          </div>
-        );
-        current.setDate(current.getDate() + 1);
-      }
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      const safeName = `${project.project_code || ''}_${
+        project.name || '專案'
+      }_甘特圖與進度檢核表.xlsx`.replace(/[\\/:*?"<>|]/g, '_');
+      link.setAttribute('download', safeName);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Export timeline excel error:', err);
+      alert('匯出甘特圖 Excel 失敗，請稍後再試');
+    } finally {
+      setIsExporting(false);
     }
-    return headers;
   };
 
-  const getStatusColor = (item: any) => {
-    if (item.actualProgress >= 100) return 'bg-blue-500';
-    if (item.endTs < todayTs && item.actualProgress < 100) return 'bg-red-500'; // Delayed
-    return 'bg-blue-400';
+  const getBlockStyleClass = (statusKey: string) => {
+    switch (statusKey) {
+      case 'COMPLETED':
+        return 'bg-[#70AD47] text-white border-[#5c9338]'; // 綠底
+      case 'DELAYED':
+        return 'bg-[#C00000] text-white border-[#9e0000]'; // 紅底
+      case 'PLANNED':
+        return 'bg-[#ED7D31] text-white border-[#d16820]'; // 橘底
+      case 'ACTIVE':
+      default:
+        return 'bg-[#2F5597] text-white border-[#234278]'; // 深藍底
+    }
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col h-[700px]">
-      
-      {/* Toolbar */}
-      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-4 pb-2 border-b">
-        <div className="flex-shrink-0">
-          <h3 className="text-lg font-semibold text-slate-800 whitespace-nowrap">專案總體與工項時間軸</h3>
-          <p className="text-sm text-slate-500">
-            期間：{new Date(minDate).toLocaleDateString()} - {new Date(maxDate).toLocaleDateString()}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-4 w-full xl:w-auto xl:justify-end">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 bg-slate-50 px-3 py-1.5 rounded-lg border">
-            <div className="flex items-center"><span className="w-3 h-3 bg-slate-200 rounded-sm mr-1"></span> 預計工期</div>
-            <div className="flex items-center"><span className="w-3 h-3 bg-blue-500 rounded-sm mr-1"></span> 實際完成比例</div>
-            <div className="flex items-center"><span className="w-3 h-3 bg-red-500 rounded-sm mr-1"></span> 延遲警示</div>
-            <div className="flex items-center"><span className="w-px h-3 bg-red-500 mr-1"></span> 今日 ({new Date().toLocaleDateString(undefined, {month:'2-digit', day:'2-digit'})})</div>
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col space-y-3">
+      {/* 操作控制列 */}
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-slate-200">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* 工程階段篩選 */}
+          <div className="flex items-center gap-1.5 bg-slate-100 px-2.5 py-1.5 rounded-lg text-xs font-bold text-slate-700">
+            <Filter size={14} className="text-slate-500" />
+            <span>工程階段：</span>
+            <select
+              value={selectedCategory}
+              onChange={e => setSelectedCategory(e.target.value)}
+              className="bg-white border border-slate-300 rounded px-2 py-0.5 text-xs font-bold text-slate-800 outline-none"
+            >
+              <option value="ALL">全部工程階段 ({allRows.length} 項)</option>
+              {categories.map(cat => (
+                <option key={cat} value={cat}>
+                  {cat} ({allRows.filter(r => r.category === cat).length} 項)
+                </option>
+              ))}
+            </select>
           </div>
-          <div className="flex items-center gap-2 whitespace-nowrap">
-            <span className="text-xs text-slate-400 hidden sm:inline-block">提示: 按住 Ctrl + 滾輪可縮放</span>
-            <button onClick={() => setZoomLevel(Math.max(100, zoomLevel - 25))} className="p-1.5 border rounded hover:bg-slate-100 text-slate-600 transition-colors" title="縮小">
-              <ZoomOut size={16} />
-            </button>
-            <span className="text-sm font-bold w-12 text-center">{zoomLevel}%</span>
-            <button onClick={() => setZoomLevel(Math.min(600, zoomLevel + 25))} className="p-1.5 border rounded hover:bg-slate-100 text-slate-600 transition-colors" title="放大">
-              <ZoomIn size={16} />
-            </button>
-          </div>
-        </div>
-      </div>
 
-      {/* Gantt Chart Area */}
-      <div className="flex-1 overflow-auto border border-slate-200 rounded-lg relative flex" ref={containerRef}>
-        
-        {/* Left Frozen Column: Items List */}
-        <div className="w-64 flex-shrink-0 bg-white z-20 sticky left-0 border-r border-slate-300 shadow-[2px_0_5px_rgba(0,0,0,0.05)]">
-          {/* Top-left empty corner for header */}
-          <div className="h-12 border-b border-slate-300 bg-slate-100 sticky top-0 z-30 flex items-center px-4 font-bold text-slate-600 text-sm">
-            工程階段 / 工項名稱
-          </div>
-          
-          <div className="flex flex-col">
-            {data.map((categoryGroup, cIdx) => (
-              <React.Fragment key={cIdx}>
-                <div className="bg-slate-50 font-bold text-slate-700 px-4 py-2 border-b text-sm">
-                  {categoryGroup.category}
-                </div>
-                {categoryGroup.items.map((item, iIdx) => (
-                  <div key={iIdx} className="px-4 py-2 border-b text-sm text-slate-600 hover:bg-teal-50 truncate h-10 flex items-center" title={item.name}>
-                    {iIdx + 1}. {item.name}
-                  </div>
-                ))}
-              </React.Fragment>
+          {/* 時間顆粒度切換 */}
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg text-xs font-bold">
+            <Calendar size={14} className="text-slate-500 ml-1.5 mr-1" />
+            {(
+              [
+                { id: 'WEEK', label: '週別 (W1~W5)' },
+                { id: 'BIWEEK', label: '雙週 (上/下半月)' },
+                { id: 'MONTH', label: '月別' },
+              ] as { id: Granularity; label: string }[]
+            ).map(g => (
+              <button
+                key={g.id}
+                type="button"
+                onClick={() => setGranularity(g.id)}
+                className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer ${
+                  granularity === g.id
+                    ? 'bg-[#1F4E78] text-white shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                {g.label}
+              </button>
             ))}
           </div>
         </div>
 
-        {/* Right Scrollable Timeline Area */}
-        <div className="flex-1 relative bg-white" style={{ minWidth: totalWidth }}>
-          
-          {/* Top Frozen Row: Timeline Header */}
-          <div className="h-12 border-b border-slate-300 sticky top-0 z-10 bg-slate-50 overflow-hidden relative w-full">
-            {renderTimeHeaders()}
-          </div>
+        {/* 匯出 Excel 按鈕 */}
+        <button
+          type="button"
+          onClick={handleExportExcel}
+          disabled={isExporting}
+          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-extrabold flex items-center gap-2 shadow-sm transition-colors disabled:opacity-50 cursor-pointer"
+        >
+          <Download size={15} />
+          {isExporting ? '正在產生 Excel...' : '輸出成 Excel (.xlsx)'}
+        </button>
+      </div>
 
-          {/* Timeline Grid & Bars */}
-          <div className="relative w-full" style={{ height: 'calc(100% - 3rem)' }}>
-            
-            {/* Background Grid Lines based on months */}
-            <div className="absolute inset-0 pointer-events-none opacity-20">
-               {renderTimeHeaders()}
-            </div>
+      {/* 甘特圖主表區塊（參考圖片樣式：深藍大標題 + 圖例說明 + 表格色塊） */}
+      <div className="border-2 border-[#1F4E78] rounded-lg overflow-hidden shadow-sm">
+        {/* 第一列：深藍主標題橫幅 */}
+        <div className="bg-[#1F4E78] text-white text-center py-3 px-4 font-extrabold text-base md:text-lg tracking-wide">
+          {bannerTitle}
+        </div>
 
-            {/* Today Line Line indicator */}
-            {todayX >= 0 && todayX <= totalWidth && (
-              <div className="absolute top-0 bottom-0 border-l-2 border-dashed border-red-500 z-10 pointer-events-none" style={{ left: todayX }}>
-                <div className="absolute top-1.5 -ml-[14px] bg-red-500 text-white text-[10px] px-1 rounded whitespace-nowrap shadow">今日</div>
-              </div>
-            )}
+        {/* 第二列：圖例說明列 */}
+        <div className="bg-[#E8EEF5] border-y border-[#B4C6E7] px-4 py-2 text-xs font-bold text-[#1F4E78] flex flex-wrap items-center gap-x-4 gap-y-1.5">
+          <span>圖例說明：</span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-block w-3.5 h-3.5 rounded-xs bg-[#70AD47] border border-[#5c9338]"></span>
+            【綠底】■ 已完工 (100%)
+          </span>
+          <span className="text-slate-400">｜</span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-block w-3.5 h-3.5 rounded-xs bg-[#2F5597] border border-[#234278]"></span>
+            【深藍底】● 正式執行 / 施工中
+          </span>
+          <span className="text-slate-400">｜</span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-block w-3.5 h-3.5 rounded-xs bg-[#ED7D31] border border-[#d16820]"></span>
+            【橘底】▲ 排程預定 / 待開工
+          </span>
+          <span className="text-slate-400">｜</span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-block w-3.5 h-3.5 rounded-xs bg-[#C00000] border border-[#9e0000]"></span>
+            【紅底】★ 延遲警示 (逾期未完成)
+          </span>
+        </div>
 
-            {/* Data Rows */}
-            <div className="flex flex-col relative">
-              {data.map((categoryGroup, cIdx) => (
-                <React.Fragment key={cIdx}>
-                  <div className="h-[37px] border-b bg-slate-50/30"></div> {/* Category gap */}
-                  {categoryGroup.items.map((item, iIdx) => {
-                    const x = getX(item.startTs);
-                    const w = getWidth(item.startTs, item.endTs);
-                    const isDelayed = item.endTs < todayTs && item.actualProgress < 100;
+        {/* 第三列起：甘特圖色塊矩陣表格 */}
+        <div className="overflow-auto max-h-[620px]">
+          <table className="w-full border-collapse text-xs">
+            <thead className="sticky top-0 z-30">
+              <tr className="bg-[#2F5597] text-white">
+                <th className="sticky left-0 z-40 bg-[#2F5597] border border-[#8EA9DB] px-2.5 py-2.5 w-12 text-center font-bold whitespace-nowrap">
+                  項次
+                </th>
+                <th className="sticky left-12 z-40 bg-[#2F5597] border border-[#8EA9DB] px-3 py-2.5 w-24 text-center font-bold whitespace-nowrap">
+                  工程階段
+                </th>
+                <th className="sticky left-36 z-40 bg-[#2F5597] border border-[#8EA9DB] px-3 py-2.5 min-w-[210px] text-left font-bold">
+                  工作模組 / 施工工項
+                </th>
+                <th className="border border-[#8EA9DB] px-3 py-2.5 min-w-[190px] text-left font-bold">
+                  預計起訖與檢核目標
+                </th>
 
-                    return (
-                      <div key={iIdx} className="h-10 border-b hover:bg-slate-50 relative group">
-                        
-                        {/* Planned Bar (Grey) */}
-                        <div className="absolute top-2 h-5 bg-slate-200 rounded-full flex items-center justify-center" style={{ left: x, width: w }}>
-                          
-                          {/* Actual Progress Bar (Colored) */}
-                          <div className={`absolute top-0 left-0 h-full rounded-full transition-all duration-300 ${getStatusColor(item)}`}
-                               style={{ width: `${item.actualProgress}%` }}>
-                          </div>
+                {buckets.map(b => (
+                  <th
+                    key={b.id}
+                    className={`border border-[#8EA9DB] px-2 py-2 min-w-[96px] text-center font-bold whitespace-nowrap leading-tight ${
+                      b.isCurrent ? 'bg-[#1b3b6f] ring-2 ring-inset ring-amber-300' : ''
+                    }`}
+                  >
+                    <div>{b.topLabel}</div>
+                    <div className="text-[11px] font-mono text-blue-100 mt-0.5">{b.subLabel}</div>
+                    {b.isCurrent && (
+                      <div className="mt-0.5 inline-block px-1.5 py-0.2 bg-amber-400 text-slate-900 text-[10px] font-extrabold rounded">
+                        本週/今日
+                      </div>
+                    )}
+                  </th>
+                ))}
 
-                          {/* Percentage Text */}
-                          {w > 30 && (
-                            <span className="relative z-10 text-[10px] font-bold text-slate-800 pointer-events-none" style={{ textShadow: '0 0 3px white, 0 0 3px white, 0 0 3px white' }}>
-                              {item.actualProgress}%
-                            </span>
-                          )}
+                <th className="border border-[#8EA9DB] px-2.5 py-2.5 w-16 text-center font-bold whitespace-nowrap">
+                  進度%
+                </th>
+                <th className="border border-[#8EA9DB] px-3 py-2.5 min-w-[170px] text-left font-bold">
+                  備註 / 狀態
+                </th>
+              </tr>
+            </thead>
 
-                          {/* Delayed Warning Icon */}
-                          {isDelayed && (
-                            <div className="absolute -right-6 top-0 text-red-500 text-xs flex items-center h-full font-bold">
-                              ⚠️
+            <tbody>
+              {rowsWithBuckets.map((row, idx) => {
+                const seqStr = String(idx + 1).padStart(2, '0');
+                const isDelayed = row.statusKey === 'DELAYED';
+                const blockClass = getBlockStyleClass(row.statusKey);
+
+                return (
+                  <tr
+                    key={`${row.category}-${row.name}-${idx}`}
+                    className="hover:bg-blue-50/40 transition-colors bg-white"
+                  >
+                    {/* 項次 */}
+                    <td
+                      className={`sticky left-0 z-20 bg-white border border-slate-300 px-2 py-2.5 text-center font-mono font-bold ${
+                        isDelayed ? 'text-[#C00000]' : 'text-slate-700'
+                      }`}
+                    >
+                      {seqStr}
+                    </td>
+
+                    {/* 工程階段 */}
+                    <td className="sticky left-12 z-20 bg-white border border-slate-300 px-2.5 py-2.5 text-center font-bold text-slate-700 whitespace-nowrap">
+                      {row.category}
+                    </td>
+
+                    {/* 工作模組 / 施工工項 */}
+                    <td
+                      className={`sticky left-36 z-20 bg-white border border-slate-300 px-3 py-2.5 font-bold ${
+                        isDelayed ? 'text-[#C00000]' : 'text-slate-800'
+                      }`}
+                    >
+                      {isDelayed && <span className="mr-1">★</span>}
+                      {row.name}
+                    </td>
+
+                    {/* 預計起訖與檢核目標 */}
+                    <td
+                      className={`border border-slate-300 px-3 py-2.5 leading-snug ${
+                        isDelayed ? 'text-[#C00000] font-bold' : 'text-slate-700'
+                      }`}
+                    >
+                      <div className="font-mono text-[11px]">
+                        {formatMD(new Date(row.startTs))} ~ {formatMD(new Date(row.endTs))}
+                      </div>
+                      <div className="text-[11px]">{row.gateText}</div>
+                    </td>
+
+                    {/* 時間區間色塊欄位 */}
+                    {buckets.map(b => {
+                      const isHit = row.activeBucketIds.includes(b.id);
+                      return (
+                        <td
+                          key={b.id}
+                          title={
+                            isHit
+                              ? `${row.category} - ${row.name}\n預計工期：${row.startStr} ~ ${row.endStr}\n目前進度：${row.actualProgress}%\n狀態：${row.remark}`
+                              : `${b.topLabel} (${b.subLabel})`
+                          }
+                          className={`border border-slate-300 p-0 text-center align-middle h-11 ${
+                            isHit ? blockClass : b.isCurrent ? 'bg-amber-50/30' : 'bg-white'
+                          }`}
+                        >
+                          {isHit && (
+                            <div className="w-full h-full px-1.5 py-2 flex items-center justify-center font-bold text-[11px] tracking-tight whitespace-nowrap select-none">
+                              {row.blockLabel}
                             </div>
                           )}
-                        </div>
+                        </td>
+                      );
+                    })}
 
-                        {/* Tooltip */}
-                        <div className="hidden group-hover:block absolute z-50 bg-slate-800 text-white text-xs p-3 rounded shadow-lg whitespace-nowrap"
-                             style={{ left: Math.min(x + w / 2, totalWidth - 200), top: '24px' }}>
-                          <div className="font-bold text-sm mb-1">{item.name}</div>
-                          <div>預計: {item.startDate} ~ {item.endDate}</div>
-                          <div>實際進度: {item.actualProgress}%</div>
-                          {isDelayed && <div className="text-red-400 font-bold mt-1">狀態: 進度落後</div>}
-                          {item.actualProgress >= 100 && <div className="text-green-400 font-bold mt-1">狀態: 已完成</div>}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </React.Fragment>
-              ))}
-            </div>
-          </div>
+                    {/* 進度% */}
+                    <td
+                      className={`border border-slate-300 px-2.5 py-2.5 text-center font-mono font-extrabold ${
+                        row.actualProgress >= 100
+                          ? 'text-emerald-700 bg-emerald-50/50'
+                          : isDelayed
+                          ? 'text-[#C00000] bg-red-50/50'
+                          : 'text-slate-800'
+                      }`}
+                    >
+                      {row.actualProgress}%
+                    </td>
+
+                    {/* 備註 / 狀態 */}
+                    <td
+                      className={`border border-slate-300 px-3 py-2.5 text-xs ${
+                        isDelayed
+                          ? 'text-[#C00000] font-bold'
+                          : row.actualProgress >= 100
+                          ? 'text-emerald-700 font-bold'
+                          : 'text-slate-700'
+                      }`}
+                    >
+                      {row.remark}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
   );
 };
 
-const ProjectTimeline = (props: any) => <ErrorBoundary><ProjectTimelineInner {...props} /></ErrorBoundary>;
+const ProjectTimeline = (props: any) => (
+  <ErrorBoundary>
+    <ProjectTimelineInner {...props} />
+  </ErrorBoundary>
+);
 export default ProjectTimeline;
