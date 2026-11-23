@@ -8,6 +8,239 @@ const router = Router();
 const prisma = new PrismaClient();
 const memoryUpload = multer({ storage: multer.memoryStorage() });
 
+// Download Excel template for projects batch import
+router.get('/import-template', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const wb = XLSX.utils.book_new();
+    const sampleRows = [
+      ['專案代碼', '專案名稱', '狀態', '業主名稱', '設置容量', '工程地點', '發起日期', '預計結束日期', '專案內容', '備註'],
+      ['Y2600001888', '台南新市廠屋頂型太陽能工程', '施工中', '元融科技股份有限公司', '499 kW', '台南市新市區自由街9號', '2026-11-01', '2027-03-31', '屋頂型鋼構及模組鋪設工程', '範例資料'],
+      ['Y2600001889', '高雄路竹地面型光電案場', '評估中', '大成光電有限公司', '1200 kW', '高雄市路竹區中山路100號', '2026-12-01', '2027-06-30', '地面型光電工程', ''],
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(sampleRows);
+    ws['!cols'] = [
+      { wch: 16 },
+      { wch: 28 },
+      { wch: 10 },
+      { wch: 22 },
+      { wch: 14 },
+      { wch: 28 },
+      { wch: 14 },
+      { wch: 14 },
+      { wch: 28 },
+      { wch: 20 },
+    ];
+    XLSX.utils.book_append_sheet(wb, ws, '專案匯入範本');
+    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename*=UTF-8''${encodeURIComponent('專案批次匯入範本.xlsx')}`
+    );
+    res.send(buf);
+  } catch (error) {
+    console.error('Project template download error:', error);
+    res.status(500).json({ error: '下載專案匯入範本失敗' });
+  }
+});
+
+// Batch import projects from Excel (keep existing system project if already exists)
+router.post('/import', authenticateToken, memoryUpload.single('file'), async (req: AuthRequest, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: '請選擇要匯入的 Excel 檔案' });
+    }
+
+    const workbook = XLSX.read(req.file.buffer, { type: 'buffer', cellDates: true });
+    if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+      return res.status(400).json({ error: 'Excel 檔案內沒有任何工作表' });
+    }
+
+    const parseExcelDateToDate = (val: any): Date | undefined => {
+      if (val === undefined || val === null || val === '') return undefined;
+      if (val instanceof Date && !isNaN(val.getTime())) return val;
+      if (typeof val === 'number') {
+        const parsed = XLSX.SSF.parse_date_code(val);
+        if (parsed && parsed.y && parsed.m && parsed.d) {
+          return new Date(parsed.y, parsed.m - 1, parsed.d);
+        }
+      }
+      const str = String(val).trim().replace(/\./g, '-').replace(/\//g, '-');
+      // 支援民國年格式如 115-11-20
+      const rocMatch = str.match(/^(\d{2,3})-(\d{1,2})-(\d{1,2})$/);
+      if (rocMatch) {
+        const y = parseInt(rocMatch[1], 10) + 1911;
+        const m = parseInt(rocMatch[2], 10) - 1;
+        const d = parseInt(rocMatch[3], 10);
+        return new Date(y, m, d);
+      }
+      const d = new Date(str);
+      if (!isNaN(d.getTime())) return d;
+      return undefined;
+    };
+
+    const CODE_ALIASES = ['專案代碼', '專案代號', '案場代碼', '案場代號', '工程代碼', '工程編號', '專案編號', '代碼', 'project_code', 'code'];
+    const NAME_ALIASES = ['專案名稱', '案場名稱', '工程名稱', '案名', '名稱', 'project_name', 'name'];
+    const STATUS_ALIASES = ['狀態', '專案狀態', '工程狀態', 'status'];
+    const OWNER_ALIASES = ['業主名稱', '業主', '客戶名稱', '客戶', 'owner'];
+    const CAPACITY_ALIASES = ['設置容量', '容量', '裝置容量', '設置容量(kw)', '容量(kw)', 'capacity'];
+    const ADDRESS_ALIASES = ['工程地點', '案場地址', '案場地點', '地址', '地點', '位置', 'address'];
+    const START_ALIASES = ['發起日期', '開始日期', '開工日期', '起始日期', 'start_date'];
+    const TARGET_ALIASES = ['預計結束日期', '結束日期', '預計完工日期', '預計完工日', '完工日期', 'target_date'];
+    const CONTENT_ALIASES = ['專案內容', '工程內容', '工作內容', '內容', '說明', 'content'];
+    const NOTES_ALIASES = ['備註', '備註說明', 'notes', 'remark'];
+
+    const existingProjects = await prisma.project.findMany({
+      select: { id: true, project_code: true, name: true },
+    });
+
+    const existingCodeSet = new Set(
+      existingProjects.map(p => (p.project_code || '').trim().toLowerCase()).filter(Boolean)
+    );
+    const existingNameSet = new Set(
+      existingProjects.map(p => (p.name || '').trim().toLowerCase()).filter(Boolean)
+    );
+
+    const activeTemplate = await prisma.workflowTemplate.findFirst({
+      where: { is_active: true },
+      orderBy: { created_at: 'asc' },
+    });
+
+    const importedProjects: { project_code: string; name: string }[] = [];
+    const skippedExisting: { project_code: string; name: string; reason: string }[] = [];
+    let totalRowsRead = 0;
+
+    for (const sheetName of workbook.SheetNames) {
+      const sheet = workbook.Sheets[sheetName];
+      if (!sheet) continue;
+      const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+      if (rows.length < 2) continue;
+
+      // 自動尋找標題列 (前 10 列內含有專案代碼或專案名稱的列)
+      let headerRowIdx = 0;
+      for (let r = 0; r < Math.min(rows.length, 10); r++) {
+        const rowCells = (rows[r] || []).map(c => String(c || '').trim().toLowerCase());
+        const hasCode = rowCells.some(c => CODE_ALIASES.some(a => c === a.toLowerCase() || c.includes(a.toLowerCase())));
+        const hasName = rowCells.some(c => NAME_ALIASES.some(a => c === a.toLowerCase() || c.includes(a.toLowerCase())));
+        if (hasCode || hasName) {
+          headerRowIdx = r;
+          break;
+        }
+      }
+
+      const headerCells = (rows[headerRowIdx] || []).map(c => String(c || '').trim());
+      const findColIdx = (aliases: string[]) => {
+        // 先精準比對，再包含比對
+        const exact = headerCells.findIndex(h => aliases.some(a => h.toLowerCase() === a.toLowerCase()));
+        if (exact !== -1) return exact;
+        return headerCells.findIndex(h => aliases.some(a => h && h.toLowerCase().includes(a.toLowerCase())));
+      };
+
+      const codeIdx = findColIdx(CODE_ALIASES);
+      const nameIdx = findColIdx(NAME_ALIASES);
+      if (codeIdx === -1 && nameIdx === -1) continue;
+
+      const statusIdx = findColIdx(STATUS_ALIASES);
+      const ownerIdx = findColIdx(OWNER_ALIASES);
+      const capacityIdx = findColIdx(CAPACITY_ALIASES);
+      const addressIdx = findColIdx(ADDRESS_ALIASES);
+      const startIdx = findColIdx(START_ALIASES);
+      const targetIdx = findColIdx(TARGET_ALIASES);
+      const contentIdx = findColIdx(CONTENT_ALIASES);
+      const notesIdx = findColIdx(NOTES_ALIASES);
+
+      for (let r = headerRowIdx + 1; r < rows.length; r++) {
+        const row = rows[r];
+        if (!row || row.every(cell => String(cell ?? '').trim() === '')) continue;
+
+        const rawCode = codeIdx !== -1 ? String(row[codeIdx] ?? '').trim() : '';
+        const rawName = nameIdx !== -1 ? String(row[nameIdx] ?? '').trim() : '';
+
+        if (!rawCode && !rawName) continue;
+        // 排除範例說明或合計列
+        if (rawCode.includes('合計') || rawCode.includes('總計') || rawName.includes('合計')) continue;
+
+        totalRowsRead++;
+        const finalCode = rawCode || `PRJ-${Date.now()}-${r}`;
+        const finalName = rawName || finalCode;
+
+        const codeKey = finalCode.toLowerCase();
+        const nameKey = finalName.toLowerCase();
+
+        // 規則 2：若從 Excel 匯入的專案系統上已有（代碼已存在或同名專案已存在），則保留系統原有專案，不覆蓋
+        if (existingCodeSet.has(codeKey) || (rawName && existingNameSet.has(nameKey))) {
+          skippedExisting.push({
+            project_code: finalCode,
+            name: finalName,
+            reason: existingCodeSet.has(codeKey) ? '專案代碼已存在於系統（保留系統資料）' : '專案名稱已存在於系統（保留系統資料）',
+          });
+          continue;
+        }
+
+        const rawStatus = statusIdx !== -1 ? String(row[statusIdx] ?? '').trim() : '';
+        const validStatuses = ['待接洽', '評估中', '施工中', '已完工', '停工', '退回修正'];
+        const finalStatus = validStatuses.includes(rawStatus) ? rawStatus : '施工中';
+
+        const owner = ownerIdx !== -1 ? String(row[ownerIdx] ?? '').trim() || undefined : undefined;
+        const capacity = capacityIdx !== -1 ? String(row[capacityIdx] ?? '').trim() || undefined : undefined;
+        const address = addressIdx !== -1 ? String(row[addressIdx] ?? '').trim() || undefined : undefined;
+        const startDate = startIdx !== -1 ? parseExcelDateToDate(row[startIdx]) : undefined;
+        const targetDate = targetIdx !== -1 ? parseExcelDateToDate(row[targetIdx]) : undefined;
+        const content = contentIdx !== -1 ? String(row[contentIdx] ?? '').trim() || undefined : undefined;
+        const notes = notesIdx !== -1 ? String(row[notesIdx] ?? '').trim() || undefined : undefined;
+
+        const created = await prisma.project.create({
+          data: {
+            project_code: finalCode,
+            name: finalName,
+            status: finalStatus,
+            owner,
+            capacity,
+            address,
+            start_date: startDate,
+            target_date: targetDate,
+            content,
+            notes,
+          },
+        });
+
+        if (activeTemplate) {
+          await prisma.projectWorkflow
+            .create({
+              data: {
+                project_id: created.id,
+                template_id: activeTemplate.id,
+              },
+            })
+            .catch(() => {});
+        }
+
+        existingCodeSet.add(codeKey);
+        existingNameSet.add(nameKey);
+        importedProjects.push({ project_code: finalCode, name: finalName });
+      }
+    }
+
+    if (totalRowsRead === 0) {
+      return res.status(400).json({
+        error: '未在 Excel 中找到有效的專案資料列，請確認標題列包含「專案代碼」與「專案名稱」（可先下載匯入範本參考）',
+      });
+    }
+
+    res.json({
+      message: `匯入完成：成功新增 ${importedProjects.length} 筆專案，保留系統既有專案（略過） ${skippedExisting.length} 筆`,
+      importedCount: importedProjects.length,
+      skippedCount: skippedExisting.length,
+      importedProjects,
+      skippedExisting,
+    });
+  } catch (error: any) {
+    console.error('Import projects error:', error);
+    res.status(500).json({ error: `匯入專案失敗：${error?.message || '請確認 Excel 檔案格式是否正確'}` });
+  }
+});
+
 // Download Excel template for work items import
 router.get('/work-items-template', authenticateToken, async (req: AuthRequest, res) => {
   try {

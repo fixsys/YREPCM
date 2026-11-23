@@ -1,19 +1,90 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuthStore } from '../store/authStore';
-import { Plus, Search, Calendar, ChevronRight, Briefcase, FileText, Trash2 } from 'lucide-react';
+import { Plus, Search, Calendar, ChevronRight, Briefcase, FileText, Trash2, Upload, Download } from 'lucide-react';
 
 const Projects = () => {
   const [projects, setProjects] = useState<any[]>([]);
   const [templates, setTemplates] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
+  const excelInputRef = useRef<HTMLInputElement>(null);
   const [newProject, setNewProject] = useState({ project_code: '', name: '', status: '評估中', owner: '', capacity: '', address: '', start_date: '', target_date: '', content: '', notes: '', template_id: '' });
   const [submitError, setSubmitError] = useState('');
   
   const { token, user } = useAuthStore();
   const navigate = useNavigate();
+
+  const handleDownloadTemplate = async () => {
+    try {
+      const res = await axios.get('/api/projects/import-template', {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', '專案批次匯入範本.xlsx');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      alert('下載專案匯入範本失敗');
+    }
+  };
+
+  const handleExcelImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsImporting(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await axios.post('/api/projects/import', formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      const { importedCount, skippedCount, importedProjects, skippedExisting } = res.data;
+      const lines: string[] = [
+        `✅ Excel 專案匯入完成！`,
+        `• 成功新增專案：${importedCount} 筆`,
+        `• 系統既有專案（已自動保留系統原資料，未覆蓋）：${skippedCount} 筆`,
+      ];
+      if (Array.isArray(importedProjects) && importedProjects.length > 0) {
+        lines.push(
+          `\n【本次新增專案】\n` +
+            importedProjects
+              .slice(0, 15)
+              .map((p: any) => `  - ${p.project_code} ${p.name}`)
+              .join('\n') +
+            (importedProjects.length > 15 ? `\n  ...等共 ${importedProjects.length} 筆` : '')
+        );
+      }
+      if (Array.isArray(skippedExisting) && skippedExisting.length > 0) {
+        lines.push(
+          `\n【已存在於系統（保留系統資料）】\n` +
+            skippedExisting
+              .slice(0, 15)
+              .map((p: any) => `  - ${p.project_code} ${p.name}`)
+              .join('\n') +
+            (skippedExisting.length > 15 ? `\n  ...等共 ${skippedExisting.length} 筆` : '')
+        );
+      }
+      alert(lines.join('\n'));
+      fetchData();
+    } catch (error: any) {
+      alert(error.response?.data?.error || '匯入專案失敗，請確認 Excel 格式是否正確');
+    } finally {
+      setIsImporting(false);
+      if (excelInputRef.current) excelInputRef.current.value = '';
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -194,22 +265,59 @@ const Projects = () => {
     </div>
   );
 
+  const filteredProjects = projects.filter(p => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      (p.project_code || '').toLowerCase().includes(q) ||
+      (p.name || '').toLowerCase().includes(q) ||
+      (p.owner || '').toLowerCase().includes(q) ||
+      (p.address || '').toLowerCase().includes(q)
+    );
+  });
+
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-wrap justify-between items-center gap-3">
         <h1 className="text-2xl font-bold text-slate-800">專案管理</h1>
-        <button 
-          onClick={() => setIsModalOpen(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors shadow-sm"
-        >
-          <Plus size={18} /> 新增專案
-        </button>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            type="button"
+            onClick={handleDownloadTemplate}
+            className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 px-3.5 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors shadow-sm cursor-pointer"
+          >
+            <Download size={16} /> 下載匯入範本
+          </button>
+          <input
+            ref={excelInputRef}
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            onChange={handleExcelImport}
+            className="hidden"
+          />
+          <button
+            type="button"
+            disabled={isImporting}
+            onClick={() => excelInputRef.current?.click()}
+            className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors shadow-sm cursor-pointer"
+          >
+            <Upload size={16} /> {isImporting ? '匯入中...' : '從 Excel 匯入專案'}
+          </button>
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors shadow-sm cursor-pointer"
+          >
+            <Plus size={18} /> 新增專案
+          </button>
+        </div>
       </div>
 
       <div className="relative max-w-md mb-6">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
         <input 
           type="text" 
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
           placeholder="搜尋專案代碼或名稱..." 
           className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition-all"
         />
@@ -221,7 +329,7 @@ const Projects = () => {
         <div className="flex flex-col gap-8">
           {/* Unaccepted Projects */}
           {(() => {
-            const unaccepted = projects.filter(p => p.status === '待接洽');
+            const unaccepted = filteredProjects.filter(p => p.status === '待接洽');
             if (unaccepted.length === 0) return null;
             
             return (
@@ -239,7 +347,7 @@ const Projects = () => {
 
           {/* Accepted Projects */}
           {(() => {
-            const accepted = projects.filter(p => p.status !== '待接洽' && p.status !== '退回修正');
+            const accepted = filteredProjects.filter(p => p.status !== '待接洽' && p.status !== '退回修正');
             
             return (
               <div>
