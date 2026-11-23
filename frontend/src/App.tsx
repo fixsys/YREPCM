@@ -19,6 +19,7 @@ import SimulatorsDashboard from './pages/SimulatorsDashboard';
 import SolarModuleSim from './pages/SolarModuleSim';
 import Onsite from './pages/Onsite';
 import SystemLogs from './pages/SystemLogs';
+import ElectronicApprovals from './pages/ElectronicApprovals';
 
 const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
   const { token, requirePasswordChange } = useAuthStore();
@@ -55,6 +56,7 @@ function App() {
                 <Route path="/budget/:id" element={<BudgetDetail />} />
                 <Route path="/onsite" element={<Onsite mode="ONSITE" />} />
                 <Route path="/manufacturing" element={<Onsite mode="MANUFACTURING" />} />
+                <Route path="/approvals" element={<ElectronicApprovals />} />
                 <Route path="/simulators" element={<SimulatorsDashboard />} />
                 <Route path="/simulators/solar" element={<SolarModuleSim />} />
                 <Route path="/workflow-builder" element={(user?.level && user.level >= 100) ? <WorkflowBuilder /> : <Navigate to="/" />} />

@@ -568,4 +568,66 @@ model DispatchOrder {
   laborReports           DailyLaborReport[]
 }
 
+// ==========================================
+// 電子簽核模組 (E-Approval: 表單/簽呈/報表 + 簽核流程 + 電子印章)
+// ==========================================
+
+model ApprovalStamp {
+  id           String   @id @default(uuid())
+  name         String   // 印章名稱 e.g. "受託單位收圖章", "部門主管審核章", "總經理核決章"
+  shape        String   @default("CIRCLE") // CIRCLE(圓形收圖章), RECTANGLE(長方章), SQUARE(方章), OVAL(橢圓章)
+  color        String   @default("#DC2626") // 印泥顏色
+  top_text     String   @default("元融科技") // 上排文字 (公司名)
+  middle_text  String   @default("自動帶入部門") // 中排文字 (部門/職稱，若填 "自動帶入部門" 則動態顯示簽核人部門)
+  bottom_text  String   @default("收圖章") // 下排文字 (收圖章 / 審核章 / 核准章 / 驗收章)
+  show_date    Boolean  @default(true) // 中央是否顯示簽核日期
+  show_signer  Boolean  @default(false) // 是否在印章內顯示簽核人姓名
+  border_style String   @default("DOUBLE") // SINGLE, DOUBLE
+  department   String?  // 適用部門 (空值代表通用)
+  is_active    Boolean  @default(true)
+  creator_id   String?
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+}
+
+model ApprovalTemplate {
+  id               String            @id @default(uuid())
+  name             String            // 表單/簽呈/報表名稱
+  doc_type         String            @default("簽呈") // 簽呈, 報表, 表單
+  code_prefix      String            @default("AP") // 單號前綴 e.g. AP, RPT, FRM
+  description      String?           @db.Text
+  fields           Json              // 表單欄位定義 [{ id, label, type, required, width, placeholder, options, tableColumns }]
+  workflow_steps   Json              // 簽核流程關卡 [{ step_order, step_name, approver_type, target_dept, target_user_id, target_role_level, stamp_id, require_stamp }]
+  default_stamp_id String?
+  is_active        Boolean           @default(true)
+  creator_id       String?
+  created_at       DateTime          @default(now())
+  updated_at       DateTime          @updatedAt
+
+  requests         ApprovalRequest[]
+}
+
+model ApprovalRequest {
+  id               String           @id @default(uuid())
+  request_no       String           @unique // 簽核單號 e.g. AP-20261123-001
+  template_id      String
+  title            String           // 主旨 / 標題
+  doc_type         String           @default("簽呈") // 簽呈, 報表, 表單
+  urgency          String           @default("一般") // 一般, 速件, 最速件
+  project_id       String?
+  applicant_id     String
+  applicant_name   String
+  applicant_dept   String
+  form_data        Json             // 填寫的表單內容 { [fieldId]: value }
+  workflow_steps   Json             // 該單據的簽核流程與進度快照
+  current_step     Int              @default(1) // 目前所在關卡 (1-based)
+  status           String           @default("待簽核") // 待簽核, 簽核中, 已核准, 已退回
+  approval_records Json             // 歷次簽核與蓋章紀錄 [{ step_order, step_name, action, signer_id, signer_name, signer_dept, comment, stamp_snapshot, signed_at }]
+  created_at       DateTime         @default(now())
+  updated_at       DateTime         @updatedAt
+
+  template         ApprovalTemplate @relation(fields: [template_id], references: [id])
+}
+
+
 

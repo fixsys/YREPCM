@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
-import { LogOut, LayoutDashboard, FolderKanban, Shield, BarChart2, Settings, CheckSquare, Network, Briefcase, Smartphone, Monitor, Menu, Calculator, Lightbulb, ClipboardList, Factory, Key, Terminal } from 'lucide-react';
+import { LogOut, LayoutDashboard, FolderKanban, Shield, BarChart2, Settings, CheckSquare, Network, Briefcase, Smartphone, Monitor, Menu, Calculator, Lightbulb, ClipboardList, Factory, Key, Terminal, FileSignature } from 'lucide-react';
 import clsx from 'clsx';
 import { useState } from 'react';
 import NotificationCenter from './NotificationCenter';
@@ -19,6 +19,7 @@ const Layout = ({ children }: { children: ReactNode }) => {
 
   let navItems = [
     { id: 'dashboard', name: '總覽看板', path: '/', icon: LayoutDashboard },
+    { id: 'approvals', name: '電子簽核', path: '/approvals', icon: FileSignature },
     { id: 'crm', name: '業務開發', path: '/crm/leads', icon: Briefcase },
     { id: 'onsite', name: '現場報工', path: '/onsite', icon: ClipboardList },
     { id: 'manufacturing', name: '製造報工', path: '/manufacturing', icon: Factory },
@@ -31,7 +32,7 @@ const Layout = ({ children }: { children: ReactNode }) => {
 
   if (user?.level && user.level < 100) {
     const allowed = user.permissions || [];
-    navItems = navItems.filter(item => allowed.includes(item.id));
+    navItems = navItems.filter(item => item.id === 'approvals' || item.id === 'dashboard' || allowed.includes(item.id));
   }
 
   if (user?.level && user.level >= 100) {

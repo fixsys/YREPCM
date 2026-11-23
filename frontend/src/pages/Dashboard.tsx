@@ -216,6 +216,7 @@ const Dashboard = () => {
   // Render Manager View
   const pendingOrders: any[] = manager?.pendingDispatchOrders || [];
   const processedOrders: any[] = manager?.processedDispatchOrders || [];
+  const pendingEApprovals: any[] = manager?.pendingApprovalRequests || [];
   const displayedApprovalOrders = approvalTab === 'PENDING' ? pendingOrders : processedOrders;
 
   const renderManagerView = () => (
@@ -294,9 +295,48 @@ const Dashboard = () => {
 
           <p className="text-xs text-slate-500 mb-4">
             {user?.level && user.level >= 100
-              ? '管理員視角：顯示所有部門委託之派工單簽核與收圖章狀態。尚未完成簽核與蓋下收圖章前，製造端無法進行生產報工。'
-              : `受託單位【${user?.department || '本部門'}】主管簽核區：請針對委託貴部門之派工單進行簽核並蓋下收圖章，簽核同意並蓋章後始開放製造生產。`}
+              ? '管理員視角：顯示所有部門委託之派工單簽核與收圖章狀態，以及電子簽核單據。尚未完成簽核與蓋下收圖章前，製造端無法進行生產報工。'
+              : `受託單位【${user?.department || '本部門'}】主管簽核區：請針對委託貴部門之派工單與電子簽呈/報表/表單進行簽核並蓋章。`}
           </p>
+
+          {pendingEApprovals.length > 0 && (
+            <div className="mb-4 p-3.5 bg-indigo-50/80 border border-indigo-200 rounded-xl space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-extrabold text-indigo-900">
+                  📄 電子簽核（簽呈 / 報表 / 表單）待您簽核用印：{pendingEApprovals.length} 筆
+                </span>
+                <button
+                  type="button"
+                  onClick={() => navigate('/approvals')}
+                  className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold cursor-pointer"
+                >
+                  前往電子簽核中心 ➔
+                </button>
+              </div>
+              <div className="space-y-1.5">
+                {pendingEApprovals.slice(0, 3).map((reqItem: any) => (
+                  <div
+                    key={reqItem.id}
+                    onClick={() => navigate('/approvals')}
+                    className="bg-white border border-indigo-100 hover:border-indigo-300 rounded-lg px-3 py-2 text-xs flex items-center justify-between cursor-pointer"
+                  >
+                    <div className="truncate pr-2">
+                      <span className="font-mono font-bold text-slate-700 mr-1.5">
+                        {reqItem.request_no}
+                      </span>
+                      <span className="px-1.5 py-0.2 bg-indigo-100 text-indigo-700 rounded text-[10px] font-bold mr-1.5">
+                        {reqItem.doc_type}
+                      </span>
+                      <span className="font-bold text-slate-800">{reqItem.title}</span>
+                    </div>
+                    <span className="text-[11px] font-bold text-rose-600 shrink-0">
+                      第 {reqItem.current_step} 關：{reqItem.activeStepName}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {displayedApprovalOrders.length > 0 ? (
             <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">

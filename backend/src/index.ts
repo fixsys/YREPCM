@@ -17,6 +17,7 @@ import budgetRoutes from './routes/budget';
 import toolboxMeetingsRoutes from './routes/toolboxMeetings';
 import laborReportsRoutes from './routes/laborReports';
 import dispatchOrdersRoutes from './routes/dispatchOrders';
+import approvalsRoutes from './routes/approvals';
 import systemLogsRoutes, { systemAuditMiddleware } from './routes/systemLogs';
 import path from 'path';
 
@@ -49,6 +50,7 @@ app.use('/api/budget', budgetRoutes);
 app.use('/api/toolbox-meetings', toolboxMeetingsRoutes);
 app.use('/api/labor-reports', laborReportsRoutes);
 app.use('/api/dispatch-orders', dispatchOrdersRoutes);
+app.use('/api/approvals', approvalsRoutes);
 app.use('/api/system-logs', systemLogsRoutes);
 
 app.get('/api/health', (req, res) => {

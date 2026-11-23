@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import ExcelJS from 'exceljs';
 import { authenticateToken, AuthRequest } from '../middleware/authMiddleware';
+import { canUserApproveStep } from './approvals';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -686,6 +687,32 @@ router.get('/dashboard', authenticateToken, async (req: AuthRequest, res) => {
       );
     }
 
+    // Fetch pending electronic approval requests (報表/簽呈/表單) waiting for this user
+    let pendingApprovalRequests: any[] = [];
+    try {
+      const openReqs = await prisma.approvalRequest.findMany({
+        where: { status: { in: ['待簽核', '簽核中'] } },
+        include: { template: true },
+        orderBy: { created_at: 'desc' },
+      });
+      pendingApprovalRequests = openReqs
+        .filter(r => {
+          const steps: any[] = Array.isArray(r.workflow_steps) ? (r.workflow_steps as any[]) : [];
+          const activeStep = steps.find(s => Number(s.step_order) === Number(r.current_step));
+          return activeStep && canUserApproveStep(user, r, activeStep);
+        })
+        .map(r => {
+          const steps: any[] = Array.isArray(r.workflow_steps) ? (r.workflow_steps as any[]) : [];
+          const activeStep = steps.find(s => Number(s.step_order) === Number(r.current_step));
+          return {
+            ...r,
+            activeStepName: activeStep?.step_name || '',
+          };
+        });
+    } catch (e) {
+      console.error('Failed to query pendingApprovalRequests:', e);
+    }
+
     res.json({
       global: {
         activeProjects,
@@ -702,7 +729,8 @@ router.get('/dashboard', authenticateToken, async (req: AuthRequest, res) => {
         teamTasks,
         teamOverdueTasks: overdueTasks.filter(t => teamTasks.find(tt => tt.id === t.id)),
         pendingDispatchOrders,
-        processedDispatchOrders
+        processedDispatchOrders,
+        pendingApprovalRequests
       }
     });
   } catch (error) {
