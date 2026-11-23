@@ -319,11 +319,11 @@ router.post('/', authenticateToken, async (req: AuthRequest, res) => {
         required_date: required_date ? new Date(required_date) : null,
         req_manager_sign: req_manager_sign || '',
         req_manager_comment: req_manager_comment || '',
-        drawing_received_date: drawing_received_date || '',
-        target_manager_sign: target_manager_sign || '',
-        approval_status: approval_status || '待簽核',
-        target_manager_comment: target_manager_comment || '',
-        assigned_staff_sign: assigned_staff_sign || '',
+        drawing_received_date: '',
+        target_manager_sign: '',
+        approval_status: '待簽核',
+        target_manager_comment: '',
+        assigned_staff_sign: '',
         remarks: remarks || '',
         creator_id: req.user.id
       },
@@ -333,6 +333,31 @@ router.post('/', authenticateToken, async (req: AuthRequest, res) => {
         }
       }
     });
+
+    // Notify target department managers (level >= 50)
+    try {
+      const targetDeptName = target_dept || '鋼構部';
+      const targetManagers = await prisma.user.findMany({
+        where: {
+          is_active: true,
+          department: { name: targetDeptName },
+          role: { level: { gte: 50 } }
+        },
+        select: { id: true }
+      });
+
+      if (targetManagers.length > 0) {
+        await prisma.notification.createMany({
+          data: targetManagers.map(m => ({
+            user_id: m.id,
+            title: `【派工單待簽核】${finalDispatchNo}`,
+            content: `${request_dept || '需求單位'}（${requester_name || req.user?.account || ''}）開立派工單 ${finalDispatchNo} 委託貴部門（${targetDeptName}），請至「總覽看板 ➔ 待辦簽核專區」進行簽核與蓋下收圖章。`
+          }))
+        });
+      }
+    } catch (notifyErr) {
+      console.error('Failed to notify target managers:', notifyErr);
+    }
 
     res.status(201).json(order);
   } catch (error) {
@@ -365,13 +390,15 @@ router.put('/:id', authenticateToken, async (req: AuthRequest, res) => {
       required_date,
       req_manager_sign,
       req_manager_comment,
-      drawing_received_date,
-      target_manager_sign,
-      approval_status,
-      target_manager_comment,
-      assigned_staff_sign,
       remarks
     } = req.body;
+
+    const existing = await prisma.dispatchOrder.findUnique({
+      where: { id: String(id) }
+    });
+    if (!existing) {
+      return res.status(404).json({ error: '找不到該筆派工單' });
+    }
 
     if (dispatch_no) {
       const conflict = await prisma.dispatchOrder.findFirst({
@@ -384,6 +411,10 @@ router.put('/:id', authenticateToken, async (req: AuthRequest, res) => {
         return res.status(400).json({ error: `派工單號「${dispatch_no}」已被其他派工單使用` });
       }
     }
+
+    // If target_dept changed or previous status was '退回', reset to '待簽核' so the target manager reviews again
+    const deptChanged = target_dept && target_dept !== existing.target_dept;
+    const shouldResetApproval = deptChanged || existing.approval_status === '退回';
 
     const order = await prisma.dispatchOrder.update({
       where: { id: String(id) },
@@ -405,12 +436,15 @@ router.put('/:id', authenticateToken, async (req: AuthRequest, res) => {
         required_date: required_date ? new Date(required_date) : null,
         req_manager_sign: req_manager_sign ?? '',
         req_manager_comment: req_manager_comment ?? '',
-        drawing_received_date: drawing_received_date ?? '',
-        target_manager_sign: target_manager_sign ?? '',
-        approval_status: approval_status || '待簽核',
-        target_manager_comment: target_manager_comment ?? '',
-        assigned_staff_sign: assigned_staff_sign ?? '',
-        remarks: remarks ?? ''
+        ...(shouldResetApproval
+          ? {
+              approval_status: '待簽核',
+              drawing_received_date: '',
+              target_manager_sign: '',
+              target_manager_comment: ''
+            }
+          : {}),
+        remarks: remarks ?? existing.remarks ?? ''
       },
       include: {
         project: {
@@ -448,16 +482,39 @@ router.post('/:id/approve', authenticateToken, async (req: AuthRequest, res) => 
       return res.status(404).json({ error: '找不到該筆派工單' });
     }
 
+    const userLevel = Number(req.user.level || 0);
+    if (userLevel < 50) {
+      return res.status(403).json({
+        error: `權限不足：僅受託單位（${existing.target_dept}）部門主管可進行派工單簽核與蓋收圖章`
+      });
+    }
+    if (userLevel < 100 && req.user.department && req.user.department !== existing.target_dept) {
+      return res.status(403).json({
+        error: `權限不足：此派工單受託單位為「${existing.target_dept}」，您目前所屬部門為「${req.user.department}」`
+      });
+    }
+
+    const nextStatus = approval_status || existing.approval_status || '同意';
+    const nextStampDate =
+      drawing_received_date !== undefined
+        ? String(drawing_received_date).trim()
+        : String(existing.drawing_received_date || '').trim();
+
+    if (nextStatus === '同意' && !nextStampDate) {
+      return res.status(400).json({
+        error: '簽核結果為「同意」時，必須一併蓋下受託單位「收圖章」（填寫收圖章日期），方可開放進行製造生產！'
+      });
+    }
+
     const updated = await prisma.dispatchOrder.update({
       where: { id: String(id) },
       data: {
         target_manager_sign:
           target_manager_sign !== undefined ? String(target_manager_sign).trim() : existing.target_manager_sign,
-        approval_status: approval_status || existing.approval_status || '同意',
+        approval_status: nextStatus,
         target_manager_comment:
           target_manager_comment !== undefined ? String(target_manager_comment) : existing.target_manager_comment,
-        drawing_received_date:
-          drawing_received_date !== undefined ? String(drawing_received_date).trim() : existing.drawing_received_date,
+        drawing_received_date: nextStatus === '退回' ? '' : nextStampDate,
         assigned_staff_sign:
           assigned_staff_sign !== undefined ? String(assigned_staff_sign).trim() : existing.assigned_staff_sign,
         remarks: remarks !== undefined ? String(remarks) : existing.remarks,

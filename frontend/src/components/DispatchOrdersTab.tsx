@@ -155,13 +155,23 @@ const DispatchOrdersTab: React.FC<DispatchOrdersTabProps> = ({ project }) => {
     fetchOrders();
   }, [project?.id, token]);
 
+  const canApproveOrder = (order: any) => {
+    const lvl = Number(user?.level || 0);
+    if (lvl >= 100) return true;
+    return lvl >= 50 && Boolean(user?.department && user.department === order?.target_dept);
+  };
+
   const handleOpenApprove = (order: any) => {
+    if (!canApproveOrder(order)) {
+      alert(`僅受託單位（${order.target_dept}）部門主管登入後，可於「總覽看板 ➔ 待辦簽核專區」進行簽核與蓋收圖章。`);
+      return;
+    }
     setApprovingOrder(order);
     setApproveForm({
       target_manager_sign: order.target_manager_sign || user?.name || '',
       approval_status: order.approval_status && order.approval_status !== '待簽核' ? order.approval_status : '同意',
       target_manager_comment: order.target_manager_comment || '',
-      drawing_received_date: order.drawing_received_date || new Date().toISOString().slice(0, 10),
+      drawing_received_date: order.drawing_received_date || '',
       assigned_staff_sign: order.assigned_staff_sign || '',
       remarks: order.remarks || '',
     });
@@ -170,6 +180,14 @@ const DispatchOrdersTab: React.FC<DispatchOrdersTabProps> = ({ project }) => {
   const handleApproveSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!approvingOrder) return;
+    if (!approveForm.target_manager_sign.trim()) {
+      alert('請輸入受託單位主管簽名');
+      return;
+    }
+    if (approveForm.approval_status === '同意' && !approveForm.drawing_received_date.trim()) {
+      alert('簽核為「同意」時，請先點擊右側「蓋下收圖章」蓋章後再確認送出，方可開放生產！');
+      return;
+    }
     setIsApproving(true);
     try {
       const res = await axios.post(`/api/dispatch-orders/${approvingOrder.id}/approve`, approveForm, {
@@ -520,26 +538,19 @@ const DispatchOrdersTab: React.FC<DispatchOrdersTabProps> = ({ project }) => {
                         {order.urgency}
                       </span>
                       <span
-                        className={`px-2.5 py-0.5 text-xs font-bold rounded-md ${
-                          order.approval_status === '同意'
-                            ? 'bg-emerald-100 text-emerald-700'
-                            : order.approval_status === '退回'
-                            ? 'bg-red-100 text-red-700'
-                            : 'bg-slate-200 text-slate-700'
-                        }`}
-                      >
-                        簽核：{order.approval_status || '待簽核'}
-                      </span>
-                      <span
                         className={`px-2.5 py-0.5 text-xs font-bold rounded-md border ${
-                          order.drawing_received_date
-                            ? 'bg-rose-50 text-rose-700 border-rose-200'
-                            : 'bg-slate-100 text-slate-500 border-slate-200'
+                          order.approval_status === '同意' && order.drawing_received_date
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                            : order.approval_status === '退回'
+                            ? 'bg-red-50 text-red-700 border-red-300'
+                            : 'bg-amber-50 text-amber-800 border-amber-300'
                         }`}
                       >
-                        {order.drawing_received_date
-                          ? `💮 已蓋收圖章 (${order.drawing_received_date})`
-                          : '⏳ 待受託單位收圖'}
+                        {order.approval_status === '同意' && order.drawing_received_date
+                          ? `✅ 已簽核並蓋收圖章 (${order.drawing_received_date}) — 可進行生產`
+                          : order.approval_status === '退回'
+                          ? '❌ 受託單位已退回 — 不可生產'
+                          : `🔒 待【${order.target_dept}】主管於待簽核區簽核蓋章 — 尚未開放生產`}
                       </span>
                       <span
                         className={`px-2.5 py-0.5 text-xs font-extrabold rounded-md border ${
@@ -568,12 +579,14 @@ const DispatchOrdersTab: React.FC<DispatchOrdersTabProps> = ({ project }) => {
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      onClick={() => handleOpenApprove(order)}
-                      className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
-                    >
-                      <Stamp size={14} /> 受託單位簽核 / 蓋收圖章
-                    </button>
+                    {canApproveOrder(order) && (
+                      <button
+                        onClick={() => handleOpenApprove(order)}
+                        className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+                      >
+                        <Stamp size={14} /> 受託單位簽核 / 蓋收圖章
+                      </button>
+                    )}
                     <button
                       onClick={() => setViewingOrder(order)}
                       className="px-3 py-1.5 bg-white border border-slate-300 hover:border-blue-400 hover:text-blue-600 text-slate-700 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
@@ -1205,97 +1218,44 @@ const DispatchOrdersTab: React.FC<DispatchOrdersTabProps> = ({ project }) => {
                   </div>
                 </div>
 
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
-                  <div className="flex items-center justify-between gap-2 text-sm font-bold text-slate-800 border-b border-slate-200 pb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs">四</span>
-                      受託單位簽核、收圖章與交辦
-                    </div>
-                    <span className="text-[11px] font-bold text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full">
-                      受託單位主管簽核區
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">受託單位主管簽名</label>
-                      <input
-                        type="text"
-                        value={formData.target_manager_sign}
-                        onChange={e => setFormData({ ...formData, target_manager_sign: e.target.value })}
-                        placeholder="受託單位主管姓名"
-                        className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-sm bg-white outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">簽核結果</label>
-                      <select
-                        value={formData.approval_status}
-                        onChange={e => setFormData({ ...formData, approval_status: e.target.value })}
-                        className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-sm bg-white outline-none font-bold"
-                      >
-                        <option value="待簽核">待簽核</option>
-                        <option value="同意">同意</option>
-                        <option value="退回">退回</option>
-                      </select>
-                    </div>
-                  </div>
+                <div className="bg-rose-50/50 border border-rose-200 rounded-xl p-4 space-y-3 flex flex-col justify-between">
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">受託單位收圖章日期</label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="date"
-                        value={formData.drawing_received_date}
-                        onChange={e => setFormData({ ...formData, drawing_received_date: e.target.value })}
-                        className="flex-1 px-3 py-1.5 border border-slate-300 rounded-lg text-sm bg-white outline-none"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setFormData({ ...formData, drawing_received_date: todayStr })}
-                        className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 shrink-0 cursor-pointer"
-                      >
-                        <Stamp size={13} /> 蓋今日收圖章
-                      </button>
-                      {formData.drawing_received_date && (
-                        <button
-                          type="button"
-                          onClick={() => setFormData({ ...formData, drawing_received_date: '' })}
-                          className="px-2 py-1.5 text-slate-500 hover:text-red-600 text-xs font-bold cursor-pointer"
-                        >
-                          清除
-                        </button>
-                      )}
+                    <div className="flex items-center justify-between gap-2 text-sm font-bold text-slate-800 border-b border-rose-200 pb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-full bg-rose-600 text-white flex items-center justify-center text-xs">四</span>
+                        受託單位簽核、收圖章與交辦
+                      </div>
+                      <span className="text-[11px] font-bold text-rose-700 bg-white border border-rose-200 px-2 py-0.5 rounded-full">
+                        受託單位主管專屬簽核
+                      </span>
+                    </div>
+                    <div className="mt-3 text-xs text-slate-700 leading-relaxed space-y-1.5">
+                      <p className="font-bold text-rose-800 flex items-center gap-1.5">
+                        <Stamp size={15} />
+                        派工單送出後，將自動進入受託單位【{formData.target_dept || '受託單位'}】部門主管的「待辦簽核專區」：
+                      </p>
+                      <ul className="list-disc pl-5 space-y-1 text-slate-600">
+                        <li>由受託單位部門主管登入後，於<strong>「總覽看板 ➔ 待辦簽核專區」</strong>進行簽核並蓋下收圖章。</li>
+                        <li><strong>尚未完成簽核同意與蓋下收圖章前，製造報工端將鎖定無法進行生產。</strong></li>
+                      </ul>
                     </div>
                   </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">受託單位簽核意見</label>
-                    <input
-                      type="text"
-                      value={formData.target_manager_comment}
-                      onChange={e => setFormData({ ...formData, target_manager_comment: e.target.value })}
-                      placeholder="受託單位簽核意見"
-                      className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-sm bg-white outline-none"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">交辦人員簽名</label>
-                      <input
-                        type="text"
-                        value={formData.assigned_staff_sign}
-                        onChange={e => setFormData({ ...formData, assigned_staff_sign: e.target.value })}
-                        className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-sm bg-white outline-none"
-                      />
+                  {editingOrder && (
+                    <div className="bg-white border border-rose-200 rounded-lg p-2.5 text-xs flex items-center justify-between">
+                      <div>
+                        <span className="text-slate-500">目前簽核狀態：</span>
+                        <span className="font-bold text-slate-800">{editingOrder.approval_status || '待簽核'}</span>
+                        {editingOrder.target_manager_sign && (
+                          <span className="text-slate-500 ml-2">（主管：{editingOrder.target_manager_sign}）</span>
+                        )}
+                      </div>
+                      <div className="font-bold text-rose-700">
+                        {editingOrder.drawing_received_date
+                          ? `💮 已蓋收圖章 (${editingOrder.drawing_received_date})`
+                          : '⏳ 尚未蓋收圖章'}
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">備註</label>
-                      <input
-                        type="text"
-                        value={formData.remarks}
-                        onChange={e => setFormData({ ...formData, remarks: e.target.value })}
-                        className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-sm bg-white outline-none"
-                      />
-                    </div>
-                  </div>
+                  )}
                 </div>
               </div>
 

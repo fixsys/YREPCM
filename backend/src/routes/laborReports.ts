@@ -165,6 +165,19 @@ router.post('/', authenticateToken, upload.any(), async (req: AuthRequest, res) 
   const missing: string[] = [];
   if (isMfg && !cleanedDispatchId) {
     missing.push('「派工單號」：請選擇製造生產派工單號');
+  } else if (isMfg && cleanedDispatchId) {
+    const targetOrder = await prisma.dispatchOrder.findUnique({ where: { id: cleanedDispatchId } });
+    if (!targetOrder) {
+      missing.push('「派工單號」：找不到指定的派工單，請重新選擇');
+    } else if (
+      targetOrder.approval_status !== '同意' ||
+      !targetOrder.drawing_received_date ||
+      String(targetOrder.drawing_received_date).trim() === ''
+    ) {
+      missing.push(
+        `「派工單簽核狀態」：派工單（${targetOrder.dispatch_no}）尚未經受託單位（${targetOrder.target_dept}）主管簽核同意並蓋下收圖章（目前狀態：${targetOrder.approval_status || '待簽核'}${targetOrder.drawing_received_date ? '' : ' / 未蓋收圖章'}），尚未簽核前不可進行生產！`
+      );
+    }
   }
   if (!cleanedProjectId) {
     missing.push('「專案代碼」：請選擇所屬專案');
@@ -366,6 +379,19 @@ router.put('/:id', authenticateToken, upload.any(), async (req: AuthRequest, res
     const missing: string[] = [];
     if (isMfg && !cleanedDispatchId) {
       missing.push('「派工單號」：請選擇製造生產派工單號');
+    } else if (isMfg && cleanedDispatchId) {
+      const targetOrder = await prisma.dispatchOrder.findUnique({ where: { id: cleanedDispatchId } });
+      if (!targetOrder) {
+        missing.push('「派工單號」：找不到指定的派工單，請重新選擇');
+      } else if (
+        targetOrder.approval_status !== '同意' ||
+        !targetOrder.drawing_received_date ||
+        String(targetOrder.drawing_received_date).trim() === ''
+      ) {
+        missing.push(
+          `「派工單簽核狀態」：派工單（${targetOrder.dispatch_no}）尚未經受託單位（${targetOrder.target_dept}）主管簽核同意並蓋下收圖章（目前狀態：${targetOrder.approval_status || '待簽核'}${targetOrder.drawing_received_date ? '' : ' / 未蓋收圖章'}），尚未簽核前不可進行生產！`
+        );
+      }
     }
     if (!cleanedProjectId) {
       missing.push('「專案代碼」：請選擇所屬專案');

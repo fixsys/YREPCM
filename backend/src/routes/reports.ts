@@ -639,19 +639,51 @@ router.get('/dashboard', authenticateToken, async (req: AuthRequest, res) => {
     const myTasks = tasks.filter(t => t.assignees.some(a => a.id === user.id));
     const myOverdueTasks = overdueTasks.filter(t => t.assignees.some(a => a.id === user.id));
 
-    // Team tasks (if manager)
+    // Team tasks & pending dispatch order approvals (if manager)
     let teamTasks: any[] = [];
+    let pendingDispatchOrders: any[] = [];
+    let processedDispatchOrders: any[] = [];
+
     if (user.level >= 50) {
       if (user.level >= 100) {
         teamTasks = tasks; // All tasks for top management
       } else {
-        const teamMembers = await prisma.user.findMany({ where: { department_id: user.department } }); // Wait user.department is now department_name string or id? The JWT payload in auth.ts says `department: user.department?.name`. 
-        // We'd better use the db query to get department members.
         const dept = await prisma.department.findUnique({ where: { name: user.department } });
         if (dept) {
           teamTasks = tasks.filter(t => t.assignees.some(a => a.department_id === dept.id));
         }
       }
+
+      // Fetch dispatch orders for this department manager (or all if level >= 100)
+      const dispatchWhere: any =
+        user.level >= 100 || !user.department
+          ? {}
+          : { target_dept: user.department };
+
+      const deptDispatchOrders = await prisma.dispatchOrder.findMany({
+        where: dispatchWhere,
+        include: {
+          project: {
+            select: { id: true, project_code: true, name: true }
+          },
+          laborReports: {
+            select: { id: true, report_date: true, work_items: true }
+          }
+        },
+        orderBy: { created_at: 'desc' }
+      });
+
+      pendingDispatchOrders = deptDispatchOrders.filter(
+        o =>
+          o.approval_status !== '同意' && o.approval_status !== '退回' ||
+          (o.approval_status === '同意' && (!o.drawing_received_date || String(o.drawing_received_date).trim() === ''))
+      );
+
+      processedDispatchOrders = deptDispatchOrders.filter(
+        o =>
+          (o.approval_status === '同意' && Boolean(o.drawing_received_date && String(o.drawing_received_date).trim() !== '')) ||
+          o.approval_status === '退回'
+      );
     }
 
     res.json({
@@ -668,7 +700,9 @@ router.get('/dashboard', authenticateToken, async (req: AuthRequest, res) => {
       },
       manager: {
         teamTasks,
-        teamOverdueTasks: overdueTasks.filter(t => teamTasks.find(tt => tt.id === t.id))
+        teamOverdueTasks: overdueTasks.filter(t => teamTasks.find(tt => tt.id === t.id)),
+        pendingDispatchOrders,
+        processedDispatchOrders
       }
     });
   } catch (error) {

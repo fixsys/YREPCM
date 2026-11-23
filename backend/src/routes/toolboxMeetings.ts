@@ -108,6 +108,31 @@ router.post('/', authenticateToken, upload.array('photos', 20), async (req: Auth
   if (isMfg) {
     if (!Array.isArray(parsedWorkItems) || parsedWorkItems.filter((w: any) => w?.name).length === 0) {
       missing.push('「工作內容」：請至少選擇一筆今日生產之「專案與派工單號」');
+    } else {
+      const doIds = Array.from(
+        new Set(
+          [
+            cleanedDispatchId,
+            ...parsedWorkItems.map((w: any) => cleanOptionalId(w?.dispatch_order_id)),
+          ].filter(Boolean) as string[]
+        )
+      );
+      if (doIds.length > 0) {
+        const orders = await prisma.dispatchOrder.findMany({
+          where: { id: { in: doIds } },
+        });
+        for (const ord of orders) {
+          if (
+            ord.approval_status !== '同意' ||
+            !ord.drawing_received_date ||
+            String(ord.drawing_received_date).trim() === ''
+          ) {
+            missing.push(
+              `「派工單簽核狀態」：派工單（${ord.dispatch_no}）尚未經受託單位（${ord.target_dept}）主管簽核同意並蓋下收圖章（目前狀態：${ord.approval_status || '待簽核'}${ord.drawing_received_date ? '' : ' / 未蓋收圖章'}），尚未簽核前不可進行生產！`
+            );
+          }
+        }
+      }
     }
   } else if (!cleanedProjectId) {
     missing.push('「專案代碼」：請選擇所屬專案');
@@ -227,6 +252,31 @@ router.put('/:id', authenticateToken, upload.array('photos', 20), async (req: Au
     if (isMfg) {
       if (!Array.isArray(parsedWorkItems) || parsedWorkItems.filter((w: any) => w?.name).length === 0) {
         missing.push('「工作內容」：請至少選擇一筆今日生產之「專案與派工單號」');
+      } else {
+        const doIds = Array.from(
+          new Set(
+            [
+              cleanedDispatchId,
+              ...parsedWorkItems.map((w: any) => cleanOptionalId(w?.dispatch_order_id)),
+            ].filter(Boolean) as string[]
+          )
+        );
+        if (doIds.length > 0) {
+          const orders = await prisma.dispatchOrder.findMany({
+            where: { id: { in: doIds } },
+          });
+          for (const ord of orders) {
+            if (
+              ord.approval_status !== '同意' ||
+              !ord.drawing_received_date ||
+              String(ord.drawing_received_date).trim() === ''
+            ) {
+              missing.push(
+                `「派工單簽核狀態」：派工單（${ord.dispatch_no}）尚未經受託單位（${ord.target_dept}）主管簽核同意並蓋下收圖章（目前狀態：${ord.approval_status || '待簽核'}${ord.drawing_received_date ? '' : ' / 未蓋收圖章'}），尚未簽核前不可進行生產！`
+              );
+            }
+          }
+        }
       }
     } else if (!cleanedProjectId) {
       missing.push('「專案代碼」：請選擇所屬專案');

@@ -83,6 +83,14 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
     return `${projText || '未指定專案'} / ${o?.dispatch_no || ''}`;
   }, []);
 
+  // 檢查派工單是否已經受託單位主管簽核同意並蓋下收圖章（未完成前不可進行生產）
+  const isDispatchOrderApproved = useCallback((o: any) => {
+    return (
+      o?.approval_status === '同意' &&
+      Boolean(o?.drawing_received_date && String(o.drawing_received_date).trim() !== '')
+    );
+  }, []);
+
   // 工具箱會議 State
   const [toolboxMeetings, setToolboxMeetings] = useState<any[]>([]);
   const [isToolboxModalOpen, setIsToolboxModalOpen] = useState(false);
@@ -678,13 +686,20 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
 
     if (isManufacturing) {
       if (validToolboxWorkItems.length === 0) {
-        missing.push('「工作內容」：請至少選擇一筆今日參與生產的「專案與派工單號」');
+        missing.push('「工作內容」：請至少選擇一筆今日參與生產的「專案與已簽核派工單號」');
       } else {
         (toolboxForm.work_items || []).forEach((row: any, idx: number) => {
           if (row?.project_id) {
             const projOrders = dispatchOrders.filter((o: any) => String(o.project_id) === String(row.project_id));
             if (projOrders.length > 0 && !row.dispatch_order_id) {
-              missing.push(`「工作內容」第 ${idx + 1} 列：已選擇專案，請接著選擇「該專案派工單號」`);
+              missing.push(`「工作內容」第 ${idx + 1} 列：已選擇專案，請接著選擇已簽核同意並蓋收圖章的「派工單號」`);
+            } else if (row.dispatch_order_id) {
+              const ord = dispatchOrders.find((o: any) => String(o.id) === String(row.dispatch_order_id));
+              if (ord && !isDispatchOrderApproved(ord)) {
+                missing.push(
+                  `「工作內容」第 ${idx + 1} 列：派工單（${ord.dispatch_no}）尚未經受託單位（${ord.target_dept}）主管簽核同意並蓋下收圖章，不可進行生產！`
+                );
+              }
             }
           }
         });
@@ -871,6 +886,13 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
 
     if (isManufacturing && !laborForm.dispatch_order_id) {
       missing.push('「派工單號」：請選擇製造生產派工單號');
+    } else if (isManufacturing && laborForm.dispatch_order_id) {
+      const selectedOrder = dispatchOrders.find((o: any) => String(o.id) === String(laborForm.dispatch_order_id));
+      if (selectedOrder && !isDispatchOrderApproved(selectedOrder)) {
+        missing.push(
+          `「派工單簽核狀態」：派工單（${selectedOrder.dispatch_no}）尚未經受託單位（${selectedOrder.target_dept}）主管簽核同意並蓋下收圖章，尚未簽核前不可進行生產！`
+        );
+      }
     }
     if (!laborForm.project_id) {
       missing.push('「專案代碼」：請選擇所屬專案');
@@ -1620,13 +1642,16 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                                       const projOrders = dispatchOrders.filter(
                                         (o: any) => String(o.project_id) === String(pid)
                                       );
-                                      const autoOrder = projOrders.length === 1 ? projOrders[0] : null;
+                                      const approvedProjOrders = projOrders.filter(isDispatchOrderApproved);
+                                      const autoOrder = approvedProjOrders.length === 1 ? approvedProjOrders[0] : null;
                                       const projLabel = proj
                                         ? [proj.project_code, proj.name].filter(Boolean).join(' ')
                                         : '';
                                       const computedName = autoOrder
                                         ? formatDispatchOrderWorkItem(autoOrder)
-                                        : projLabel;
+                                        : projOrders.length === 0
+                                        ? projLabel
+                                        : '';
 
                                       const nextRows = [...arr];
                                       nextRows[idx] = {
@@ -1641,13 +1666,16 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                                   >
                                     <option value="">-- 請選擇專案 --</option>
                                     {projects.map((p: any) => {
-                                      const count = dispatchOrders.filter(
+                                      const allProjOrders = dispatchOrders.filter(
                                         (o: any) => String(o.project_id) === String(p.id)
-                                      ).length;
+                                      );
+                                      const approvedCount = allProjOrders.filter(isDispatchOrderApproved).length;
+                                      const unapprovedCount = allProjOrders.length - approvedCount;
                                       return (
                                         <option key={p.id} value={p.id}>
                                           {p.project_code} - {p.name}
-                                          {count > 0 ? ` (${count} 張派工單)` : ''}
+                                          {approvedCount > 0 ? ` (${approvedCount} 張已簽核可生產)` : ''}
+                                          {unapprovedCount > 0 ? ` [${unapprovedCount} 張待簽核]` : ''}
                                         </option>
                                       );
                                     })}
@@ -1665,13 +1693,19 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                                     onChange={e => {
                                       const oid = e.target.value;
                                       const ord = dispatchOrders.find((o: any) => String(o.id) === String(oid));
+                                      if (ord && !isDispatchOrderApproved(ord)) {
+                                        alert(`派工單「${ord.dispatch_no}」尚未經受託單位（${ord.target_dept}）主管簽核同意並蓋收圖章，不可進行生產！`);
+                                        return;
+                                      }
                                       const proj = projects.find((p: any) => String(p.id) === String(rowProjectId));
                                       const projLabel = proj
                                         ? [proj.project_code, proj.name].filter(Boolean).join(' ')
                                         : '';
                                       const computedName = ord
                                         ? formatDispatchOrderWorkItem(ord)
-                                        : projLabel;
+                                        : projectDispatchOrders.length === 0
+                                        ? projLabel
+                                        : '';
 
                                       const nextRows = [...arr];
                                       nextRows[idx] = {
@@ -1689,13 +1723,20 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                                       <option value="">(此專案尚無派工單，僅帶入專案)</option>
                                     ) : (
                                       <>
-                                        <option value="">-- 請選擇派工單號 ({projectDispatchOrders.length} 筆) --</option>
-                                        {projectDispatchOrders.map((o: any) => (
-                                          <option key={o.id} value={o.id}>
-                                            {o.dispatch_no}
-                                            {o.priority ? ` [${o.priority}]` : ''}
-                                          </option>
-                                        ))}
+                                        <option value="">
+                                          -- 請選擇已簽核派工單號 ({projectDispatchOrders.filter(isDispatchOrderApproved).length}/{projectDispatchOrders.length} 筆可生產) --
+                                        </option>
+                                        {projectDispatchOrders.map((o: any) => {
+                                          const approved = isDispatchOrderApproved(o);
+                                          return (
+                                            <option key={o.id} value={o.id} disabled={!approved}>
+                                              {o.dispatch_no}
+                                              {approved
+                                                ? ' [✅ 已簽核可生產]'
+                                                : ` [🔒 尚未簽核 (${o.approval_status || '待簽核'}${o.drawing_received_date ? '' : '/未蓋收圖章'}) — 不可生產]`}
+                                            </option>
+                                          );
+                                        })}
                                       </>
                                     )}
                                   </select>
@@ -2071,8 +2112,10 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                 )}
                 <div className="grid grid-cols-1 gap-4">
                   {isManufacturing && (
-                    <div className="bg-amber-50/70 border border-amber-200 p-3.5 rounded-lg">
-                      <label className="block text-sm font-bold text-amber-900 mb-1">派工單號 * (選擇後自動帶入專案代碼與派工單工項)</label>
+                    <div className="bg-amber-50/70 border border-amber-200 p-3.5 rounded-lg space-y-1.5">
+                      <label className="block text-sm font-bold text-amber-900">
+                        派工單號 * (僅已由受託單位主管簽核同意並蓋收圖章之派工單可進行生產)
+                      </label>
                       <select
                         required={isManufacturing}
                         value={laborForm.dispatch_order_id}
@@ -2080,6 +2123,10 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                           const orderId = e.target.value;
                           const order = dispatchOrders.find((o: any) => o.id === orderId);
                           if (order) {
+                            if (!isDispatchOrderApproved(order)) {
+                              alert(`派工單「${order.dispatch_no}」尚未經受託單位（${order.target_dept}）主管簽核同意並蓋收圖章，不可進行生產！`);
+                              return;
+                            }
                             const items = safeParseJSON(order.items, []);
                             const catMap: Record<string, string[]> = {};
                             items.forEach((it: any) => {
@@ -2114,13 +2161,26 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                         }}
                         className="w-full px-3 py-2 border border-amber-300 bg-white rounded-lg outline-none focus:ring-2 focus:ring-amber-500 font-medium text-slate-800"
                       >
-                        <option value="">-- 請選擇派工單號 --</option>
-                        {dispatchOrders.map((o: any) => (
-                          <option key={o.id} value={o.id}>
-                            {o.dispatch_no} ({o.project?.project_code || ''} {o.project?.name || o.site_name || ''})
-                          </option>
-                        ))}
+                        <option value="">
+                          -- 請選擇已簽核派工單號 ({dispatchOrders.filter(isDispatchOrderApproved).length}/{dispatchOrders.length} 筆可生產) --
+                        </option>
+                        {dispatchOrders.map((o: any) => {
+                          const approved = isDispatchOrderApproved(o);
+                          return (
+                            <option key={o.id} value={o.id} disabled={!approved}>
+                              {o.dispatch_no} ({o.project?.project_code || ''} {o.project?.name || o.site_name || ''})
+                              {approved
+                                ? ' [✅ 已簽核可生產]'
+                                : ` [🔒 尚未簽核 (${o.approval_status || '待簽核'}${o.drawing_received_date ? '' : '/未蓋收圖章'}) — 不可生產]`}
+                            </option>
+                          );
+                        })}
                       </select>
+                      {dispatchOrders.some(o => !isDispatchOrderApproved(o)) && (
+                        <p className="text-xs font-medium text-rose-700">
+                          🔒 提示：標示「尚未簽核 — 不可生產」之派工單，需先由受託單位部門主管登入後於「總覽看板 ➔ 待辦簽核專區」完成簽核同意並蓋下收圖章後，始開放選擇與生產報工。
+                        </p>
+                      )}
                     </div>
                   )}
                   <div>
