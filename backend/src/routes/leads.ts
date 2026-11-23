@@ -9,10 +9,11 @@ const prisma = new PrismaClient();
 router.get('/', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const userRole = req.user?.role || '';
+    const userLevel = Number(req.user?.level || 0);
     const userId = req.user?.id;
 
     let whereClause: any = {};
-    if (!['SystemAdmin', 'Chairman', 'TopManagement'].includes(userRole)) {
+    if (userLevel < 100 && !['SystemAdmin', 'Chairman', 'TopManagement', '系統管理員'].includes(userRole)) {
       whereClause = {
         OR: [
           { assignee_id: userId },
@@ -67,7 +68,8 @@ router.get('/:id', authenticateToken, async (req: AuthRequest, res) => {
     if (!lead) return res.status(404).json({ error: 'Lead not found' });
 
     // Check visibility
-    if (!['SystemAdmin', 'Chairman', 'TopManagement'].includes(userRole)) {
+    const userLevel = Number(req.user?.level || 0);
+    if (userLevel < 100 && !['SystemAdmin', 'Chairman', 'TopManagement', '系統管理員'].includes(userRole)) {
       if (lead.assignee_id !== userId && lead.created_by !== userId) {
         return res.status(403).json({ error: '您沒有權限檢視此名單' });
       }
@@ -135,7 +137,8 @@ router.put('/:id', authenticateToken, async (req: AuthRequest, res) => {
     const existingLead = await prisma.lead.findUnique({ where: { id } });
     if (!existingLead) return res.status(404).json({ error: 'Lead not found' });
 
-    if (!['SystemAdmin', 'Chairman', 'TopManagement'].includes(userRole)) {
+    const userLevel = Number(req.user?.level || 0);
+    if (userLevel < 100 && !['SystemAdmin', 'Chairman', 'TopManagement', '系統管理員'].includes(userRole)) {
       if (existingLead.assignee_id !== userId && existingLead.created_by !== userId) {
         return res.status(403).json({ error: '您沒有權限修改此名單' });
       }
@@ -162,7 +165,8 @@ router.delete('/:id', authenticateToken, async (req: AuthRequest, res) => {
     const existingLead = await prisma.lead.findUnique({ where: { id } });
     if (!existingLead) return res.status(404).json({ error: 'Lead not found' });
 
-    if (userRole !== 'SystemAdmin') {
+    const userLevel = Number(req.user?.level || 0);
+    if (userLevel < 100 && userRole !== 'SystemAdmin' && userRole !== '系統管理員') {
       return res.status(403).json({ error: '權限不足，僅系統管理員可刪除' });
     }
 

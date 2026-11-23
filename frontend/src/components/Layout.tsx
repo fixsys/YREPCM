@@ -38,7 +38,6 @@ const Layout = ({ children }: { children: ReactNode }) => {
   if (user?.level && user.level >= 100) {
     navItems.push({ name: '帳號管理', path: '/users', icon: Shield });
     navItems.push({ name: '系統設定', path: '/settings', icon: Settings });
-    navItems.push({ name: '流程引擎', path: '/workflow-builder', icon: Network });
     navItems.push({ name: '後臺紀錄', path: '/system-logs', icon: Terminal });
   }
 

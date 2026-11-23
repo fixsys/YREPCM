@@ -137,7 +137,8 @@ export default function LeadDetail() {
   const userStr = localStorage.getItem('auth-storage');
   const currentUser = userStr ? JSON.parse(userStr).state?.user : null;
   const canEdit = currentUser && (
-    ['SystemAdmin', 'Chairman', 'TopManagement'].includes(currentUser.role) || 
+    (currentUser.level && currentUser.level >= 100) ||
+    ['SystemAdmin', 'Chairman', 'TopManagement', '系統管理員'].includes(currentUser.role) || 
     currentUser.id === lead.assignee_id || 
     currentUser.id === lead.created_by
   );

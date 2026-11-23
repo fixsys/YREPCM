@@ -4,8 +4,10 @@ import axios from 'axios';
 import { Plus, Search, Phone, Building2, User, ChevronRight, FileText, Briefcase, Trash2 } from 'lucide-react';
 import clsx from 'clsx';
 import DailyLogs from './DailyLogs';
+import { useAuthStore } from '../../store/authStore';
 
 export default function Leads() {
+  const { user, token } = useAuthStore();
   const [leads, setLeads] = useState<any[]>([]);
   const [showAdd, setShowAdd] = useState(false);
   const [activeTab, setActiveTab] = useState<'leads' | 'dailyLog'>('leads');

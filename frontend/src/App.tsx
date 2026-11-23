@@ -10,7 +10,6 @@ import Users from './pages/Users';
 import SystemSettings from './pages/SystemSettings';
 import Tasks from './pages/Tasks';
 import AnalyticsReports from './pages/AnalyticsReports';
-import WorkflowBuilder from './pages/WorkflowBuilder';
 import Budget from './pages/Budget';
 import BudgetDetail from './pages/BudgetDetail';
 import Leads from './pages/crm/Leads';
@@ -59,7 +58,6 @@ function App() {
                 <Route path="/approvals" element={<ElectronicApprovals />} />
                 <Route path="/simulators" element={<SimulatorsDashboard />} />
                 <Route path="/simulators/solar" element={<SolarModuleSim />} />
-                <Route path="/workflow-builder" element={(user?.level && user.level >= 100) ? <WorkflowBuilder /> : <Navigate to="/" />} />
                 <Route path="/system-logs" element={(user?.level && user.level >= 100) ? <SystemLogs /> : <Navigate to="/" />} />
                 <Route path="*" element={<Navigate to="/" />} />
               </Routes>
