@@ -426,6 +426,59 @@ router.put('/:id', authenticateToken, async (req: AuthRequest, res) => {
   }
 });
 
+// Target department manager approval & drawing received stamp
+router.post('/:id/approve', authenticateToken, async (req: AuthRequest, res) => {
+  if (!req.user) return res.status(401).json({ error: '未授權' });
+
+  try {
+    const { id } = req.params;
+    const {
+      target_manager_sign,
+      approval_status,
+      target_manager_comment,
+      drawing_received_date,
+      assigned_staff_sign,
+      remarks,
+    } = req.body;
+
+    const existing = await prisma.dispatchOrder.findUnique({
+      where: { id: String(id) },
+    });
+    if (!existing) {
+      return res.status(404).json({ error: '找不到該筆派工單' });
+    }
+
+    const updated = await prisma.dispatchOrder.update({
+      where: { id: String(id) },
+      data: {
+        target_manager_sign:
+          target_manager_sign !== undefined ? String(target_manager_sign).trim() : existing.target_manager_sign,
+        approval_status: approval_status || existing.approval_status || '同意',
+        target_manager_comment:
+          target_manager_comment !== undefined ? String(target_manager_comment) : existing.target_manager_comment,
+        drawing_received_date:
+          drawing_received_date !== undefined ? String(drawing_received_date).trim() : existing.drawing_received_date,
+        assigned_staff_sign:
+          assigned_staff_sign !== undefined ? String(assigned_staff_sign).trim() : existing.assigned_staff_sign,
+        remarks: remarks !== undefined ? String(remarks) : existing.remarks,
+      },
+      include: {
+        project: {
+          select: { id: true, project_code: true, name: true },
+        },
+        laborReports: {
+          select: { id: true, report_date: true, work_items: true },
+        },
+      },
+    });
+
+    res.json(updated);
+  } catch (error) {
+    console.error('Approve dispatch order error:', error);
+    res.status(500).json({ error: '受託單位簽核派工單失敗' });
+  }
+});
+
 // Delete dispatch order
 router.delete('/:id', authenticateToken, async (req: AuthRequest, res) => {
   if (!req.user) return res.status(401).json({ error: '未授權' });
