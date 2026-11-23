@@ -710,7 +710,8 @@ router.post('/:id/timeline-excel', authenticateToken, async (req: AuthRequest, r
       return res.status(404).json({ error: '找不到專案' });
     }
 
-    const { title, legendText, buckets = [], rows = [] } = req.body;
+    const { title, legendText, granularity, buckets = [], rows = [] } = req.body;
+    const isDayMode = granularity === 'DAY';
 
     const wb = new ExcelJS.Workbook();
     wb.creator = '元融集團專案管理系統';
@@ -789,7 +790,17 @@ router.post('/:id/timeline-excel', authenticateToken, async (req: AuthRequest, r
         r.gateText || '',
         ...buckets.map((b: any) => {
           const hit = Array.isArray(r.activeBucketIds) && r.activeBucketIds.includes(b.id);
-          return hit ? r.blockLabel || '● 正式執行' : '';
+          if (!hit) return '';
+          if (isDayMode) {
+            return r.statusKey === 'COMPLETED'
+              ? '■ 完工'
+              : r.statusKey === 'DELAYED'
+              ? '★ 延遲'
+              : r.statusKey === 'PLANNED'
+              ? '▲ 預定'
+              : '● 執行';
+          }
+          return r.blockLabel || '● 正式執行';
         }),
         `${r.actualProgress ?? 0}%`,
         r.remark || '',
@@ -890,7 +901,7 @@ router.post('/:id/timeline-excel', authenticateToken, async (req: AuthRequest, r
     ws.getColumn(3).width = 30;  // 工作模組/施工工項
     ws.getColumn(4).width = 28;  // 預計起訖與檢核目標
     for (let i = 0; i < buckets.length; i++) {
-      ws.getColumn(5 + i).width = 13;
+      ws.getColumn(5 + i).width = isDayMode ? 8.5 : 13;
     }
     ws.getColumn(5 + buckets.length).width = 10; // 進度%
     ws.getColumn(6 + buckets.length).width = 24; // 備註

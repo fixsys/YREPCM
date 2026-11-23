@@ -9,7 +9,7 @@ interface ProjectTimelineProps {
   logs: any[];
 }
 
-type Granularity = 'WEEK' | 'BIWEEK' | 'MONTH';
+type Granularity = 'DAY' | 'WEEK' | 'BIWEEK' | 'MONTH';
 
 interface TimeBucket {
   id: string;
@@ -18,6 +18,7 @@ interface TimeBucket {
   startTs: number;
   endTs: number;
   isCurrent: boolean;
+  isWeekend?: boolean;
 }
 
 class ErrorBoundary extends React.Component<any, { hasError: boolean; error: any }> {
@@ -70,6 +71,7 @@ const ProjectTimelineInner: React.FC<ProjectTimelineProps> = ({
   const { token } = useAuthStore();
   const [granularity, setGranularity] = useState<Granularity>('WEEK');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
+  const [selectedMonth, setSelectedMonth] = useState<string>('ALL');
   const [isExporting, setIsExporting] = useState(false);
 
   // 統計各工項在施工日誌累計完成之進度/數量
@@ -249,11 +251,41 @@ const ProjectTimelineInner: React.FC<ProjectTimelineProps> = ({
     };
   }, [workItemsConfig, accumulatedProgressMap, todayStartTs, todayEndTs]);
 
-  // 依據篩選後的工項決定時間區間欄位 (週別 W1~W5 / 雙週 / 月別)
+  // 依據篩選後的工項決定時間區間欄位 (單日 / 週別 W1~W5 / 雙週 / 月別)
   const filteredRows = useMemo(() => {
     if (selectedCategory === 'ALL') return allRows;
     return allRows.filter(r => r.category === selectedCategory);
   }, [allRows, selectedCategory]);
+
+  // 計算專案涵蓋的所有月份選項 (供「單日」或各模式快速篩選特定月份)
+  const availableMonths = useMemo(() => {
+    const targetRows = filteredRows.length > 0 ? filteredRows : allRows;
+    if (targetRows.length === 0) return [] as { key: string; label: string; startTs: number; endTs: number }[];
+    let rMin = Infinity;
+    let rMax = -Infinity;
+    targetRows.forEach(r => {
+      if (r.startTs < rMin) rMin = r.startTs;
+      if (r.endTs > rMax) rMax = r.endTs;
+    });
+    const minD = new Date(rMin);
+    const maxD = new Date(rMax);
+    const months: { key: string; label: string; startTs: number; endTs: number }[] = [];
+    let cur = new Date(minD.getFullYear(), minD.getMonth(), 1);
+    const endM = new Date(maxD.getFullYear(), maxD.getMonth() + 1, 0);
+    while (cur <= endM) {
+      const y = cur.getFullYear();
+      const m = cur.getMonth();
+      const daysInMonth = new Date(y, m + 1, 0).getDate();
+      months.push({
+        key: `${y}-${pad2(m + 1)}`,
+        label: `${y}年${pad2(m + 1)}月`,
+        startTs: new Date(y, m, 1, 0, 0, 0, 0).getTime(),
+        endTs: new Date(y, m, daysInMonth, 23, 59, 59, 999).getTime(),
+      });
+      cur = new Date(y, m + 1, 1);
+    }
+    return months;
+  }, [filteredRows, allRows]);
 
   const { buckets, rangeStartStr, rangeEndStr } = useMemo(() => {
     const targetRows = filteredRows.length > 0 ? filteredRows : allRows;
@@ -268,12 +300,47 @@ const ProjectTimelineInner: React.FC<ProjectTimelineProps> = ({
       if (r.endTs > rMax) rMax = r.endTs;
     });
 
+    if (selectedMonth !== 'ALL') {
+      const matchedM = availableMonths.find(m => m.key === selectedMonth);
+      if (matchedM) {
+        rMin = matchedM.startTs;
+        rMax = matchedM.endTs;
+      }
+    }
+
     const minD = new Date(rMin);
     const maxD = new Date(rMax);
     const spanYears = maxD.getFullYear() !== minD.getFullYear();
     const list: TimeBucket[] = [];
+    const WEEKDAY_SHORT = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
 
-    if (granularity === 'WEEK') {
+    if (granularity === 'DAY') {
+      // 單日模式：逐日產生欄位
+      let cur = new Date(minD.getFullYear(), minD.getMonth(), minD.getDate(), 0, 0, 0, 0);
+      const endDay = new Date(maxD.getFullYear(), maxD.getMonth(), maxD.getDate(), 23, 59, 59, 999);
+
+      while (cur <= endDay) {
+        const y = cur.getFullYear();
+        const m = cur.getMonth();
+        const d = cur.getDate();
+        const dow = cur.getDay();
+        const bStart = new Date(y, m, d, 0, 0, 0, 0).getTime();
+        const bEnd = new Date(y, m, d, 23, 59, 59, 999).getTime();
+
+        const topPrefix = spanYears ? `${String(y).slice(2)}/` : '';
+        list.push({
+          id: `D-${y}-${pad2(m + 1)}-${pad2(d)}`,
+          topLabel: `${topPrefix}${pad2(m + 1)}/${pad2(d)}`,
+          subLabel: WEEKDAY_SHORT[dow],
+          startTs: bStart,
+          endTs: bEnd,
+          isCurrent: todayStartTs >= bStart && todayStartTs <= bEnd,
+          isWeekend: dow === 0 || dow === 6,
+        });
+
+        cur = new Date(y, m, d + 1, 0, 0, 0, 0);
+      }
+    } else if (granularity === 'WEEK') {
       // 將每個月份切分為月內週別 W1 ~ W5（與參考圖完全一致：例如 11月 W4 11/23-11/30, 12月 W1 12/01-12/06）
       let cur = new Date(minD.getFullYear(), minD.getMonth(), 1);
       const endMonth = new Date(maxD.getFullYear(), maxD.getMonth() + 1, 0);
@@ -392,7 +459,7 @@ const ProjectTimelineInner: React.FC<ProjectTimelineProps> = ({
       rangeStartStr: formatYMD(minD),
       rangeEndStr: formatYMD(maxD),
     };
-  }, [filteredRows, allRows, granularity, todayStartTs]);
+  }, [filteredRows, allRows, granularity, todayStartTs, selectedMonth, availableMonths]);
 
   // 計算每一列命中的時間區間 ID
   const rowsWithBuckets = useMemo(() => {
@@ -434,6 +501,7 @@ const ProjectTimelineInner: React.FC<ProjectTimelineProps> = ({
         {
           title: bannerTitle,
           legendText,
+          granularity,
           buckets,
           rows: rowsWithBuckets,
         },
@@ -504,6 +572,7 @@ const ProjectTimelineInner: React.FC<ProjectTimelineProps> = ({
             <Calendar size={14} className="text-slate-500 ml-1.5 mr-1" />
             {(
               [
+                { id: 'DAY', label: '單日' },
                 { id: 'WEEK', label: '週別 (W1~W5)' },
                 { id: 'BIWEEK', label: '雙週 (上/下半月)' },
                 { id: 'MONTH', label: '月別' },
@@ -523,6 +592,25 @@ const ProjectTimelineInner: React.FC<ProjectTimelineProps> = ({
               </button>
             ))}
           </div>
+
+          {/* 月份區間快速篩選 */}
+          {availableMonths.length > 1 && (
+            <div className="flex items-center gap-1.5 bg-slate-100 px-2.5 py-1.5 rounded-lg text-xs font-bold text-slate-700">
+              <span>顯示月份：</span>
+              <select
+                value={selectedMonth}
+                onChange={e => setSelectedMonth(e.target.value)}
+                className="bg-white border border-slate-300 rounded px-2 py-0.5 text-xs font-bold text-slate-800 outline-none"
+              >
+                <option value="ALL">全部期間 ({availableMonths.length} 個月)</option>
+                {availableMonths.map(m => (
+                  <option key={m.key} value={m.key}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
 
         {/* 匯出 Excel 按鈕 */}
@@ -589,15 +677,27 @@ const ProjectTimelineInner: React.FC<ProjectTimelineProps> = ({
                 {buckets.map(b => (
                   <th
                     key={b.id}
-                    className={`border border-[#8EA9DB] px-2 py-2 min-w-[96px] text-center font-bold whitespace-nowrap leading-tight ${
-                      b.isCurrent ? 'bg-[#1b3b6f] ring-2 ring-inset ring-amber-300' : ''
+                    className={`border border-[#8EA9DB] ${
+                      granularity === 'DAY' ? 'px-1.5 py-1.5 min-w-[64px]' : 'px-2 py-2 min-w-[96px]'
+                    } text-center font-bold whitespace-nowrap leading-tight ${
+                      b.isCurrent
+                        ? 'bg-[#1b3b6f] ring-2 ring-inset ring-amber-300'
+                        : b.isWeekend
+                        ? 'bg-[#25467e]'
+                        : ''
                     }`}
                   >
                     <div>{b.topLabel}</div>
-                    <div className="text-[11px] font-mono text-blue-100 mt-0.5">{b.subLabel}</div>
+                    <div
+                      className={`text-[11px] font-mono mt-0.5 ${
+                        b.isWeekend ? 'text-amber-200' : 'text-blue-100'
+                      }`}
+                    >
+                      {b.subLabel}
+                    </div>
                     {b.isCurrent && (
                       <div className="mt-0.5 inline-block px-1.5 py-0.2 bg-amber-400 text-slate-900 text-[10px] font-extrabold rounded">
-                        本週/今日
+                        {granularity === 'DAY' ? '今日' : '本週/今日'}
                       </div>
                     )}
                   </th>
@@ -662,6 +762,14 @@ const ProjectTimelineInner: React.FC<ProjectTimelineProps> = ({
                     {/* 時間區間色塊欄位 */}
                     {buckets.map(b => {
                       const isHit = row.activeBucketIds.includes(b.id);
+                      const shortDayLabel =
+                        row.statusKey === 'COMPLETED'
+                          ? '■ 完工'
+                          : row.statusKey === 'DELAYED'
+                          ? '★ 延遲'
+                          : row.statusKey === 'PLANNED'
+                          ? '▲ 預定'
+                          : '● 執行';
                       return (
                         <td
                           key={b.id}
@@ -671,12 +779,18 @@ const ProjectTimelineInner: React.FC<ProjectTimelineProps> = ({
                               : `${b.topLabel} (${b.subLabel})`
                           }
                           className={`border border-slate-300 p-0 text-center align-middle h-11 ${
-                            isHit ? blockClass : b.isCurrent ? 'bg-amber-50/30' : 'bg-white'
+                            isHit
+                              ? blockClass
+                              : b.isCurrent
+                              ? 'bg-amber-50/40'
+                              : b.isWeekend
+                              ? 'bg-slate-50/70'
+                              : 'bg-white'
                           }`}
                         >
                           {isHit && (
-                            <div className="w-full h-full px-1.5 py-2 flex items-center justify-center font-bold text-[11px] tracking-tight whitespace-nowrap select-none">
-                              {row.blockLabel}
+                            <div className="w-full h-full px-1 py-2 flex items-center justify-center font-bold text-[11px] tracking-tight whitespace-nowrap select-none">
+                              {granularity === 'DAY' ? shortDayLabel : row.blockLabel}
                             </div>
                           )}
                         </td>
