@@ -38,6 +38,8 @@ const Dashboard = () => {
   const [approvingOrder, setApprovingOrder] = useState<any | null>(null);
   const [viewingOrder, setViewingOrder] = useState<any | null>(null);
   const [isApproving, setIsApproving] = useState(false);
+  const [animReady, setAnimReady] = useState(false);
+  const [photoTick, setPhotoTick] = useState(0);
   const [previewLightbox, setPreviewLightbox] = useState<{
     isOpen: boolean;
     photos: { url: string; label: string; date?: string }[];
@@ -49,6 +51,20 @@ const Dashboard = () => {
     currentIndex: 0,
     title: '',
   });
+
+  useEffect(() => {
+    if (!loading && data) {
+      const t = setTimeout(() => setAnimReady(true), 120);
+      return () => clearTimeout(t);
+    }
+  }, [loading, data]);
+
+  useEffect(() => {
+    const iv = setInterval(() => {
+      setPhotoTick(prev => prev + 1);
+    }, 3500);
+    return () => clearInterval(iv);
+  }, []);
 
   const openPhotoLightbox = (
     photos: { url: string; label: string; date?: string }[],
@@ -197,87 +213,47 @@ const Dashboard = () => {
           </div>
         </div>
       </div>
-
-      <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-sm border border-white/40 overflow-hidden mt-6">
-        <div className="bg-indigo-50/50 px-6 py-4 border-b border-indigo-100 flex items-center gap-2">
-          <FolderKanban className="text-indigo-600" size={20} />
-          <h3 className="font-semibold text-indigo-900">進行中專案輪播</h3>
-        </div>
-        <div className="p-6 bg-slate-50/50 overflow-hidden relative group">
-           <div className="flex gap-6 animate-marquee-seamless group-hover:[animation-play-state:paused] w-max">
-             {(() => {
-               // Filter active projects
-               const activeProjects = global.projects.filter((p: any) => p.status !== '已完工' && p.status !== '停工');
-               if (activeProjects.length === 0) {
-                 return <div className="text-slate-500 italic">目前沒有進行中的專案</div>;
-               }
-               // Duplicate list to create seamless loop if there's enough items to scroll,
-               // but just doing it anyway for the marquee effect.
-               const displayList = [...activeProjects, ...activeProjects, ...activeProjects];
-                return displayList.map((p: any, idx: number) => (
-                 <div key={`${p.id}-${idx}`} onClick={() => navigate(`/projects/${p.id}`)} className="cursor-pointer w-80 shrink-0 bg-white border border-slate-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow">
-                    <div className="flex justify-between items-start mb-3">
-                      <h4 className="font-bold text-slate-800 text-lg truncate pr-2">{p.name}</h4>
-                      <span className="text-xs font-medium px-2 py-1 bg-indigo-50 text-indigo-600 rounded-md whitespace-nowrap">
-                        {p.status}
-                      </span>
-                    </div>
-                    <div className="space-y-3">
-                      <div>
-                        <div className="flex justify-between text-xs text-slate-500 mb-1 font-medium">
-                          <span>專案進度</span>
-                          <span>{p.progress_pct || 0}%</span>
-                        </div>
-                        <div className="w-full bg-slate-100 rounded-full h-2">
-                          <div className="bg-gradient-to-r from-blue-400 to-indigo-500 h-2 rounded-full" style={{ width: `${p.progress_pct || 0}%` }}></div>
-                        </div>
-                      </div>
-                      <div className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-lg truncate border border-slate-100 font-medium flex items-center gap-2" title={p.dailyLogs?.[0]?.task_item || '尚未新增工項'}>
-                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0"></div>
-                        最新: {p.dailyLogs?.[0]?.task_item || '尚未新增工項'}
-                      </div>
-                    </div>
-                 </div>
-               ));
-             })()}
-           </div>
-        </div>
-      </div>
     </div>
   );
 
   const ongoingOnsiteList: any[] = global?.ongoingOnsiteProgress || [];
   const ongoingMfgList: any[] = global?.ongoingManufacturingProgress || [];
 
-  const STAGE_META: Record<string, { short: string; badge: string; bar: string }> = {
-    '一次加工': { short: '① 一次加工', badge: 'bg-indigo-100 text-indigo-800 border-indigo-200', bar: 'bg-indigo-500' },
-    '二次加工': { short: '② 二次加工', badge: 'bg-blue-100 text-blue-800 border-blue-200', bar: 'bg-blue-500' },
-    '送至鍍鋅廠': { short: '③ 送至鍍鋅廠', badge: 'bg-amber-100 text-amber-800 border-amber-200', bar: 'bg-amber-500' },
-    '鍍鋅完成出貨至案場': { short: '④ 出貨至案場', badge: 'bg-emerald-100 text-emerald-800 border-emerald-200', bar: 'bg-emerald-500' },
+  const STAGE_META: Record<string, { short: string; badge: string; bar: string; ring: string }> = {
+    '一次加工': { short: '① 一次加工', badge: 'bg-indigo-100 text-indigo-800 border-indigo-200', bar: 'from-indigo-500 to-blue-500', ring: 'border-indigo-400 shadow-indigo-100' },
+    '二次加工': { short: '② 二次加工', badge: 'bg-blue-100 text-blue-800 border-blue-200', bar: 'from-blue-500 to-cyan-500', ring: 'border-blue-400 shadow-blue-100' },
+    '送至鍍鋅廠': { short: '③ 送至鍍鋅廠', badge: 'bg-amber-100 text-amber-800 border-amber-200', bar: 'from-amber-500 to-orange-400', ring: 'border-amber-400 shadow-amber-100' },
+    '鍍鋅完成出貨至案場': { short: '④ 出貨至案場', badge: 'bg-emerald-100 text-emerald-800 border-emerald-200', bar: 'from-emerald-500 to-teal-500', ring: 'border-emerald-400 shadow-emerald-100' },
   };
 
   // Render Live Engineering & Manufacturing Progress + Latest Photos
   const renderLiveProgressSections = () => (
-    <div className="space-y-10 mt-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="space-y-12 mt-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* 1. 目前正在進行的工程進度以及最新的照片 */}
-      <div className="space-y-4">
+      <div className="space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-gradient-to-br from-blue-500 to-teal-600 rounded-lg text-white shadow-lg shadow-blue-200">
+            <div className="relative p-2.5 bg-gradient-to-br from-blue-500 to-teal-600 rounded-xl text-white shadow-lg shadow-blue-200 animate-float-slow">
               <HardHat size={24} />
+              <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-300 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-teal-400 border border-white"></span>
+              </span>
             </div>
             <div>
-              <h2 className="text-xl font-bold text-slate-800">目前正在進行的工程進度與最新照片</h2>
-              <p className="text-xs text-slate-500 mt-0.5">即時彙整現場報工之各案場工程進度、施工項目累計完成度與最新現場施工照片</p>
+              <div className="flex items-center gap-2.5">
+                <h2 className="text-xl font-bold text-slate-800">目前正在進行的工程進度與最新照片</h2>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  </span>
+                  LIVE 即時監控中
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">即時彙整現場報工之各案場工程進度、施工項目累計完成度與最新現場施工照片動態展示</p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => navigate('/onsite')}
-            className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-sm transition-colors cursor-pointer"
-          >
-            前往現場報工 ➔
-          </button>
         </div>
 
         {ongoingOnsiteList.length > 0 ? (
@@ -285,22 +261,26 @@ const Dashboard = () => {
             {ongoingOnsiteList.map((proj: any, idx: number) => {
               const items: any[] = Array.isArray(proj.items) ? proj.items : [];
               const photos: any[] = Array.isArray(proj.latest_photos) ? proj.latest_photos : [];
+              const activePhotoIdx = photos.length > 0 ? (photoTick + idx) % Math.min(4, photos.length) : -1;
+              const targetOverallPct = Math.min(100, proj.overall_pct || 0);
 
               return (
                 <div
                   key={`${proj.project_id}-${idx}`}
-                  className="bg-white/90 backdrop-blur-xl rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden flex flex-col justify-between hover:shadow-md transition-all"
+                  style={{ animationDelay: `${idx * 100}ms` }}
+                  className="group/card bg-white/95 backdrop-blur-xl rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden flex flex-col justify-between hover:shadow-xl hover:-translate-y-1 hover:border-blue-300/80 transition-all duration-300 animate-in fade-in slide-in-from-bottom-3"
                 >
                   {/* 卡片頂部：案場名稱與總體進度 */}
-                  <div className="p-5 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-blue-50/30">
-                    <div className="flex items-start justify-between gap-2 mb-2">
+                  <div className="p-5 border-b border-slate-100 bg-gradient-to-r from-slate-50 via-blue-50/30 to-teal-50/30 relative overflow-hidden">
+                    <div className="absolute -right-10 -top-10 w-32 h-32 rounded-full bg-gradient-to-br from-blue-400/10 to-teal-400/10 blur-2xl group-hover/card:scale-150 transition-transform duration-700 pointer-events-none" />
+                    <div className="flex items-start justify-between gap-2 mb-2 relative">
                       <div
                         onClick={() => proj.project_id && proj.project_id !== 'UNASSIGNED' && navigate(`/projects/${proj.project_id}`)}
                         className="cursor-pointer group"
                       >
                         <div className="flex items-center gap-2 flex-wrap">
                           {proj.project_code && (
-                            <span className="font-mono text-xs font-extrabold px-2 py-0.5 bg-blue-100 text-blue-800 rounded">
+                            <span className="font-mono text-xs font-extrabold px-2 py-0.5 bg-blue-100 text-blue-800 rounded shadow-2xs">
                               {proj.project_code}
                             </span>
                           )}
@@ -309,12 +289,16 @@ const Dashboard = () => {
                           </h3>
                         </div>
                       </div>
-                      <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-teal-100 text-teal-800 border border-teal-200 shrink-0">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-xs font-bold rounded-full bg-teal-100 text-teal-800 border border-teal-200 shrink-0 shadow-2xs">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-teal-600"></span>
+                        </span>
                         {proj.project_status || '施工中'}
                       </span>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 mb-3">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 mb-3.5 relative">
                       {proj.latest_report_date && (
                         <span className="flex items-center gap-1">
                           <Calendar size={12} className="text-blue-600" />
@@ -338,17 +322,23 @@ const Dashboard = () => {
                       )}
                     </div>
 
-                    {/* 總體進度條 */}
-                    <div>
-                      <div className="flex justify-between items-center text-xs font-bold mb-1">
-                        <span className="text-slate-600">案場整體工程進度</span>
-                        <span className="text-blue-700 font-mono text-sm">{proj.overall_pct || 0}%</span>
+                    {/* 動態流光總體進度條 */}
+                    <div className="relative">
+                      <div className="flex justify-between items-center text-xs font-bold mb-1.5">
+                        <span className="text-slate-600 flex items-center gap-1.5">
+                          案場整體工程進度
+                        </span>
+                        <span className="text-blue-700 font-mono text-sm font-black bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200/60">
+                          {proj.overall_pct || 0}%
+                        </span>
                       </div>
-                      <div className="w-full bg-slate-200/80 rounded-full h-2.5 overflow-hidden">
+                      <div className="w-full bg-slate-200/80 rounded-full h-3 overflow-hidden shadow-inner p-0.5">
                         <div
-                          className="bg-gradient-to-r from-blue-500 to-teal-500 h-2.5 rounded-full transition-all duration-500"
-                          style={{ width: `${Math.min(100, proj.overall_pct || 0)}%` }}
-                        />
+                          className="relative bg-gradient-to-r from-blue-500 via-teal-500 to-emerald-500 h-full rounded-full transition-all duration-1000 ease-out overflow-hidden animate-progress-stripes"
+                          style={{ width: `${animReady ? targetOverallPct : 0}%` }}
+                        >
+                          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent animate-progress-shimmer" />
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -356,40 +346,66 @@ const Dashboard = () => {
                   {/* 卡片中段：進行中施工工項進度明細 */}
                   <div className="p-5 space-y-4 flex-1">
                     <div>
-                      <div className="text-xs font-extrabold text-slate-700 mb-2 flex items-center justify-between">
-                        <span>📋 進行中工項進度明細</span>
-                        <span className="text-[11px] font-normal text-slate-400">共 {items.length} 項工項</span>
+                      <div className="text-xs font-extrabold text-slate-700 mb-2.5 flex items-center justify-between">
+                        <span className="flex items-center gap-1.5">
+                          <span>📋 進行中工項進度明細</span>
+                        </span>
+                        <span className="text-[11px] font-semibold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                          共 {items.length} 項工項
+                        </span>
                       </div>
                       {items.length > 0 ? (
-                        <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                          {items.slice(0, 6).map((it: any, iIdx: number) => (
-                            <div key={iIdx} className="bg-slate-50 border border-slate-200/70 rounded-xl p-2.5 text-xs">
-                              <div className="flex items-center justify-between gap-2 mb-1">
-                                <div className="flex items-center gap-1.5 min-w-0">
-                                  <span className="px-1.5 py-0.5 bg-blue-100/80 text-blue-800 font-bold rounded text-[10px] shrink-0">
-                                    {it.category}
-                                  </span>
-                                  <span className="font-bold text-slate-800 truncate" title={it.name}>
-                                    {it.name}
-                                  </span>
+                        <div className="space-y-2.5 max-h-52 overflow-y-auto pr-1">
+                          {items.slice(0, 6).map((it: any, iIdx: number) => {
+                            const itemPct = Math.min(100, it.pct || 0);
+                            const isItemDone = itemPct >= 100;
+                            return (
+                              <div
+                                key={iIdx}
+                                className="bg-slate-50/90 hover:bg-blue-50/40 border border-slate-200/80 hover:border-blue-200 rounded-xl p-2.5 text-xs transition-all duration-200"
+                              >
+                                <div className="flex items-center justify-between gap-2 mb-1.5">
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    <span className="px-1.5 py-0.5 bg-blue-100/90 text-blue-800 font-bold rounded text-[10px] shrink-0">
+                                      {it.category}
+                                    </span>
+                                    <span className="font-bold text-slate-800 truncate" title={it.name}>
+                                      {it.name}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-2 shrink-0 font-mono">
+                                    <span className="text-slate-600">
+                                      已完 <strong className="text-slate-800">{it.accumulated}{it.unitSuffix}</strong> / {it.targetNum}{it.unitSuffix}
+                                    </span>
+                                    <span
+                                      className={`font-extrabold px-1.5 py-0.5 rounded border ${
+                                        isItemDone
+                                          ? 'text-emerald-700 bg-emerald-100/80 border-emerald-300'
+                                          : 'text-blue-700 bg-blue-50 border-blue-200'
+                                      }`}
+                                    >
+                                      {it.pct}%
+                                    </span>
+                                  </div>
                                 </div>
-                                <div className="flex items-center gap-2 shrink-0 font-mono">
-                                  <span className="text-slate-600">
-                                    已完 <strong className="text-slate-800">{it.accumulated}{it.unitSuffix}</strong> / {it.targetNum}{it.unitSuffix}
-                                  </span>
-                                  <span className="font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
-                                    {it.pct}%
-                                  </span>
+                                <div className="w-full bg-slate-200/90 rounded-full h-2 overflow-hidden">
+                                  <div
+                                    className={`relative h-full rounded-full transition-all duration-1000 ease-out overflow-hidden ${
+                                      isItemDone
+                                        ? 'bg-gradient-to-r from-emerald-500 to-teal-500'
+                                        : 'bg-gradient-to-r from-blue-500 to-teal-500 animate-progress-stripes'
+                                    }`}
+                                    style={{
+                                      width: `${animReady ? itemPct : 0}%`,
+                                      transitionDelay: `${iIdx * 120}ms`,
+                                    }}
+                                  >
+                                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/35 to-transparent animate-progress-shimmer" />
+                                  </div>
                                 </div>
                               </div>
-                              <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
-                                <div
-                                  className="bg-emerald-500 h-1.5 rounded-full"
-                                  style={{ width: `${Math.min(100, it.pct || 0)}%` }}
-                                />
-                              </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       ) : (
                         <div className="text-xs text-slate-400 italic bg-slate-50 rounded-xl p-3 text-center">
@@ -398,40 +414,54 @@ const Dashboard = () => {
                       )}
                     </div>
 
-                    {/* 卡片底部：最新現場施工照片 */}
+                    {/* 卡片底部：最新現場施工照片 (含自動輪播聚焦特效) */}
                     <div>
                       <div className="text-xs font-extrabold text-slate-700 mb-2 flex items-center justify-between">
                         <span className="flex items-center gap-1.5">
-                          <Camera size={14} className="text-blue-600" />
+                          <Camera size={14} className="text-blue-600 animate-pulse" />
                           最新現場施工照片
                         </span>
                         {photos.length > 0 && (
-                          <span className="text-[11px] font-normal text-slate-400">點擊照片可放大檢視 ({photos.length} 張)</span>
+                          <span className="text-[11px] font-normal text-slate-400">
+                            自動焦點輪播中・點擊照片放大 ({photos.length} 張)
+                          </span>
                         )}
                       </div>
                       {photos.length > 0 ? (
-                        <div className="grid grid-cols-4 gap-2">
-                          {photos.slice(0, 4).map((ph: any, pIdx: number) => (
-                            <div
-                              key={pIdx}
-                              onClick={() => openPhotoLightbox(photos, pIdx, `${proj.project_name} — 最新現場施工照片`)}
-                              className="group relative aspect-square rounded-xl overflow-hidden border border-slate-200 bg-slate-100 cursor-zoom-in shadow-2xs"
-                            >
-                              <img
-                                src={ph.url}
-                                alt={ph.label || '施工照片'}
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                              />
-                              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 via-black/40 to-transparent px-1.5 py-1 text-[10px] text-white font-bold truncate">
-                                {ph.label}
-                              </div>
-                              {pIdx === 3 && photos.length > 4 && (
-                                <div className="absolute inset-0 bg-black/55 flex items-center justify-center text-white font-extrabold text-sm">
-                                  +{photos.length - 4}
+                        <div className="grid grid-cols-4 gap-2.5">
+                          {photos.slice(0, 4).map((ph: any, pIdx: number) => {
+                            const isSpotlit = pIdx === activePhotoIdx;
+                            return (
+                              <div
+                                key={pIdx}
+                                onClick={() => openPhotoLightbox(photos, pIdx, `${proj.project_name} — 最新現場施工照片`)}
+                                className={`group relative aspect-square rounded-xl overflow-hidden border-2 bg-slate-100 cursor-zoom-in transition-all duration-500 ${
+                                  isSpotlit
+                                    ? 'border-blue-500 shadow-md shadow-blue-200/80 -translate-y-0.5'
+                                    : 'border-slate-200 hover:border-blue-400'
+                                }`}
+                              >
+                                <img
+                                  src={ph.url}
+                                  alt={ph.label || '施工照片'}
+                                  className={`w-full h-full object-cover transition-transform duration-700 ${
+                                    isSpotlit ? 'scale-110' : 'group-hover:scale-110'
+                                  }`}
+                                />
+                                {isSpotlit && (
+                                  <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-blue-400 ring-2 ring-white animate-ping" />
+                                )}
+                                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/45 to-transparent px-1.5 py-1 text-[10px] text-white font-bold truncate">
+                                  {ph.label}
                                 </div>
-                              )}
-                            </div>
-                          ))}
+                                {pIdx === 3 && photos.length > 4 && (
+                                  <div className="absolute inset-0 bg-black/55 hover:bg-black/40 transition-colors flex items-center justify-center text-white font-extrabold text-sm">
+                                    +{photos.length - 4}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       ) : (
                         <div className="flex items-center justify-center gap-2 py-4 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-xs text-slate-400">
@@ -452,24 +482,30 @@ const Dashboard = () => {
       </div>
 
       {/* 2. 目前正在進行的生產製造進度以及最新的照片 */}
-      <div className="space-y-4">
+      <div className="space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-gradient-to-br from-indigo-600 to-violet-600 rounded-lg text-white shadow-lg shadow-indigo-200">
+            <div className="relative p-2.5 bg-gradient-to-br from-indigo-600 to-violet-600 rounded-xl text-white shadow-lg shadow-indigo-200 animate-float-slow">
               <Factory size={24} />
+              <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-300 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-indigo-400 border border-white"></span>
+              </span>
             </div>
             <div>
-              <h2 className="text-xl font-bold text-slate-800">目前正在進行的生產製造進度與最新照片</h2>
+              <div className="flex items-center gap-2.5">
+                <h2 className="text-xl font-bold text-slate-800">目前正在進行的生產製造進度與最新照片</h2>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-2xs">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-600"></span>
+                  </span>
+                  4 階段產線追蹤
+                </span>
+              </div>
               <p className="text-xs text-slate-500 mt-0.5">即時追蹤各派工單 4 階段工序（① 一次加工 ➔ ② 二次加工 ➔ ③ 送至鍍鋅廠 ➔ ④ 出貨至案場）進度與最新廠內製造照片</p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => navigate('/manufacturing')}
-            className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow-sm transition-colors cursor-pointer"
-          >
-            前往製造報工 ➔
-          </button>
         </div>
 
         {ongoingMfgList.length > 0 ? (
@@ -478,15 +514,18 @@ const Dashboard = () => {
               const items: any[] = Array.isArray(mfg.items) ? mfg.items : [];
               const stageSummary: any[] = Array.isArray(mfg.stageSummary) ? mfg.stageSummary : [];
               const photos: any[] = Array.isArray(mfg.latest_photos) ? mfg.latest_photos : [];
+              const activePhotoIdx = photos.length > 0 ? (photoTick + idx) % Math.min(4, photos.length) : -1;
 
               return (
                 <div
                   key={`${mfg.group_key}-${idx}`}
-                  className="bg-white/90 backdrop-blur-xl rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden flex flex-col justify-between hover:shadow-md transition-all"
+                  style={{ animationDelay: `${idx * 100}ms` }}
+                  className="group/mfg bg-white/95 backdrop-blur-xl rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden flex flex-col justify-between hover:shadow-xl hover:-translate-y-1 hover:border-indigo-300/80 transition-all duration-300 animate-in fade-in slide-in-from-bottom-3"
                 >
-                  {/* 卡片頂部：派工單號、所屬專案與 4 階段總覽 */}
-                  <div className="p-5 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-indigo-50/40">
-                    <div className="flex items-start justify-between gap-2 mb-2">
+                  {/* 卡片頂部：派工單號、所屬專案與 4 階段動態流線總覽 */}
+                  <div className="p-5 border-b border-slate-100 bg-gradient-to-r from-slate-50 via-indigo-50/35 to-violet-50/30 relative overflow-hidden">
+                    <div className="absolute -right-10 -top-10 w-32 h-32 rounded-full bg-gradient-to-br from-indigo-400/10 to-violet-400/10 blur-2xl group-hover/mfg:scale-150 transition-transform duration-700 pointer-events-none" />
+                    <div className="flex items-start justify-between gap-2 mb-2 relative">
                       <div>
                         <div className="flex items-center gap-2 flex-wrap">
                           {mfg.dispatch_no && (
@@ -504,16 +543,25 @@ const Dashboard = () => {
                           </h3>
                         </div>
                       </div>
-                      <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200 shrink-0">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-xs font-bold rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200 shrink-0">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-600"></span>
+                        </span>
                         {mfg.target_dept || '鋼構部'}
                       </span>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 mb-3">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 mb-3.5 relative">
                       {mfg.latest_report_date && (
                         <span className="flex items-center gap-1">
                           <Calendar size={12} className="text-indigo-600" />
-                          最新生產回報：<strong className="text-slate-700">{mfg.latest_report_date}</strong>
+                          最新動態：<strong className="text-slate-700">{mfg.latest_report_date}</strong>
+                        </span>
+                      )}
+                      {mfg.work_category && (
+                        <span>
+                          狀態/類別：<strong className="text-indigo-700">{mfg.work_category}</strong>
                         </span>
                       )}
                       {mfg.construction_location && (
@@ -523,26 +571,45 @@ const Dashboard = () => {
                         </span>
                       )}
                       {mfg.recorder_name && (
-                        <span>紀錄人：{mfg.recorder_name}</span>
+                        <span>負責/紀錄人：{mfg.recorder_name}</span>
                       )}
                     </div>
 
-                    {/* 4 階段工序進度橫列 (Stage Summary Cards) */}
+                    {/* 4 階段工序進度橫列 (含流水動畫進度條) */}
                     {stageSummary.length > 0 && (
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
-                        {stageSummary.map((st: any) => {
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 relative">
+                        {stageSummary.map((st: any, stIdx: number) => {
                           const meta = STAGE_META[st.stage] || {
                             short: st.stage,
                             badge: 'bg-slate-100 text-slate-700 border-slate-200',
-                            bar: 'bg-indigo-500',
+                            bar: 'from-indigo-500 to-blue-500',
+                            ring: 'border-indigo-300',
                           };
+                          const stPct = Math.min(100, st.pct || 0);
+                          const isActiveStage = stPct > 0 && stPct < 100;
+                          const isStageDone = stPct >= 100 && st.totalCount > 0;
+
                           return (
                             <div
                               key={st.stage}
-                              className="bg-white border border-slate-200/90 rounded-xl p-2 shadow-2xs flex flex-col justify-between"
+                              className={`bg-white rounded-xl p-2.5 shadow-2xs flex flex-col justify-between border transition-all duration-300 ${
+                                isActiveStage
+                                  ? `${meta.ring} shadow-sm`
+                                  : isStageDone
+                                  ? 'border-emerald-300 bg-emerald-50/30'
+                                  : 'border-slate-200/90'
+                              }`}
                             >
-                              <div className="text-[11px] font-extrabold text-slate-700 whitespace-nowrap truncate">
-                                {meta.short}
+                              <div className="flex items-center justify-between gap-1">
+                                <span className="text-[11px] font-extrabold text-slate-700 whitespace-nowrap truncate">
+                                  {meta.short}
+                                </span>
+                                {isActiveStage && (
+                                  <span className="relative flex h-2 w-2 shrink-0">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-600"></span>
+                                  </span>
+                                )}
                               </div>
                               <div className="flex items-baseline justify-between mt-1">
                                 <span className="text-xs font-extrabold font-mono text-indigo-700">
@@ -552,11 +619,18 @@ const Dashboard = () => {
                                   {st.completedCount}/{st.totalCount}件
                                 </span>
                               </div>
-                              <div className="w-full bg-slate-100 rounded-full h-1.5 mt-1 overflow-hidden">
+                              <div className="w-full bg-slate-100 rounded-full h-2 mt-1.5 overflow-hidden">
                                 <div
-                                  className={`${meta.bar} h-1.5 rounded-full transition-all`}
-                                  style={{ width: `${Math.min(100, st.pct || 0)}%` }}
-                                />
+                                  className={`relative bg-gradient-to-r ${meta.bar} h-full rounded-full transition-all duration-1000 ease-out overflow-hidden ${
+                                    isActiveStage ? 'animate-progress-stripes' : ''
+                                  }`}
+                                  style={{
+                                    width: `${animReady ? stPct : 0}%`,
+                                    transitionDelay: `${stIdx * 120}ms`,
+                                  }}
+                                >
+                                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent animate-progress-shimmer" />
+                                </div>
                               </div>
                             </div>
                           );
@@ -568,14 +642,19 @@ const Dashboard = () => {
                   {/* 卡片中段：各構件 4 道工序進度明細 */}
                   <div className="p-5 space-y-4 flex-1">
                     <div>
-                      <div className="text-xs font-extrabold text-slate-700 mb-2 flex items-center justify-between">
+                      <div className="text-xs font-extrabold text-slate-700 mb-2.5 flex items-center justify-between">
                         <span>🔩 生產構件工序進度明細</span>
-                        <span className="text-[11px] font-normal text-slate-400">共 {items.length} 項構件</span>
+                        <span className="text-[11px] font-semibold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                          共 {items.length} 項構件
+                        </span>
                       </div>
                       {items.length > 0 ? (
-                        <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                        <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
                           {items.slice(0, 6).map((it: any, iIdx: number) => (
-                            <div key={iIdx} className="bg-slate-50 border border-slate-200/70 rounded-xl p-2.5 text-xs space-y-1.5">
+                            <div
+                              key={iIdx}
+                              className="bg-slate-50/90 hover:bg-indigo-50/30 border border-slate-200/80 hover:border-indigo-200 rounded-xl p-2.5 text-xs space-y-2 transition-all duration-200"
+                            >
                               <div className="flex items-center justify-between gap-2">
                                 <div className="flex items-center gap-1.5 min-w-0">
                                   <span className="px-1.5 py-0.5 bg-indigo-100 text-indigo-800 font-bold rounded text-[10px] shrink-0">
@@ -586,36 +665,48 @@ const Dashboard = () => {
                                   </span>
                                 </div>
                                 <span
-                                  className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold shrink-0 ${
+                                  className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold shrink-0 flex items-center gap-1 ${
                                     it.isReadyToHoist
                                       ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                                      : 'bg-amber-50 text-amber-800 border border-amber-200'
+                                      : 'bg-indigo-50 text-indigo-800 border border-indigo-200'
                                   }`}
                                 >
-                                  {it.isReadyToHoist ? '✅ 現場可吊裝' : `最新：${STAGE_META[it.latestStage]?.short || it.latestStage}`}
+                                  {!it.isReadyToHoist && (
+                                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-ping" />
+                                  )}
+                                  {it.isReadyToHoist ? '✅ 現場可吊裝' : `進行中：${STAGE_META[it.latestStage]?.short || it.latestStage}`}
                                 </span>
                               </div>
 
                               <div className="grid grid-cols-4 gap-1.5 pt-0.5">
                                 {(it.stageDetails || []).map((sd: any) => {
                                   const isDone = sd.done >= sd.target && sd.target > 0;
+                                  const isWorking = sd.done > 0 && !isDone;
                                   return (
                                     <div
                                       key={sd.stage}
-                                      className={`px-1.5 py-1 rounded border text-[10px] font-mono flex flex-col ${
+                                      className={`px-1.5 py-1 rounded-lg border text-[10px] font-mono flex flex-col justify-between transition-all ${
                                         isDone
-                                          ? 'bg-emerald-50/80 border-emerald-300 text-emerald-800 font-bold'
-                                          : sd.done > 0
-                                          ? 'bg-indigo-50/70 border-indigo-200 text-indigo-800 font-bold'
+                                          ? 'bg-emerald-50/90 border-emerald-300 text-emerald-800 font-bold'
+                                          : isWorking
+                                          ? 'bg-indigo-50/90 border-indigo-300 text-indigo-800 font-bold shadow-2xs'
                                           : 'bg-white border-slate-200 text-slate-400'
                                       }`}
                                     >
                                       <span className="truncate text-[9px]">
                                         {STAGE_META[sd.stage]?.short || sd.stage}
                                       </span>
-                                      <span className="whitespace-nowrap">
+                                      <span className="whitespace-nowrap mt-0.5">
                                         {sd.done}/{sd.target}{it.unitSuffix} ({sd.pct}%)
                                       </span>
+                                      <div className="w-full bg-slate-200/70 rounded-full h-1 mt-1 overflow-hidden">
+                                        <div
+                                          className={`h-full rounded-full transition-all duration-1000 ${
+                                            isDone ? 'bg-emerald-500' : isWorking ? 'bg-indigo-500 animate-pulse' : 'bg-slate-300'
+                                          }`}
+                                          style={{ width: `${animReady ? Math.min(100, sd.pct || 0) : 0}%` }}
+                                        />
+                                      </div>
                                     </div>
                                   );
                                 })}
@@ -630,46 +721,60 @@ const Dashboard = () => {
                       )}
                     </div>
 
-                    {/* 卡片底部：最新生產製造照片 */}
+                    {/* 卡片底部：最新生產製造照片 (含自動輪播聚焦特效) */}
                     <div>
                       <div className="text-xs font-extrabold text-slate-700 mb-2 flex items-center justify-between">
                         <span className="flex items-center gap-1.5">
-                          <Camera size={14} className="text-indigo-600" />
+                          <Camera size={14} className="text-indigo-600 animate-pulse" />
                           最新生產製造照片
                         </span>
                         {photos.length > 0 && (
-                          <span className="text-[11px] font-normal text-slate-400">點擊照片可放大檢視 ({photos.length} 張)</span>
+                          <span className="text-[11px] font-normal text-slate-400">
+                            自動焦點輪播中・點擊照片放大 ({photos.length} 張)
+                          </span>
                         )}
                       </div>
                       {photos.length > 0 ? (
-                        <div className="grid grid-cols-4 gap-2">
-                          {photos.slice(0, 4).map((ph: any, pIdx: number) => (
-                            <div
-                              key={pIdx}
-                              onClick={() =>
-                                openPhotoLightbox(
-                                  photos,
-                                  pIdx,
-                                  `${mfg.dispatch_no ? `${mfg.dispatch_no} ` : ''}${mfg.project_name} — 最新生產製造照片`
-                                )
-                              }
-                              className="group relative aspect-square rounded-xl overflow-hidden border border-slate-200 bg-slate-100 cursor-zoom-in shadow-2xs"
-                            >
-                              <img
-                                src={ph.url}
-                                alt={ph.label || '生產製造照片'}
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                              />
-                              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 via-black/40 to-transparent px-1.5 py-1 text-[10px] text-white font-bold truncate">
-                                {ph.label}
-                              </div>
-                              {pIdx === 3 && photos.length > 4 && (
-                                <div className="absolute inset-0 bg-black/55 flex items-center justify-center text-white font-extrabold text-sm">
-                                  +{photos.length - 4}
+                        <div className="grid grid-cols-4 gap-2.5">
+                          {photos.slice(0, 4).map((ph: any, pIdx: number) => {
+                            const isSpotlit = pIdx === activePhotoIdx;
+                            return (
+                              <div
+                                key={pIdx}
+                                onClick={() =>
+                                  openPhotoLightbox(
+                                    photos,
+                                    pIdx,
+                                    `${mfg.dispatch_no ? `${mfg.dispatch_no} ` : ''}${mfg.project_name} — 最新生產製造照片`
+                                  )
+                                }
+                                className={`group relative aspect-square rounded-xl overflow-hidden border-2 bg-slate-100 cursor-zoom-in transition-all duration-500 ${
+                                  isSpotlit
+                                    ? 'border-indigo-500 shadow-md shadow-indigo-200/80 -translate-y-0.5'
+                                    : 'border-slate-200 hover:border-indigo-400'
+                                }`}
+                              >
+                                <img
+                                  src={ph.url}
+                                  alt={ph.label || '生產製造照片'}
+                                  className={`w-full h-full object-cover transition-transform duration-700 ${
+                                    isSpotlit ? 'scale-110' : 'group-hover:scale-110'
+                                  }`}
+                                />
+                                {isSpotlit && (
+                                  <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-indigo-400 ring-2 ring-white animate-ping" />
+                                )}
+                                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/45 to-transparent px-1.5 py-1 text-[10px] text-white font-bold truncate">
+                                  {ph.label}
                                 </div>
-                              )}
-                            </div>
-                          ))}
+                                {pIdx === 3 && photos.length > 4 && (
+                                  <div className="absolute inset-0 bg-black/55 hover:bg-black/40 transition-colors flex items-center justify-center text-white font-extrabold text-sm">
+                                    +{photos.length - 4}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       ) : (
                         <div className="flex items-center justify-center gap-2 py-4 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-xs text-slate-400">

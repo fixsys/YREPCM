@@ -991,9 +991,9 @@ router.get('/dashboard', authenticateToken, async (req: AuthRequest, res) => {
       });
     });
 
-    // Also include approved dispatch orders that haven't had reports yet or are in progress
+    // Also include dispatch orders that haven't had reports yet or are in progress
     allDispatchOrders
-      .filter(ord => ord.approval_status === '同意' && ord.drawing_received_date)
+      .filter(ord => ord.approval_status !== '退回')
       .forEach(ord => {
         const key = `DO_${ord.id}`;
         if (!mfgGroupsMap[key]) {
@@ -1013,6 +1013,7 @@ router.get('/dashboard', authenticateToken, async (req: AuthRequest, res) => {
             completedCount: 0,
             totalCount: itemsList.length
           }));
+          const isApproved = ord.approval_status === '同意' && Boolean(ord.drawing_received_date);
           mfgGroupsMap[key] = {
             group_key: key,
             project_id: ord.project?.id || ord.project_id,
@@ -1022,10 +1023,12 @@ router.get('/dashboard', authenticateToken, async (req: AuthRequest, res) => {
             dispatch_no: ord.dispatch_no,
             target_dept: ord.target_dept || '鋼構部',
             urgency: ord.urgency || '',
+            approval_status: ord.approval_status || '待簽核',
+            drawing_received_date: ord.drawing_received_date || '',
             latest_report_id: null,
-            latest_report_date: ord.drawing_received_date || '',
+            latest_report_date: ord.drawing_received_date || (ord.submit_date ? new Date(ord.submit_date).toISOString().slice(0, 10) : ''),
             recorder_name: ord.requester_name || '',
-            work_category: '已收圖待生產',
+            work_category: isApproved ? '已收圖待生產' : '派工單簽核中',
             construction_location: ord.factory_area || ord.site_name || '',
             overall_pct: 0,
             stageSummary,
