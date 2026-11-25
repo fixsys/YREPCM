@@ -156,6 +156,7 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
     end_time: string;
     work_category: string;
     work_item: string;
+    work_stage?: string;
     work_hours: number;
   };
   const [dispatchWorkers, setDispatchWorkers] = useState<DispatchWorker[]>([]);
@@ -236,9 +237,17 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [lightbox.isOpen, lightbox.images.length]);
+  const MANUFACTURING_STAGES = [
+    { key: '一次加工', stepNum: '①', label: '① 一次加工', sub: '裁切/鑽孔/下料', isFactoryLabor: true },
+    { key: '二次加工', stepNum: '②', label: '② 二次加工', sub: '組立/焊接/整修', isFactoryLabor: true },
+    { key: '送至鍍鋅廠', stepNum: '③', label: '③ 送至鍍鋅廠', sub: '委外鍍鋅/表面處理', isFactoryLabor: false },
+    { key: '鍍鋅完成出貨至案場', stepNum: '④', label: '④ 鍍鋅完成出貨至案場', sub: '成品出貨至工地', isFactoryLabor: false },
+  ] as const;
+
   type WorkItem = {
     category?: string;
     name: string;
+    stage?: string;
     target_quantity?: string;
     unit?: string;
     progress: string;
@@ -253,7 +262,17 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
       photo?: string | File;
     }
   };
-  const [workItems, setWorkItems] = useState<WorkItem[]>([{category: '', name: '', target_quantity: '', progress: '', worker_count: '', work_hours: ''}]);
+  const [workItems, setWorkItems] = useState<WorkItem[]>([
+    {
+      category: '',
+      name: '',
+      stage: isManufacturing ? '一次加工' : undefined,
+      target_quantity: '',
+      progress: '',
+      worker_count: '',
+      work_hours: '',
+    },
+  ]);
 
   const INSPECTION_TEMPLATES: Record<string, { fields: string[], checks: string[], results: string[], photoLabel: string }> = {
     'PC': {
@@ -389,9 +408,16 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
     [dispatchOrders, projects, laborForm.project_id, laborForm.dispatch_order_id]
   );
 
-  // 計算截至指定日期(含)前，同專案/同派工單下某工項的歷史累計完成數量（不含當前編輯中或指定排除之報表）
+  // 計算截至指定日期(含)前，同專案/同派工單下某工項（若指定 stage 則依工序分開累計）的歷史累計完成數量（不含當前編輯中或指定排除之報表）
   const getPastAccumulatedQty = useCallback(
-    (itemName: string, projectId: string, dispatchOrderId: string, excludeReportId?: string | null, upToDate?: string) => {
+    (
+      itemName: string,
+      projectId: string,
+      dispatchOrderId: string,
+      excludeReportId?: string | null,
+      upToDate?: string,
+      stage?: string
+    ) => {
       if (!itemName) return 0;
       const normTarget = normalizeItemKey(itemName);
       const seenReportIds = new Set<string>();
@@ -425,6 +451,10 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
         if (Array.isArray(rItems)) {
           rItems.forEach((wi: any) => {
             if (wi && (wi.name === itemName || normalizeItemKey(wi.name) === normTarget)) {
+              if (stage) {
+                const wiStage = (wi.stage || '一次加工').trim();
+                if (wiStage !== stage) return;
+              }
               const val = parseFloat(String(wi.progress || '').replace(/,/g, ''));
               if (!Number.isNaN(val)) sum += val;
             }
@@ -517,7 +547,12 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
     if (isLaborModalOpen && workItems.length === 0) {
       const defaultCat = WORK_CATEGORIES[0] || laborForm.work_category || (isManufacturing ? 'RH鋼/柱' : '土木');
       const defaultName = categoryToItems[defaultCat]?.[0] || '';
-      const newItem: WorkItem = { category: defaultCat, name: defaultName, progress: '' };
+      const newItem: WorkItem = {
+        category: defaultCat,
+        name: defaultName,
+        stage: isManufacturing ? '一次加工' : undefined,
+        progress: '',
+      };
       if (defaultCat === '土木' && INSPECTION_TEMPLATES[defaultName]) {
         const tpl = INSPECTION_TEMPLATES[defaultName];
         newItem.inspection = {
@@ -529,7 +564,7 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
       }
       setWorkItems([newItem]);
     }
-  }, [isLaborModalOpen, WORK_CATEGORIES, categoryToItems]);
+  }, [isLaborModalOpen, WORK_CATEGORIES, categoryToItems, isManufacturing]);
 
   useEffect(() => {
     if (!isLaborModalOpen || isOutsourcedMode) return;
@@ -538,14 +573,15 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
       .filter(w => w.name.trim() !== '' && w.work_item)
       .reduce((acc, w) => {
         const cat = w.work_category || WORK_CATEGORIES[0] || '土木';
-        const key = `${cat}:::${w.work_item}`;
+        const stg = isManufacturing ? (w.work_stage || '一次加工') : '';
+        const key = isManufacturing ? `${cat}:::${w.work_item}:::${stg}` : `${cat}:::${w.work_item}`;
         if (!acc[key]) {
-          acc[key] = { category: cat, itemName: w.work_item, count: 0, hours: 0 };
+          acc[key] = { category: cat, itemName: w.work_item, stage: stg || undefined, count: 0, hours: 0 };
         }
         acc[key].count += 1;
         acc[key].hours += Number(w.work_hours) || 0;
         return acc;
-      }, {} as Record<string, {category: string, itemName: string, count: number, hours: number}>);
+      }, {} as Record<string, { category: string; itemName: string; stage?: string; count: number; hours: number }>);
 
     const hasAnyDispatch = dispatchWorkers.some(w => w.name.trim() !== '');
     if (!hasAnyDispatch) return;
@@ -556,25 +592,46 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
 
       newItems = newItems.map(item => {
         const itemCat = item.category || laborForm.work_category || WORK_CATEGORIES[0] || '土木';
-        const key = `${itemCat}:::${item.name}`;
-        const agg = aggregated[key] || Object.values(aggregated).find(a => a.itemName === item.name);
+        const itemStg = isManufacturing ? (item.stage || '一次加工') : '';
+        const key = isManufacturing ? `${itemCat}:::${item.name}:::${itemStg}` : `${itemCat}:::${item.name}`;
+        const agg =
+          aggregated[key] ||
+          Object.values(aggregated).find(
+            a => a.itemName === item.name && (!isManufacturing || !a.stage || a.stage === itemStg)
+          );
         const newCount = agg ? agg.count.toString() : '';
         const newHours = agg ? agg.hours.toString() : '';
-        if (item.worker_count !== newCount || item.work_hours !== newHours || !item.category) {
+        if (
+          item.worker_count !== newCount ||
+          item.work_hours !== newHours ||
+          !item.category ||
+          (isManufacturing && !item.stage)
+        ) {
           changed = true;
-          return { ...item, category: itemCat, worker_count: newCount, work_hours: newHours };
+          return {
+            ...item,
+            category: itemCat,
+            stage: isManufacturing ? itemStg : item.stage,
+            worker_count: newCount,
+            work_hours: newHours,
+          };
         }
         return item;
       });
 
-      const existingKeys = new Set(newItems.map(i => `${i.category || laborForm.work_category || WORK_CATEGORIES[0]}:::${i.name}`));
+      const existingKeys = new Set(
+        newItems.map(i => {
+          const c = i.category || laborForm.work_category || WORK_CATEGORIES[0];
+          return isManufacturing ? `${c}:::${i.name}:::${i.stage || '一次加工'}` : `${c}:::${i.name}`;
+        })
+      );
       for (const [key, data] of Object.entries(aggregated)) {
         if (!existingKeys.has(key)) {
           changed = true;
-          // If the only existing row is an empty placeholder, replace it
           const newItem: WorkItem = {
             category: data.category,
             name: data.itemName,
+            stage: isManufacturing ? (data.stage || '一次加工') : undefined,
             progress: '',
             worker_count: data.count.toString(),
             work_hours: data.hours.toString()
@@ -598,7 +655,7 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
 
       return changed ? newItems : prevItems;
     });
-  }, [dispatchWorkers, WORK_CATEGORIES, laborForm.work_category, isLaborModalOpen]);
+  }, [dispatchWorkers, WORK_CATEGORIES, laborForm.work_category, isLaborModalOpen, isOutsourcedMode, isManufacturing]);
 
   useEffect(() => {
     const urls = toolboxPhotos.map(file => URL.createObjectURL(file));
@@ -2373,13 +2430,43 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                           }} className="flex-1 min-w-[120px] px-2 py-1.5 text-sm border rounded outline-none bg-white" />
                         )}
 
+                        {isManufacturing && (
+                          <select
+                            value={worker.work_stage || '一次加工'}
+                            onChange={e => {
+                              const newWorkers = [...dispatchWorkers];
+                              newWorkers[idx].work_stage = e.target.value;
+                              setDispatchWorkers(newWorkers);
+                            }}
+                            className="w-36 px-2 py-1.5 text-xs font-bold border border-indigo-200 rounded outline-none bg-indigo-50/60 text-indigo-800 shrink-0"
+                            title="選擇該人員執行的製造工序"
+                          >
+                            {MANUFACTURING_STAGES.map(st => (
+                              <option key={st.key} value={st.key}>
+                                {st.label}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+
                         <button type="button" onClick={() => setDispatchWorkers(dispatchWorkers.filter((_, i) => i !== idx))} className="p-1.5 text-red-500 hover:bg-red-100 rounded shrink-0"><Trash2 size={16}/></button>
                       </div>
                     </div>
                   ))}
                   <button type="button" onClick={() => {
                     const defaultCat = laborForm.work_category || WORK_CATEGORIES[0] || '土木';
-                    setDispatchWorkers([...dispatchWorkers, {name: '', start_time: '08:00', end_time: '17:00', work_category: defaultCat, work_item: categoryToItems[defaultCat]?.[0] || '', work_hours: 8}]);
+                    setDispatchWorkers([
+                      ...dispatchWorkers,
+                      {
+                        name: '',
+                        start_time: '08:00',
+                        end_time: '17:00',
+                        work_category: defaultCat,
+                        work_item: categoryToItems[defaultCat]?.[0] || '',
+                        work_stage: isManufacturing ? '一次加工' : undefined,
+                        work_hours: 8,
+                      },
+                    ]);
                   }} className="text-sm text-indigo-600 font-medium hover:underline">+ 新增派工人員</button>
                 </div>
 
@@ -2432,6 +2519,11 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                       const rowCat = item.category || (laborForm.work_category || '').split('、')[0] || WORK_CATEGORIES[0] || (isManufacturing ? 'RH鋼/柱' : '土木');
                       const rowCategoryOptions = Array.from(new Set([rowCat, ...WORK_CATEGORIES])).filter(Boolean);
                       const itemsForRowCat = categoryToItems[rowCat] || [];
+                      const currentStage = isManufacturing ? (item.stage || '一次加工') : undefined;
+                      const currentStageMeta = isManufacturing
+                        ? MANUFACTURING_STAGES.find(s => s.key === currentStage) || MANUFACTURING_STAGES[0]
+                        : null;
+
                       const resolvedTargetQtyStr = getTargetQuantityForItem(rowCat, item.name) || item.target_quantity || '';
                       const rawTargetNum = parseFloat(String(resolvedTargetQtyStr).replace(/[,%]/g, ''));
                       const isPctMode = String(resolvedTargetQtyStr).includes('%') || Number.isNaN(rawTargetNum) || rawTargetNum <= 0;
@@ -2442,12 +2534,59 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                         laborForm.project_id,
                         laborForm.dispatch_order_id,
                         editingLaborId,
-                        laborForm.report_date
+                        laborForm.report_date,
+                        currentStage
                       );
-                      const totalAccumulatedQty = Math.round(((Number.isNaN(todayNum) ? 0 : todayNum) + pastQty) * 100) / 100;
+                      // 若同張報表內有相同構件+相同工序的其他列，一併計入
+                      const sameFormOtherRowsQty = workItems.reduce((sum, other, oIdx) => {
+                        if (oIdx === idx) return sum;
+                        if (normalizeItemKey(other.name) !== normalizeItemKey(item.name)) return sum;
+                        if (isManufacturing && (other.stage || '一次加工') !== currentStage) return sum;
+                        const v = parseFloat(String(other.progress || '').replace(/[,%]/g, ''));
+                        return sum + (Number.isNaN(v) ? 0 : v);
+                      }, 0);
+
+                      const effectivePastQty = Math.round((pastQty + sameFormOtherRowsQty) * 100) / 100;
+                      const totalAccumulatedQty = Math.round(((Number.isNaN(todayNum) ? 0 : todayNum) + effectivePastQty) * 100) / 100;
                       const isOverTarget = totalAccumulatedQty > targetNum;
                       const completionPct = Math.round((totalAccumulatedQty / targetNum) * 1000) / 10;
                       const unitSuffix = isPctMode ? '%' : '';
+
+                      // 計算此構件在 4 道工序各自的累計完成數 (歷史 + 今日同表其他列)
+                      const stageTotalsMap: Record<string, number> = {};
+                      if (isManufacturing) {
+                        MANUFACTURING_STAGES.forEach(st => {
+                          const hist = getPastAccumulatedQty(
+                            item.name,
+                            laborForm.project_id,
+                            laborForm.dispatch_order_id,
+                            editingLaborId,
+                            laborForm.report_date,
+                            st.key
+                          );
+                          const todayInForm = workItems.reduce((sum, wRow) => {
+                            if (normalizeItemKey(wRow.name) !== normalizeItemKey(item.name)) return sum;
+                            if ((wRow.stage || '一次加工') !== st.key) return sum;
+                            const v = parseFloat(String(wRow.progress || '').replace(/[,%]/g, ''));
+                            return sum + (Number.isNaN(v) ? 0 : v);
+                          }, 0);
+                          stageTotalsMap[st.key] = Math.round((hist + todayInForm) * 100) / 100;
+                        });
+                      }
+
+                      // 前道工序防呆檢查（例如報「② 二次加工」時，檢查「① 一次加工」已完數量）
+                      let prevStageMismatchWarning = '';
+                      if (isManufacturing && currentStage === '二次加工') {
+                        const prevDone = stageTotalsMap['一次加工'] || 0;
+                        if (totalAccumulatedQty > prevDone) {
+                          prevStageMismatchWarning = `💡 前道工序提醒：「① 一次加工」目前累計完成 ${prevDone}${unitSuffix}，本道「② 二次加工」累計達 ${totalAccumulatedQty}${unitSuffix}（若今日同時完成一次加工，可點右上「+ 同構件新增工序」一併補報）。`;
+                        }
+                      } else if (isManufacturing && currentStage === '送至鍍鋅廠') {
+                        const prevDone = Math.max(stageTotalsMap['二次加工'] || 0, stageTotalsMap['一次加工'] || 0);
+                        if (totalAccumulatedQty > prevDone && prevDone > 0) {
+                          prevStageMismatchWarning = `💡 前道工序提醒：廠內加工目前累計完成 ${prevDone}${unitSuffix}，本次「③ 送至鍍鋅廠」累計達 ${totalAccumulatedQty}${unitSuffix}。`;
+                        }
+                      }
 
                       return (
                         <div key={idx} className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5">
@@ -2464,6 +2603,7 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                                   ...newItems[idx],
                                   category: nextCat,
                                   name: nextDefaultItem,
+                                  stage: isManufacturing ? (newItems[idx].stage || '一次加工') : undefined,
                                   target_quantity: nextTargetQty,
                                 };
                                 if (nextCat === '土木' && INSPECTION_TEMPLATES[nextDefaultItem]) {
@@ -2538,14 +2678,26 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                                 <input
                                   type="text"
                                   readOnly
-                                  value={item.worker_count ? `${item.worker_count} 人` : ''}
+                                  value={
+                                    item.worker_count
+                                      ? `${item.worker_count} 人`
+                                      : isManufacturing && currentStageMeta && !currentStageMeta.isFactoryLabor
+                                      ? '物流/委外'
+                                      : ''
+                                  }
                                   placeholder="人數"
                                   className="w-20 px-2 py-2 border rounded-lg outline-none bg-slate-100 text-slate-500 cursor-not-allowed text-center text-sm font-medium shrink-0"
                                 />
                                 <input
                                   type="text"
                                   readOnly
-                                  value={item.work_hours ? `${item.work_hours} hr` : ''}
+                                  value={
+                                    item.work_hours
+                                      ? `${item.work_hours} hr`
+                                      : isManufacturing && currentStageMeta && !currentStageMeta.isFactoryLabor
+                                      ? '免計工時'
+                                      : ''
+                                  }
                                   placeholder="工時"
                                   className="w-20 px-2 py-2 border rounded-lg outline-none bg-slate-100 text-slate-500 cursor-not-allowed text-center text-sm font-medium shrink-0"
                                 />
@@ -2560,6 +2712,122 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                               <Trash2 size={18} />
                             </button>
                           </div>
+
+                          {/* 方案一：製造報工卡片內嵌「4 階段工序按鈕列 (Stage Pills)」 */}
+                          {isManufacturing && (
+                            <div className="bg-white border border-indigo-100 rounded-xl p-2.5 space-y-2 shadow-2xs">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div className="text-xs font-extrabold text-slate-700 flex items-center gap-1.5">
+                                  <span>📌 施工工序（點選本次報工工序）：</span>
+                                  {currentStageMeta?.isFactoryLabor ? (
+                                    <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full text-[11px] font-bold">
+                                      🔧 廠內加工階段（計入師傅工時）
+                                    </span>
+                                  ) : (
+                                    <span className="px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 rounded-full text-[11px] font-bold">
+                                      🚚 外包/物流里程碑（可免計廠內製造工時）
+                                    </span>
+                                  )}
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    // 自動挑選下一個工序，為同一構件新增一張工序報工卡
+                                    const curIdx = MANUFACTURING_STAGES.findIndex(s => s.key === currentStage);
+                                    const nextStageKey =
+                                      MANUFACTURING_STAGES[(curIdx + 1) % MANUFACTURING_STAGES.length].key;
+                                    const nextItem: WorkItem = {
+                                      category: rowCat,
+                                      name: item.name,
+                                      stage: nextStageKey,
+                                      target_quantity: resolvedTargetQtyStr,
+                                      progress: '',
+                                      worker_count: '',
+                                      work_hours: '',
+                                    };
+                                    const copy = [...workItems];
+                                    copy.splice(idx + 1, 0, nextItem);
+                                    setWorkItems(copy);
+                                  }}
+                                  className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50/70 hover:bg-indigo-100 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                                  title="同一構件今日若有跨工序進度（例如同時完成一次加工與二次加工），點此直接新增下一道工序卡片"
+                                >
+                                  + 同構件新增下一工序
+                                </button>
+                              </div>
+
+                              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+                                {MANUFACTURING_STAGES.map((st, sIdx) => {
+                                  const isSelected = currentStage === st.key;
+                                  const stDoneQty = stageTotalsMap[st.key] || 0;
+                                  const stDonePct =
+                                    targetNum > 0
+                                      ? Math.min(100, Math.round((stDoneQty / targetNum) * 1000) / 10)
+                                      : 0;
+                                  const isStageCompleted = stDoneQty >= targetNum && targetNum > 0;
+
+                                  return (
+                                    <div key={st.key} className="flex items-center gap-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const newItems = [...workItems];
+                                          newItems[idx] = {
+                                            ...newItems[idx],
+                                            stage: st.key,
+                                          };
+                                          setWorkItems(newItems);
+                                        }}
+                                        className={`w-full text-left px-3 py-2 rounded-lg border-2 transition-all cursor-pointer flex flex-col justify-between ${
+                                          isSelected
+                                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm ring-2 ring-indigo-200'
+                                            : isStageCompleted
+                                            ? 'bg-emerald-50/70 text-emerald-900 border-emerald-300 hover:border-emerald-400'
+                                            : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
+                                        }`}
+                                      >
+                                        <div className="flex items-center justify-between gap-1">
+                                          <span className="text-xs font-extrabold tracking-tight">
+                                            {st.label}
+                                          </span>
+                                          {isSelected ? (
+                                            <span className="text-[10px] font-extrabold bg-white text-indigo-700 px-1.5 py-0.2 rounded-full">
+                                              ● 本次報工
+                                            </span>
+                                          ) : isStageCompleted ? (
+                                            <span className="text-[10px] font-extrabold bg-emerald-600 text-white px-1.5 py-0.2 rounded-full">
+                                              ✓ 已完成
+                                            </span>
+                                          ) : null}
+                                        </div>
+                                        <div
+                                          className={`text-[11px] font-mono mt-1 flex items-center justify-between ${
+                                            isSelected
+                                              ? 'text-indigo-100 font-bold'
+                                              : isStageCompleted
+                                              ? 'text-emerald-700 font-bold'
+                                              : 'text-slate-500'
+                                          }`}
+                                        >
+                                          <span>
+                                            已完 {stDoneQty}/{targetNum}
+                                            {unitSuffix}
+                                          </span>
+                                          <span>({stDonePct}%)</span>
+                                        </div>
+                                      </button>
+                                      {sIdx < MANUFACTURING_STAGES.length - 1 && (
+                                        <span className="hidden lg:inline text-slate-300 font-bold select-none">
+                                          →
+                                        </span>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
 
                           {/* 目標數量/目標完成度 (唯讀不可由記錄人修改) + 今日生產數量/今日完成度 + 即時進度計算 */}
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 items-center pt-1">
@@ -2585,7 +2853,7 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                                 {isPctMode
                                   ? '今日完成度 *：'
                                   : isManufacturing
-                                  ? '今日生產數量 *：'
+                                  ? `今日完成數量 (${currentStage}) *：`
                                   : '今日完成數量 *：'}
                               </span>
                               <input
@@ -2597,16 +2865,19 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                                 onChange={e => {
                                   const nextValStr = e.target.value;
                                   const nextValNum = parseFloat(nextValStr);
-                                  const nextTotal = Math.round(((Number.isNaN(nextValNum) ? 0 : nextValNum) + pastQty) * 100) / 100;
+                                  const nextTotal = Math.round(((Number.isNaN(nextValNum) ? 0 : nextValNum) + effectivePastQty) * 100) / 100;
                                   if (nextTotal > targetNum) {
                                     alert(
                                       `⚠️ 超過${isPctMode ? '目標完成度 (100%)' : '目標數量'}警示：\n工項「${normalizeItemKey(item.name)}」${
+                                        isManufacturing ? `於工序【${currentStage}】` : ''
+                                      }${
                                         isPctMode ? '目標完成度為 100%' : `目標數量為 ${targetNum}`
-                                      }（先前已累計完成：${pastQty}${unitSuffix}），今日輸入 ${nextValNum}${unitSuffix} 後總計達 ${nextTotal}${unitSuffix}，已超過上限！`
+                                      }（先前已累計完成：${effectivePastQty}${unitSuffix}），今日輸入 ${nextValNum}${unitSuffix} 後總計達 ${nextTotal}${unitSuffix}，已超過上限！`
                                     );
                                   }
                                   const newItems = [...workItems];
                                   newItems[idx].category = rowCat;
+                                  if (isManufacturing) newItems[idx].stage = currentStage;
                                   newItems[idx].target_quantity = isPctMode ? '100%' : String(targetNum);
                                   newItems[idx].progress = nextValStr;
                                   setWorkItems(newItems);
@@ -2630,7 +2901,8 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                                 : 'bg-emerald-50 border-emerald-200 text-slate-600'
                             }`}>
                               <span>
-                                累計完成：<strong className={isOverTarget ? 'text-red-700' : 'text-slate-800'}>{totalAccumulatedQty}{unitSuffix}</strong>
+                                {isManufacturing ? `(${currentStage}) 累計：` : '累計完成：'}
+                                <strong className={isOverTarget ? 'text-red-700' : 'text-slate-800'}>{totalAccumulatedQty}{unitSuffix}</strong>
                                 {` / ${targetNum}${unitSuffix}`}
                               </span>
                               <span className={`font-extrabold text-sm ${isOverTarget ? 'text-red-700' : 'text-emerald-700'}`}>
@@ -2642,8 +2914,14 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                           {isOverTarget && (
                             <div className="text-xs font-bold text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-1.5 flex items-center gap-1.5">
                               <span>
-                                ⚠️ 警示：累計完成{isPctMode ? '度' : '數量'} ({totalAccumulatedQty}{unitSuffix}) 已超過{isPctMode ? '目標完成度 (100%)' : `目標數量 (${targetNum})`}！剩餘可填報上限為 {Math.max(0, Math.round((targetNum - pastQty) * 100) / 100)}{unitSuffix}。
+                                ⚠️ 警示：{isManufacturing ? `工序【${currentStage}】` : ''}累計完成{isPctMode ? '度' : '數量'} ({totalAccumulatedQty}{unitSuffix}) 已超過{isPctMode ? '目標完成度 (100%)' : `目標數量 (${targetNum})`}！剩餘可填報上限為 {Math.max(0, Math.round((targetNum - effectivePastQty) * 100) / 100)}{unitSuffix}。
                               </span>
+                            </div>
+                          )}
+
+                          {prevStageMismatchWarning && !isOverTarget && (
+                            <div className="text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5 flex items-center gap-1.5">
+                              <span>{prevStageMismatchWarning}</span>
                             </div>
                           )}
 
@@ -2743,7 +3021,15 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                         const lastCat = workItems[workItems.length - 1]?.category || WORK_CATEGORIES[0] || (isManufacturing ? 'RH鋼/柱' : '土木');
                         const defaultName = categoryToItems[lastCat]?.[0] || '';
                         const defaultTargetQty = getTargetQuantityForItem(lastCat, defaultName);
-                        const newItem: WorkItem = { category: lastCat, name: defaultName, target_quantity: defaultTargetQty, progress: '', worker_count: '', work_hours: '' };
+                        const newItem: WorkItem = {
+                          category: lastCat,
+                          name: defaultName,
+                          stage: isManufacturing ? '一次加工' : undefined,
+                          target_quantity: defaultTargetQty,
+                          progress: '',
+                          worker_count: '',
+                          work_hours: '',
+                        };
                         if (lastCat === '土木' && INSPECTION_TEMPLATES[defaultName]) {
                           const tpl = INSPECTION_TEMPLATES[defaultName];
                           newItem.inspection = {
@@ -2767,7 +3053,15 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                         onClick={() => {
                           const defaultName = categoryToItems[cat]?.[0] || '';
                           const defaultTargetQty = getTargetQuantityForItem(cat, defaultName);
-                          const newItem: WorkItem = { category: cat, name: defaultName, target_quantity: defaultTargetQty, progress: '', worker_count: '', work_hours: '' };
+                          const newItem: WorkItem = {
+                            category: cat,
+                            name: defaultName,
+                            stage: isManufacturing ? '一次加工' : undefined,
+                            target_quantity: defaultTargetQty,
+                            progress: '',
+                            worker_count: '',
+                            work_hours: '',
+                          };
                           if (cat === '土木' && INSPECTION_TEMPLATES[defaultName]) {
                             const tpl = INSPECTION_TEMPLATES[defaultName];
                             newItem.inspection = {
@@ -3761,12 +4055,19 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                                 const isPctMode = String(targetStr).includes('%') || Number.isNaN(rawTargetN) || rawTargetN <= 0;
                                 const effectiveTargetN = isPctMode ? 100 : rawTargetN;
                                 const todayN = parseFloat(String(w.progress || '').replace(/[,%]/g, ''));
+                                const isViewMfg =
+                                  isManufacturing || viewingRecord.data.module_type === 'MANUFACTURING';
+                                const rowStage = isViewMfg ? (w.stage || '一次加工') : undefined;
+                                const stageMeta = rowStage
+                                  ? MANUFACTURING_STAGES.find(s => s.key === rowStage)
+                                  : null;
                                 const pastN = getPastAccumulatedQty(
                                   w.name,
                                   viewingRecord.data.project_id,
                                   viewingRecord.data.dispatch_order_id || '',
                                   viewingRecord.data.id,
-                                  viewingRecord.data.report_date
+                                  viewingRecord.data.report_date,
+                                  rowStage
                                 );
                                 const accN = Math.round(((Number.isNaN(todayN) ? 0 : todayN) + pastN) * 100) / 100;
                                 const pct = `${Math.min(100, Math.round((accN / effectiveTargetN) * 1000) / 10)}%`;
@@ -3776,7 +4077,12 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                                   <tr key={i}>
                                     <td className="border border-slate-300 p-2">
                                       {w.category ? <span className="font-bold text-indigo-700 mr-1.5">[{w.category}]</span> : null}
-                                      {normalizeItemKey(w.name)}
+                                      <span>{normalizeItemKey(w.name)}</span>
+                                      {rowStage && (
+                                        <span className="ml-2 px-2 py-0.5 bg-indigo-50 text-indigo-800 border border-indigo-200 rounded-md text-xs font-extrabold">
+                                          {stageMeta ? stageMeta.label : rowStage}
+                                        </span>
+                                      )}
                                     </td>
                                     <td className="border border-slate-300 p-2 text-right font-mono">
                                       {isPctMode ? '100%' : effectiveTargetN}

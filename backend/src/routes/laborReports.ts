@@ -542,6 +542,7 @@ router.get('/:id/export', authenticateToken, async (req: AuthRequest, res) => {
         .replace(/\(\s*\)/g, '')
         .trim();
 
+    const isMfgReport = report.module_type === 'MANUFACTURING';
     const accumulatedItemQtyMap: Record<string, number> = {};
     for (const r of pastReports) {
       let rItems: any[] = [];
@@ -552,9 +553,11 @@ router.get('/:id/export', authenticateToken, async (req: AuthRequest, res) => {
         for (const it of rItems) {
           const k = normItemKey(it?.name);
           if (!k) continue;
+          const stg = isMfgReport ? String(it?.stage || '一次加工').trim() : '';
+          const mapKey = isMfgReport ? `${k}:::${stg}` : k;
           const val = parseFloat(String(it?.progress || '').replace(/,/g, ''));
           if (!Number.isNaN(val)) {
-            accumulatedItemQtyMap[k] = Math.round(((accumulatedItemQtyMap[k] || 0) + val) * 100) / 100;
+            accumulatedItemQtyMap[mapKey] = Math.round(((accumulatedItemQtyMap[mapKey] || 0) + val) * 100) / 100;
           }
         }
       }
@@ -579,6 +582,8 @@ router.get('/:id/export', authenticateToken, async (req: AuthRequest, res) => {
 
     workItems.forEach((wi: any) => {
       const cleanName = normItemKey(wi.name);
+      const wiStage = isMfgReport ? String(wi.stage || '一次加工').trim() : '';
+      const mapKey = isMfgReport ? `${cleanName}:::${wiStage}` : cleanName;
       const cfg = allConfigItems.find((c: any) => normItemKey(c?.name) === cleanName);
       if (cfg) {
         wi.contractQuantity = cfg.contractQuantity;
@@ -599,8 +604,8 @@ router.get('/:id/export', authenticateToken, async (req: AuthRequest, res) => {
         const legacyMatch = String(wi.name || '').match(/數量:\s*(\d+(?:\.\d+)?)/);
         if (legacyMatch) wi.contractQuantity = legacyMatch[1];
       }
-      wi.name = cleanName;
-      const rawAcc = accumulatedItemQtyMap[cleanName] ?? wi.progress ?? '';
+      wi.name = wiStage ? `${cleanName}【${wiStage}】` : cleanName;
+      const rawAcc = accumulatedItemQtyMap[mapKey] ?? wi.progress ?? '';
       const rawTargetNum = parseFloat(String(wi.contractQuantity ?? '').replace(/[,%]/g, ''));
       const isPctMode = String(wi.contractQuantity ?? '').includes('%') || Number.isNaN(rawTargetNum) || rawTargetNum <= 0;
       const effectiveTargetNum = isPctMode ? 100 : rawTargetNum;
@@ -1122,6 +1127,7 @@ router.get('/:id/export-pdf', authenticateToken, async (req: AuthRequest, res) =
         .replace(/\(\s*\)/g, '')
         .trim();
 
+    const isMfgReport = report.module_type === 'MANUFACTURING';
     const accumulatedItemQtyMap: Record<string, number> = {};
     for (const r of pastReports) {
       let rItems: any[] = [];
@@ -1132,9 +1138,11 @@ router.get('/:id/export-pdf', authenticateToken, async (req: AuthRequest, res) =
         for (const it of rItems) {
           const k = normItemKey(it?.name);
           if (!k) continue;
+          const stg = isMfgReport ? String(it?.stage || '一次加工').trim() : '';
+          const mapKey = isMfgReport ? `${k}:::${stg}` : k;
           const val = parseFloat(String(it?.progress || '').replace(/,/g, ''));
           if (!Number.isNaN(val)) {
-            accumulatedItemQtyMap[k] = Math.round(((accumulatedItemQtyMap[k] || 0) + val) * 100) / 100;
+            accumulatedItemQtyMap[mapKey] = Math.round(((accumulatedItemQtyMap[mapKey] || 0) + val) * 100) / 100;
           }
         }
       }
@@ -1159,6 +1167,8 @@ router.get('/:id/export-pdf', authenticateToken, async (req: AuthRequest, res) =
 
     workItems.forEach((wi: any) => {
       const cleanName = normItemKey(wi.name);
+      const wiStage = isMfgReport ? String(wi.stage || '一次加工').trim() : '';
+      const mapKey = isMfgReport ? `${cleanName}:::${wiStage}` : cleanName;
       const cfg = allConfigItems.find((c: any) => normItemKey(c?.name) === cleanName);
       if (cfg) {
         wi.contractQuantity = cfg.contractQuantity;
@@ -1179,8 +1189,8 @@ router.get('/:id/export-pdf', authenticateToken, async (req: AuthRequest, res) =
         const legacyMatch = String(wi.name || '').match(/數量:\s*(\d+(?:\.\d+)?)/);
         if (legacyMatch) wi.contractQuantity = legacyMatch[1];
       }
-      wi.name = cleanName;
-      const rawAcc = accumulatedItemQtyMap[cleanName] ?? wi.progress ?? '';
+      wi.name = wiStage ? `${cleanName}【${wiStage}】` : cleanName;
+      const rawAcc = accumulatedItemQtyMap[mapKey] ?? wi.progress ?? '';
       const rawTargetNum = parseFloat(String(wi.contractQuantity ?? '').replace(/[,%]/g, ''));
       const isPctMode = String(wi.contractQuantity ?? '').includes('%') || Number.isNaN(rawTargetNum) || rawTargetNum <= 0;
       const effectiveTargetNum = isPctMode ? 100 : rawTargetNum;

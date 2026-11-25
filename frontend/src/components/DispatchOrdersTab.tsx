@@ -313,14 +313,20 @@ const DispatchOrdersTab: React.FC<DispatchOrdersTabProps> = ({ project }) => {
     };
   };
 
-  // 計算派工單單一構件在「製造報工 (laborReports)」中累計已回報之生產數量與進度 %
+  // 計算派工單單一構件在「製造報工 (laborReports)」中 4 道工序各自的累計完成數量與現場可吊裝狀態
   const getItemProductionProgress = (order: any, it: DispatchOrderItem) => {
     const targetNum = parseFloat(String(it.quantity || '').replace(/,/g, ''));
     const targetQty = Number.isNaN(targetNum) ? 0 : targetNum;
     const memberKey = (it.member_no || '').trim();
     const reports: any[] = Array.isArray(order?.laborReports) ? order.laborReports : [];
 
-    let completedQty = 0;
+    const stageMap: Record<string, number> = {
+      '一次加工': 0,
+      '二次加工': 0,
+      '送至鍍鋅廠': 0,
+      '鍍鋅完成出貨至案場': 0,
+    };
+
     reports.forEach(rep => {
       let rItems: any[] = [];
       try {
@@ -335,15 +341,58 @@ const DispatchOrdersTab: React.FC<DispatchOrdersTabProps> = ({ project }) => {
             (!memberKey && it.spec && wName.includes(it.spec));
           if (isMatch) {
             const val = parseFloat(String(wi.progress || '').replace(/,/g, ''));
-            if (!Number.isNaN(val)) completedQty += val;
+            if (!Number.isNaN(val) && val > 0) {
+              const stg = String(wi.stage || '一次加工').trim();
+              if (stageMap[stg] !== undefined) {
+                stageMap[stg] += val;
+              } else {
+                stageMap['一次加工'] += val;
+              }
+            }
           }
         });
       }
     });
 
-    completedQty = Math.round(completedQty * 100) / 100;
+    const stage1 = Math.round(stageMap['一次加工'] * 100) / 100;
+    const stage2 = Math.round(stageMap['二次加工'] * 100) / 100;
+    const stage3 = Math.round(stageMap['送至鍍鋅廠'] * 100) / 100;
+    const stage4 = Math.round(stageMap['鍍鋅完成出貨至案場'] * 100) / 100;
+
+    // 整體代表完成數：若已有出貨至案場或後段工序，取各工序最高推進或以最終出貨/最新工序顯示
+    const completedQty = Math.max(stage1, stage2, stage3, stage4);
     const pct = targetQty > 0 ? Math.min(100, Math.round((completedQty / targetQty) * 1000) / 10) : 0;
-    return { targetQty, completedQty, pct };
+
+    let siteReadyLabel = '⚪ 待排產';
+    let siteReadyClass = 'bg-slate-100 text-slate-500 border-slate-200';
+    if (targetQty > 0 && stage4 >= targetQty) {
+      siteReadyLabel = '🟢 已到案場可吊裝';
+      siteReadyClass = 'bg-emerald-50 text-emerald-700 border-emerald-300';
+    } else if (stage4 > 0) {
+      siteReadyLabel = `🟢 部分到案場 (${stage4}/${targetQty})`;
+      siteReadyClass = 'bg-teal-50 text-teal-700 border-teal-300';
+    } else if (stage3 > 0) {
+      siteReadyLabel = `🟡 在鍍鋅廠 (${stage3}/${targetQty})`;
+      siteReadyClass = 'bg-amber-50 text-amber-800 border-amber-300';
+    } else if (stage2 > 0) {
+      siteReadyLabel = `🟠 廠內二次加工中 (${stage2}/${targetQty})`;
+      siteReadyClass = 'bg-orange-50 text-orange-700 border-orange-300';
+    } else if (stage1 > 0) {
+      siteReadyLabel = `🔴 廠內一次加工中 (${stage1}/${targetQty})`;
+      siteReadyClass = 'bg-rose-50 text-rose-700 border-rose-300';
+    }
+
+    return {
+      targetQty,
+      completedQty,
+      pct,
+      stage1,
+      stage2,
+      stage3,
+      stage4,
+      siteReadyLabel,
+      siteReadyClass,
+    };
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -541,17 +590,20 @@ const DispatchOrdersTab: React.FC<DispatchOrdersTabProps> = ({ project }) => {
                   </div>
                 </div>
 
-                {/* Items Table */}
+                {/* Items Table (含鋼構構件四階工序追蹤) */}
                 {orderItems.length > 0 && (
-                  <div className="overflow-x-auto bg-white rounded-lg border border-slate-200 max-h-80 overflow-y-auto">
+                  <div className="overflow-x-auto bg-white rounded-lg border border-slate-200 max-h-96 overflow-y-auto">
                     <table className="w-full text-xs text-left border-collapse">
                       <thead className="sticky top-0 z-10">
                         <tr className="bg-slate-100 text-slate-700 border-b border-slate-200">
                           <th className="py-2 px-2.5 w-24">項目</th>
                           <th className="py-2 px-2.5 w-24">構件編號</th>
-                          <th className="py-2 px-2.5 w-16 text-right">數量</th>
-                          <th className="py-2 px-2.5 w-24 text-right">已生產回報</th>
-                          <th className="py-2 px-2.5 w-36">目前生產進度</th>
+                          <th className="py-2 px-2.5 w-16 text-right">目標總數</th>
+                          <th className="py-2 px-2 w-24 text-center bg-indigo-50/70 text-indigo-900">① 一次加工</th>
+                          <th className="py-2 px-2 w-24 text-center bg-indigo-50/70 text-indigo-900">② 二次加工</th>
+                          <th className="py-2 px-2 w-24 text-center bg-amber-50/70 text-amber-900">③ 送至鍍鋅廠</th>
+                          <th className="py-2 px-2 w-28 text-center bg-emerald-50/70 text-emerald-900">④ 出貨至案場</th>
+                          <th className="py-2 px-2.5 w-36 text-center">現場可吊裝狀態</th>
                           <th className="py-2 px-2.5">規格尺寸</th>
                           <th className="py-2 px-2.5 w-20 text-right">長度</th>
                           <th className="py-2 px-2.5 w-20">材質</th>
@@ -562,7 +614,39 @@ const DispatchOrdersTab: React.FC<DispatchOrdersTabProps> = ({ project }) => {
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                         {orderItems.map((it, idx) => {
-                          const prog = itemProgressList[idx] || { targetQty: 0, completedQty: 0, pct: 0 };
+                          const prog = itemProgressList[idx] || {
+                            targetQty: 0,
+                            completedQty: 0,
+                            pct: 0,
+                            stage1: 0,
+                            stage2: 0,
+                            stage3: 0,
+                            stage4: 0,
+                            siteReadyLabel: '⚪ 待排產',
+                            siteReadyClass: 'bg-slate-100 text-slate-500 border-slate-200',
+                          };
+                          const renderStageCell = (done: number) => {
+                            const t = prog.targetQty || 0;
+                            const sPct = t > 0 ? Math.min(100, Math.round((done / t) * 1000) / 10) : 0;
+                            const isFull = t > 0 && done >= t;
+                            return (
+                              <div className="flex flex-col items-center leading-tight">
+                                <span
+                                  className={`font-mono font-bold ${
+                                    isFull
+                                      ? 'text-emerald-700'
+                                      : done > 0
+                                      ? 'text-indigo-700'
+                                      : 'text-slate-400'
+                                  }`}
+                                >
+                                  {done} / {t || '-'}
+                                </span>
+                                <span className="text-[10px] text-slate-400">({sPct}%)</span>
+                              </div>
+                            );
+                          };
+
                           return (
                             <tr key={idx} className="hover:bg-slate-50">
                               <td className="py-1.5 px-2.5">
@@ -572,35 +656,16 @@ const DispatchOrdersTab: React.FC<DispatchOrdersTabProps> = ({ project }) => {
                               </td>
                               <td className="py-1.5 px-2.5 font-mono font-bold text-slate-800">{it.member_no || '-'}</td>
                               <td className="py-1.5 px-2.5 text-right font-bold text-blue-700">{it.quantity || '-'}</td>
-                              <td className="py-1.5 px-2.5 text-right font-mono font-bold text-indigo-700">
-                                {prog.completedQty} <span className="text-slate-400 font-normal">/ {prog.targetQty || '-'}</span>
-                              </td>
-                              <td className="py-1.5 px-2.5">
-                                <div className="flex items-center gap-2">
-                                  <div className="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden min-w-[56px]">
-                                    <div
-                                      className={`h-full rounded-full transition-all ${
-                                        prog.pct >= 100
-                                          ? 'bg-emerald-500'
-                                          : prog.pct > 0
-                                          ? 'bg-blue-600'
-                                          : 'bg-slate-300'
-                                      }`}
-                                      style={{ width: `${Math.min(100, prog.pct)}%` }}
-                                    />
-                                  </div>
-                                  <span
-                                    className={`font-mono font-extrabold text-[11px] w-11 text-right ${
-                                      prog.pct >= 100
-                                        ? 'text-emerald-700'
-                                        : prog.pct > 0
-                                        ? 'text-blue-700'
-                                        : 'text-slate-400'
-                                    }`}
-                                  >
-                                    {prog.pct}%
-                                  </span>
-                                </div>
+                              <td className="py-1.5 px-2 text-center bg-indigo-50/20">{renderStageCell(prog.stage1)}</td>
+                              <td className="py-1.5 px-2 text-center bg-indigo-50/20">{renderStageCell(prog.stage2)}</td>
+                              <td className="py-1.5 px-2 text-center bg-amber-50/20">{renderStageCell(prog.stage3)}</td>
+                              <td className="py-1.5 px-2 text-center bg-emerald-50/20">{renderStageCell(prog.stage4)}</td>
+                              <td className="py-1.5 px-2.5 text-center">
+                                <span
+                                  className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-extrabold border whitespace-nowrap ${prog.siteReadyClass}`}
+                                >
+                                  {prog.siteReadyLabel}
+                                </span>
                               </td>
                               <td className="py-1.5 px-2.5 font-mono text-slate-700">{it.spec || '-'}</td>
                               <td className="py-1.5 px-2.5 text-right font-mono text-slate-600">{it.length || '-'}</td>
@@ -617,10 +682,10 @@ const DispatchOrdersTab: React.FC<DispatchOrdersTabProps> = ({ project }) => {
                           <td className="py-2 px-2.5">總計 ({orderItems.length} 項)</td>
                           <td className="py-2 px-2.5"></td>
                           <td className="py-2 px-2.5 text-right text-blue-700">{totals.totalQty.toLocaleString()}</td>
-                          <td className="py-2 px-2.5 text-right font-mono text-indigo-700">
-                            {totalCompletedQty.toLocaleString()} / {totals.totalQty.toLocaleString()}
+                          <td colSpan={4} className="py-2 px-2.5 text-center font-mono text-indigo-700">
+                            累計已推進構件：{totalCompletedQty.toLocaleString()} / {totals.totalQty.toLocaleString()}
                           </td>
-                          <td className="py-2 px-2.5">
+                          <td className="py-2 px-2.5 text-center">
                             <span className={`font-mono font-extrabold ${overallPct >= 100 ? 'text-emerald-700' : 'text-blue-700'}`}>
                               總進度：{overallPct}%
                             </span>
