@@ -593,23 +593,23 @@ const DispatchOrdersTab: React.FC<DispatchOrdersTabProps> = ({ project }) => {
                 {/* Items Table (含鋼構構件四階工序追蹤) */}
                 {orderItems.length > 0 && (
                   <div className="overflow-x-auto bg-white rounded-lg border border-slate-200 max-h-96 overflow-y-auto">
-                    <table className="w-full text-xs text-left border-collapse">
+                    <table className="w-max min-w-full text-xs text-left border-collapse">
                       <thead className="sticky top-0 z-10">
-                        <tr className="bg-slate-100 text-slate-700 border-b border-slate-200">
-                          <th className="py-2 px-2.5 w-24">項目</th>
-                          <th className="py-2 px-2.5 w-24">構件編號</th>
-                          <th className="py-2 px-2.5 w-16 text-right">目標總數</th>
-                          <th className="py-2 px-2 w-24 text-center bg-indigo-50/70 text-indigo-900">① 一次加工</th>
-                          <th className="py-2 px-2 w-24 text-center bg-indigo-50/70 text-indigo-900">② 二次加工</th>
-                          <th className="py-2 px-2 w-24 text-center bg-amber-50/70 text-amber-900">③ 送至鍍鋅廠</th>
-                          <th className="py-2 px-2 w-28 text-center bg-emerald-50/70 text-emerald-900">④ 出貨至案場</th>
-                          <th className="py-2 px-2.5 w-36 text-center">現場可吊裝狀態</th>
-                          <th className="py-2 px-2.5">規格尺寸</th>
-                          <th className="py-2 px-2.5 w-20 text-right">長度</th>
-                          <th className="py-2 px-2.5 w-20">材質</th>
-                          <th className="py-2 px-2.5 w-24 text-right">單重(Kg)</th>
-                          <th className="py-2 px-2.5 w-24 text-right">總量(Kgs)</th>
-                          <th className="py-2 px-2.5">備註</th>
+                        <tr className="bg-slate-100 text-slate-700 border-b border-slate-200 whitespace-nowrap">
+                          <th className="py-2.5 px-3 min-w-[96px]">項目</th>
+                          <th className="py-2.5 px-3 min-w-[96px]">構件編號</th>
+                          <th className="py-2.5 px-3 min-w-[76px] text-right">目標總數</th>
+                          <th className="py-2.5 px-3 min-w-[104px] text-center bg-indigo-50/70 text-indigo-900">① 一次加工</th>
+                          <th className="py-2.5 px-3 min-w-[104px] text-center bg-indigo-50/70 text-indigo-900">② 二次加工</th>
+                          <th className="py-2.5 px-3 min-w-[108px] text-center bg-amber-50/70 text-amber-900">③ 送至鍍鋅廠</th>
+                          <th className="py-2.5 px-3 min-w-[112px] text-center bg-emerald-50/70 text-emerald-900">④ 出貨至案場</th>
+                          <th className="py-2.5 px-3 min-w-[140px] text-center">現場可吊裝狀態</th>
+                          <th className="py-2.5 px-3 min-w-[140px]">規格尺寸</th>
+                          <th className="py-2.5 px-3 min-w-[76px] text-right">長度</th>
+                          <th className="py-2.5 px-3 min-w-[80px]">材質</th>
+                          <th className="py-2.5 px-3 min-w-[88px] text-right">單重(Kg)</th>
+                          <th className="py-2.5 px-3 min-w-[96px] text-right">總量(Kgs)</th>
+                          <th className="py-2.5 px-3 min-w-[140px]">備註</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
@@ -630,7 +630,7 @@ const DispatchOrdersTab: React.FC<DispatchOrdersTabProps> = ({ project }) => {
                             const sPct = t > 0 ? Math.min(100, Math.round((done / t) * 1000) / 10) : 0;
                             const isFull = t > 0 && done >= t;
                             return (
-                              <div className="flex flex-col items-center leading-tight">
+                              <div className="inline-flex items-center justify-center gap-1 whitespace-nowrap">
                                 <span
                                   className={`font-mono font-bold ${
                                     isFull
@@ -642,58 +642,58 @@ const DispatchOrdersTab: React.FC<DispatchOrdersTabProps> = ({ project }) => {
                                 >
                                   {done} / {t || '-'}
                                 </span>
-                                <span className="text-[10px] text-slate-400">({sPct}%)</span>
+                                <span className="text-[11px] text-slate-400">({sPct}%)</span>
                               </div>
                             );
                           };
 
                           return (
-                            <tr key={idx} className="hover:bg-slate-50">
-                              <td className="py-1.5 px-2.5">
-                                <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded font-semibold">
+                            <tr key={idx} className="hover:bg-slate-50 whitespace-nowrap">
+                              <td className="py-2 px-3">
+                                <span className="inline-block px-2.5 py-0.5 bg-indigo-50 text-indigo-700 rounded font-semibold whitespace-nowrap">
                                   {it.category || '-'}
                                 </span>
                               </td>
-                              <td className="py-1.5 px-2.5 font-mono font-bold text-slate-800">{it.member_no || '-'}</td>
-                              <td className="py-1.5 px-2.5 text-right font-bold text-blue-700">{it.quantity || '-'}</td>
-                              <td className="py-1.5 px-2 text-center bg-indigo-50/20">{renderStageCell(prog.stage1)}</td>
-                              <td className="py-1.5 px-2 text-center bg-indigo-50/20">{renderStageCell(prog.stage2)}</td>
-                              <td className="py-1.5 px-2 text-center bg-amber-50/20">{renderStageCell(prog.stage3)}</td>
-                              <td className="py-1.5 px-2 text-center bg-emerald-50/20">{renderStageCell(prog.stage4)}</td>
-                              <td className="py-1.5 px-2.5 text-center">
+                              <td className="py-2 px-3 font-mono font-bold text-slate-800 whitespace-nowrap">{it.member_no || '-'}</td>
+                              <td className="py-2 px-3 text-right font-bold text-blue-700 whitespace-nowrap">{it.quantity || '-'}</td>
+                              <td className="py-2 px-3 text-center bg-indigo-50/20 whitespace-nowrap">{renderStageCell(prog.stage1)}</td>
+                              <td className="py-2 px-3 text-center bg-indigo-50/20 whitespace-nowrap">{renderStageCell(prog.stage2)}</td>
+                              <td className="py-2 px-3 text-center bg-amber-50/20 whitespace-nowrap">{renderStageCell(prog.stage3)}</td>
+                              <td className="py-2 px-3 text-center bg-emerald-50/20 whitespace-nowrap">{renderStageCell(prog.stage4)}</td>
+                              <td className="py-2 px-3 text-center whitespace-nowrap">
                                 <span
-                                  className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-extrabold border whitespace-nowrap ${prog.siteReadyClass}`}
+                                  className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-extrabold border whitespace-nowrap ${prog.siteReadyClass}`}
                                 >
                                   {prog.siteReadyLabel}
                                 </span>
                               </td>
-                              <td className="py-1.5 px-2.5 font-mono text-slate-700">{it.spec || '-'}</td>
-                              <td className="py-1.5 px-2.5 text-right font-mono text-slate-600">{it.length || '-'}</td>
-                              <td className="py-1.5 px-2.5 text-slate-700">{it.material || '-'}</td>
-                              <td className="py-1.5 px-2.5 text-right font-mono text-slate-600">{it.unit_weight || '-'}</td>
-                              <td className="py-1.5 px-2.5 text-right font-mono font-bold text-emerald-700">{it.total_weight || '-'}</td>
-                              <td className="py-1.5 px-2.5 text-slate-600">{it.note || '-'}</td>
+                              <td className="py-2 px-3 font-mono text-slate-700 whitespace-nowrap">{it.spec || '-'}</td>
+                              <td className="py-2 px-3 text-right font-mono text-slate-600 whitespace-nowrap">{it.length || '-'}</td>
+                              <td className="py-2 px-3 text-slate-700 whitespace-nowrap">{it.material || '-'}</td>
+                              <td className="py-2 px-3 text-right font-mono text-slate-600 whitespace-nowrap">{it.unit_weight || '-'}</td>
+                              <td className="py-2 px-3 text-right font-mono font-bold text-emerald-700 whitespace-nowrap">{it.total_weight || '-'}</td>
+                              <td className="py-2 px-3 text-slate-600 whitespace-nowrap">{it.note || '-'}</td>
                             </tr>
                           );
                         })}
                       </tbody>
                       <tfoot>
-                        <tr className="bg-slate-100 font-bold text-slate-800 border-t border-slate-200">
-                          <td className="py-2 px-2.5">總計 ({orderItems.length} 項)</td>
-                          <td className="py-2 px-2.5"></td>
-                          <td className="py-2 px-2.5 text-right text-blue-700">{totals.totalQty.toLocaleString()}</td>
-                          <td colSpan={4} className="py-2 px-2.5 text-center font-mono text-indigo-700">
+                        <tr className="bg-slate-100 font-bold text-slate-800 border-t border-slate-200 whitespace-nowrap">
+                          <td className="py-2 px-3">總計 ({orderItems.length} 項)</td>
+                          <td className="py-2 px-3"></td>
+                          <td className="py-2 px-3 text-right text-blue-700">{totals.totalQty.toLocaleString()}</td>
+                          <td colSpan={4} className="py-2 px-3 text-center font-mono text-indigo-700">
                             累計已推進構件：{totalCompletedQty.toLocaleString()} / {totals.totalQty.toLocaleString()}
                           </td>
-                          <td className="py-2 px-2.5 text-center">
+                          <td className="py-2 px-3 text-center">
                             <span className={`font-mono font-extrabold ${overallPct >= 100 ? 'text-emerald-700' : 'text-blue-700'}`}>
                               總進度：{overallPct}%
                             </span>
                           </td>
-                          <td colSpan={3} className="py-2 px-2.5"></td>
-                          <td className="py-2 px-2.5 text-right font-mono">{totals.totalUnitW.toLocaleString()}</td>
-                          <td className="py-2 px-2.5 text-right font-mono text-emerald-700">{totals.totalWeight.toLocaleString()}</td>
-                          <td className="py-2 px-2.5"></td>
+                          <td colSpan={3} className="py-2 px-3"></td>
+                          <td className="py-2 px-3 text-right font-mono">{totals.totalUnitW.toLocaleString()}</td>
+                          <td className="py-2 px-3 text-right font-mono text-emerald-700">{totals.totalWeight.toLocaleString()}</td>
+                          <td className="py-2 px-3"></td>
                         </tr>
                       </tfoot>
                     </table>

@@ -238,10 +238,10 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [lightbox.isOpen, lightbox.images.length]);
   const MANUFACTURING_STAGES = [
-    { key: '一次加工', stepNum: '①', label: '① 一次加工', sub: '裁切/鑽孔/下料', isFactoryLabor: true },
-    { key: '二次加工', stepNum: '②', label: '② 二次加工', sub: '組立/焊接/整修', isFactoryLabor: true },
-    { key: '送至鍍鋅廠', stepNum: '③', label: '③ 送至鍍鋅廠', sub: '委外鍍鋅/表面處理', isFactoryLabor: false },
-    { key: '鍍鋅完成出貨至案場', stepNum: '④', label: '④ 鍍鋅完成出貨至案場', sub: '成品出貨至工地', isFactoryLabor: false },
+    { key: '一次加工', stepNum: '①', label: '① 一次加工', shortLabel: '① 一次加工', sub: '裁切/鑽孔/下料', isFactoryLabor: true },
+    { key: '二次加工', stepNum: '②', label: '② 二次加工', shortLabel: '② 二次加工', sub: '組立/焊接/整修', isFactoryLabor: true },
+    { key: '送至鍍鋅廠', stepNum: '③', label: '③ 送至鍍鋅廠', shortLabel: '③ 送至鍍鋅廠', sub: '委外鍍鋅/表面處理', isFactoryLabor: false },
+    { key: '鍍鋅完成出貨至案場', stepNum: '④', label: '④ 鍍鋅完成出貨至案場', shortLabel: '④ 出貨至案場', sub: '成品出貨至工地', isFactoryLabor: false },
   ] as const;
 
   type WorkItem = {
@@ -2768,9 +2768,10 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                                   const isStageCompleted = stDoneQty >= targetNum && targetNum > 0;
 
                                   return (
-                                    <div key={st.key} className="flex items-center gap-1">
+                                    <div key={st.key} className="flex items-center gap-1 min-w-0">
                                       <button
                                         type="button"
+                                        title={st.label}
                                         onClick={() => {
                                           const newItems = [...workItems];
                                           newItems[idx] = {
@@ -2779,7 +2780,7 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                                           };
                                           setWorkItems(newItems);
                                         }}
-                                        className={`w-full text-left px-3 py-2 rounded-lg border-2 transition-all cursor-pointer flex flex-col justify-between ${
+                                        className={`w-full min-w-0 text-left px-2.5 py-2 rounded-lg border-2 transition-all cursor-pointer flex flex-col justify-between ${
                                           isSelected
                                             ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm ring-2 ring-indigo-200'
                                             : isStageCompleted
@@ -2787,22 +2788,22 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                                             : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
                                         }`}
                                       >
-                                        <div className="flex items-center justify-between gap-1">
-                                          <span className="text-xs font-extrabold tracking-tight">
-                                            {st.label}
+                                        <div className="flex items-center justify-between gap-1 whitespace-nowrap">
+                                          <span className="text-xs font-extrabold tracking-tight whitespace-nowrap">
+                                            {st.shortLabel}
                                           </span>
                                           {isSelected ? (
-                                            <span className="text-[10px] font-extrabold bg-white text-indigo-700 px-1.5 py-0.2 rounded-full">
-                                              ● 本次報工
+                                            <span className="text-[10px] font-extrabold bg-white text-indigo-700 px-1.5 py-0.5 rounded-full whitespace-nowrap shrink-0">
+                                              ● 報工中
                                             </span>
                                           ) : isStageCompleted ? (
-                                            <span className="text-[10px] font-extrabold bg-emerald-600 text-white px-1.5 py-0.2 rounded-full">
-                                              ✓ 已完成
+                                            <span className="text-[10px] font-extrabold bg-emerald-600 text-white px-1.5 py-0.5 rounded-full whitespace-nowrap shrink-0">
+                                              ✓ 完成
                                             </span>
                                           ) : null}
                                         </div>
                                         <div
-                                          className={`text-[11px] font-mono mt-1 flex items-center justify-between ${
+                                          className={`text-[11px] font-mono mt-1.5 flex items-center justify-between gap-1 whitespace-nowrap ${
                                             isSelected
                                               ? 'text-indigo-100 font-bold'
                                               : isStageCompleted
@@ -2810,15 +2811,15 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                                               : 'text-slate-500'
                                           }`}
                                         >
-                                          <span>
+                                          <span className="whitespace-nowrap">
                                             已完 {stDoneQty}/{targetNum}
                                             {unitSuffix}
                                           </span>
-                                          <span>({stDonePct}%)</span>
+                                          <span className="whitespace-nowrap">({stDonePct}%)</span>
                                         </div>
                                       </button>
                                       {sIdx < MANUFACTURING_STAGES.length - 1 && (
-                                        <span className="hidden lg:inline text-slate-300 font-bold select-none">
+                                        <span className="hidden lg:inline text-slate-300 font-bold select-none shrink-0">
                                           →
                                         </span>
                                       )}
@@ -2831,8 +2832,8 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
 
                           {/* 目標數量/目標完成度 (唯讀不可由記錄人修改) + 今日生產數量/今日完成度 + 即時進度計算 */}
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 items-center pt-1">
-                            <div className="flex items-center bg-slate-100 border border-slate-300 rounded-lg px-3 py-1.5 cursor-not-allowed" title="由派工單或專案設定帶入，若無目標數量則自動以目標完成度 100% 計算">
-                              <span className="text-xs font-bold text-slate-500 mr-2 shrink-0">
+                            <div className="flex items-center justify-between bg-slate-100 border border-slate-300 rounded-lg px-3 py-1.5 cursor-not-allowed overflow-hidden" title="由派工單或專案設定帶入，若無目標數量則自動以目標完成度 100% 計算">
+                              <span className="text-xs font-bold text-slate-500 mr-2 shrink-0 whitespace-nowrap">
                                 {isPctMode ? '目標完成度：' : '目標數量：'}
                               </span>
                               <input
@@ -2840,11 +2841,11 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                                 readOnly
                                 tabIndex={-1}
                                 value={isPctMode ? '100%' : String(targetNum)}
-                                className="w-full text-sm font-bold text-slate-600 outline-none bg-transparent text-right cursor-not-allowed select-none"
+                                className="w-16 min-w-0 flex-1 text-sm font-bold text-slate-600 outline-none bg-transparent text-right cursor-not-allowed select-none"
                               />
                             </div>
 
-                            <div className={`flex items-center justify-between gap-2 bg-white border-2 rounded-lg px-3 py-1.5 focus-within:ring-2 ${
+                            <div className={`flex items-center justify-between gap-1.5 bg-white border-2 rounded-lg px-3 py-1.5 overflow-hidden focus-within:ring-2 ${
                               isOverTarget
                                 ? 'border-red-500 focus-within:ring-red-500 bg-red-50/30'
                                 : 'border-indigo-300 focus-within:ring-indigo-500'
@@ -2884,18 +2885,18 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                                 }}
                                 placeholder={isPctMode ? '0~100' : '輸入數量'}
                                 required
-                                className={`flex-1 min-w-[72px] text-sm font-extrabold outline-none bg-transparent text-right ${
+                                className={`w-16 min-w-0 flex-1 text-sm font-extrabold outline-none bg-transparent text-right ${
                                   isOverTarget ? 'text-red-700' : 'text-indigo-700'
                                 }`}
                               />
                               {isPctMode && (
-                                <span className={`text-xs font-bold ml-1 shrink-0 ${isOverTarget ? 'text-red-700' : 'text-indigo-700'}`}>
+                                <span className={`text-xs font-bold shrink-0 ${isOverTarget ? 'text-red-700' : 'text-indigo-700'}`}>
                                   %
                                 </span>
                               )}
                             </div>
 
-                            <div className={`flex items-center justify-between gap-2 border rounded-lg px-3 py-1.5 text-xs ${
+                            <div className={`flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 border rounded-lg px-3 py-1.5 text-xs overflow-hidden ${
                               isOverTarget
                                 ? 'bg-red-50 border-red-300 text-red-800'
                                 : 'bg-emerald-50 border-emerald-200 text-slate-600'
@@ -2904,7 +2905,7 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                                 累計完成：<strong className={isOverTarget ? 'text-red-700' : 'text-slate-800'}>{totalAccumulatedQty}{unitSuffix}</strong>
                                 {` / ${targetNum}${unitSuffix}`}
                               </span>
-                              <span className={`font-extrabold text-sm whitespace-nowrap ${isOverTarget ? 'text-red-700' : 'text-emerald-700'}`}>
+                              <span className={`font-extrabold text-xs whitespace-nowrap ${isOverTarget ? 'text-red-700' : 'text-emerald-700'}`}>
                                 進度：{`${completionPct}%`}
                               </span>
                             </div>
