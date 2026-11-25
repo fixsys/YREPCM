@@ -1,6 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { Download, Calendar, Filter } from 'lucide-react';
+import { Download, Calendar, Filter, Maximize2, Minimize2, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 
 interface ProjectTimelineProps {
@@ -73,6 +73,57 @@ const ProjectTimelineInner: React.FC<ProjectTimelineProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [selectedMonth, setSelectedMonth] = useState<string>('ALL');
   const [isExporting, setIsExporting] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [zoomScale, setZoomScale] = useState<number>(1);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const toggleFullscreen = async () => {
+    const nextState = !isFullscreen;
+    setIsFullscreen(nextState);
+    // 根據螢幕寬度自動調整至最適合閱讀的比例（電腦大螢幕略微放大至 105%，手機小螢幕自動縮放至 90% 以容納更多時程欄）
+    if (nextState) {
+      const isMobile = window.innerWidth < 768;
+      setZoomScale(isMobile ? 0.9 : 1.05);
+      try {
+        if (containerRef.current && containerRef.current.requestFullscreen && !isMobile) {
+          await containerRef.current.requestFullscreen();
+        }
+      } catch {
+        // Fallback to CSS fixed fullscreen overlay
+      }
+    } else {
+      setZoomScale(1);
+      try {
+        if (document.fullscreenElement && document.exitFullscreen) {
+          await document.exitFullscreen();
+        }
+      } catch {
+        // Ignore
+      }
+    }
+  };
+
+  useEffect(() => {
+    const onFsChange = () => {
+      if (!document.fullscreenElement && isFullscreen && window.innerWidth >= 768) {
+        // If user pressed ESC in native fullscreen, sync state
+        setIsFullscreen(false);
+        setZoomScale(1);
+      }
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isFullscreen) {
+        setIsFullscreen(false);
+        setZoomScale(1);
+      }
+    };
+    document.addEventListener('fullscreenchange', onFsChange);
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('fullscreenchange', onFsChange);
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [isFullscreen]);
 
   // 統計各工項在施工日誌累計完成之進度/數量
   const accumulatedProgressMap = useMemo(() => {
@@ -545,18 +596,25 @@ const ProjectTimelineInner: React.FC<ProjectTimelineProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col space-y-3">
+    <div
+      ref={containerRef}
+      className={
+        isFullscreen
+          ? 'fixed inset-0 z-[200] bg-white p-2.5 sm:p-4 md:p-6 flex flex-col space-y-2.5 overflow-hidden w-screen h-screen'
+          : 'bg-white rounded-xl shadow-sm border border-slate-200 p-3 sm:p-4 flex flex-col space-y-3'
+      }
+    >
       {/* 操作控制列 */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-slate-200">
+      <div className="flex flex-wrap items-center justify-between gap-2.5 pb-2 border-b border-slate-200 shrink-0">
         <div className="flex flex-wrap items-center gap-2">
           {/* 工程階段篩選 */}
           <div className="flex items-center gap-1.5 bg-slate-100 px-2.5 py-1.5 rounded-lg text-xs font-bold text-slate-700">
-            <Filter size={14} className="text-slate-500" />
-            <span>工程階段：</span>
+            <Filter size={14} className="text-slate-500 shrink-0" />
+            <span className="whitespace-nowrap">工程階段：</span>
             <select
               value={selectedCategory}
               onChange={e => setSelectedCategory(e.target.value)}
-              className="bg-white border border-slate-300 rounded px-2 py-0.5 text-xs font-bold text-slate-800 outline-none"
+              className="bg-white border border-slate-300 rounded px-2 py-0.5 text-xs font-bold text-slate-800 outline-none max-w-[160px] sm:max-w-none"
             >
               <option value="ALL">全部工程階段 ({allRows.length} 項)</option>
               {categories.map(cat => (
@@ -582,7 +640,7 @@ const ProjectTimelineInner: React.FC<ProjectTimelineProps> = ({
                 key={g.id}
                 type="button"
                 onClick={() => setGranularity(g.id)}
-                className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer whitespace-nowrap ${
+                className={`px-2 sm:px-2.5 py-1 rounded-md transition-colors cursor-pointer whitespace-nowrap ${
                   granularity === g.id
                     ? 'bg-[#1F4E78] text-white shadow-sm'
                     : 'text-slate-600 hover:text-slate-900'
@@ -596,7 +654,7 @@ const ProjectTimelineInner: React.FC<ProjectTimelineProps> = ({
           {/* 月份區間快速篩選 */}
           {availableMonths.length > 1 && (
             <div className="flex items-center gap-1.5 bg-slate-100 px-2.5 py-1.5 rounded-lg text-xs font-bold text-slate-700">
-              <span>顯示月份：</span>
+              <span className="whitespace-nowrap">顯示月份：</span>
               <select
                 value={selectedMonth}
                 onChange={e => setSelectedMonth(e.target.value)}
@@ -613,43 +671,110 @@ const ProjectTimelineInner: React.FC<ProjectTimelineProps> = ({
           )}
         </div>
 
-        {/* 匯出 Excel 按鈕 */}
-        <button
-          type="button"
-          onClick={handleExportExcel}
-          disabled={isExporting}
-          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-extrabold flex items-center gap-2 shadow-sm transition-colors disabled:opacity-50 cursor-pointer"
-        >
-          <Download size={15} />
-          {isExporting ? '正在產生 Excel...' : '輸出成 Excel (.xlsx)'}
-        </button>
+        {/* 右側工具列：閱讀比例縮放 + 全螢幕放大 + 匯出 Excel */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* 閱讀比例微調控制 */}
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg text-xs font-bold text-slate-700">
+            <button
+              type="button"
+              onClick={() => setZoomScale(prev => Math.max(0.7, Math.round((prev - 0.1) * 100) / 100))}
+              title="縮小表格比例 (-10%)"
+              className="p-1 hover:bg-white rounded text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
+            >
+              <ZoomOut size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setZoomScale(1)}
+              title="重設為預設大小 (100%)"
+              className="px-1.5 py-0.5 font-mono text-[11px] hover:bg-white rounded transition-colors cursor-pointer min-w-[44px] text-center"
+            >
+              {Math.round(zoomScale * 100)}%
+            </button>
+            <button
+              type="button"
+              onClick={() => setZoomScale(prev => Math.min(1.4, Math.round((prev + 0.1) * 100) / 100))}
+              title="放大表格比例 (+10%)"
+              className="p-1 hover:bg-white rounded text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
+            >
+              <ZoomIn size={14} />
+            </button>
+            {zoomScale !== 1 && (
+              <button
+                type="button"
+                onClick={() => setZoomScale(1)}
+                title="還原 100%"
+                className="p-1 hover:bg-white rounded text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+              >
+                <RotateCcw size={13} />
+              </button>
+            )}
+          </div>
+
+          {/* 放大到全螢幕 / 退出全螢幕按鈕 */}
+          <button
+            type="button"
+            onClick={toggleFullscreen}
+            className={`px-3.5 py-2 rounded-lg text-xs font-extrabold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer whitespace-nowrap ${
+              isFullscreen
+                ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                : 'bg-[#1F4E78] hover:bg-[#163a5c] text-white'
+            }`}
+          >
+            {isFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+            <span>{isFullscreen ? '退出全螢幕 (Esc)' : '全螢幕檢視'}</span>
+          </button>
+
+          {/* 匯出 Excel 按鈕 */}
+          <button
+            type="button"
+            onClick={handleExportExcel}
+            disabled={isExporting}
+            className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-extrabold flex items-center gap-1.5 shadow-sm transition-colors disabled:opacity-50 cursor-pointer whitespace-nowrap"
+          >
+            <Download size={15} />
+            <span>{isExporting ? '正在產生 Excel...' : '輸出成 Excel (.xlsx)'}</span>
+          </button>
+        </div>
       </div>
 
       {/* 甘特圖主表區塊（參考圖片樣式：深藍大標題 + 圖例說明 + 表格色塊） */}
-      <div className="border-2 border-[#1F4E78] rounded-lg overflow-hidden shadow-sm">
+      <div
+        className={`border-2 border-[#1F4E78] rounded-lg overflow-hidden shadow-sm flex flex-col ${
+          isFullscreen ? 'flex-1 min-h-0' : ''
+        }`}
+      >
         {/* 第一列：深藍主標題橫幅 */}
-        <div className="bg-[#1F4E78] text-white text-center py-3 px-4 font-extrabold text-base md:text-lg tracking-wide">
+        <div
+          className={`bg-[#1F4E78] text-white text-center px-3 sm:px-4 font-extrabold tracking-wide shrink-0 ${
+            isFullscreen ? 'py-2 sm:py-3 text-sm sm:text-lg md:text-xl' : 'py-2.5 sm:py-3 text-sm sm:text-base md:text-lg'
+          }`}
+        >
           {bannerTitle}
         </div>
 
         {/* 第二列：圖例說明列 */}
-        <div className="bg-[#E8EEF5] border-y border-[#B4C6E7] px-4 py-2 text-xs font-bold text-[#1F4E78] flex flex-wrap items-center gap-x-4 gap-y-1.5">
+        <div
+          className={`bg-[#E8EEF5] border-y border-[#B4C6E7] px-3 sm:px-4 py-1.5 sm:py-2 font-bold text-[#1F4E78] flex flex-wrap items-center gap-x-3 sm:gap-x-4 gap-y-1 shrink-0 ${
+            isFullscreen ? 'text-[11px] sm:text-xs md:text-sm' : 'text-[11px] sm:text-xs'
+          }`}
+        >
           <span>圖例說明：</span>
           <span className="inline-flex items-center gap-1.5">
             <span className="inline-block w-3.5 h-3.5 rounded-xs bg-[#70AD47] border border-[#5c9338]"></span>
             【綠底】■ 已完工 (100%)
           </span>
-          <span className="text-slate-400">｜</span>
+          <span className="hidden sm:inline text-slate-400">｜</span>
           <span className="inline-flex items-center gap-1.5">
             <span className="inline-block w-3.5 h-3.5 rounded-xs bg-[#2F5597] border border-[#234278]"></span>
             【深藍底】● 正式執行 / 施工中
           </span>
-          <span className="text-slate-400">｜</span>
+          <span className="hidden sm:inline text-slate-400">｜</span>
           <span className="inline-flex items-center gap-1.5">
             <span className="inline-block w-3.5 h-3.5 rounded-xs bg-[#ED7D31] border border-[#d16820]"></span>
             【橘底】▲ 排程預定 / 待開工
           </span>
-          <span className="text-slate-400">｜</span>
+          <span className="hidden sm:inline text-slate-400">｜</span>
           <span className="inline-flex items-center gap-1.5">
             <span className="inline-block w-3.5 h-3.5 rounded-xs bg-[#C00000] border border-[#9e0000]"></span>
             【紅底】★ 延遲警示 (逾期未完成)
@@ -657,23 +782,32 @@ const ProjectTimelineInner: React.FC<ProjectTimelineProps> = ({
         </div>
 
         {/* 第三列起：甘特圖色塊矩陣表格 */}
-        <div className="bg-amber-50/70 border-b border-[#B4C6E7] px-3 py-1.5 text-[11px] font-bold text-[#1F4E78] md:hidden flex items-center gap-1.5">
-          <span>👉 手機瀏覽提示：表格可左右滑動查看完整甘特圖時程色塊與進度</span>
+        <div className="bg-amber-50/70 border-b border-[#B4C6E7] px-3 py-1 text-[11px] font-bold text-[#1F4E78] md:hidden flex items-center justify-between gap-1.5 shrink-0">
+          <span>👉 手機瀏覽：可左右滑動表格，或使用上方「- / +」調整最適閱讀大小</span>
         </div>
-        <div className="overflow-auto max-h-[620px] w-full max-w-full [-webkit-overflow-scrolling:touch]">
-          <table className="w-max min-w-full border-separate border-spacing-0 text-xs">
+        <div
+          className={`overflow-auto w-full max-w-full [-webkit-overflow-scrolling:touch] ${
+            isFullscreen ? 'flex-1 min-h-0' : 'max-h-[620px]'
+          }`}
+        >
+          <table
+            style={{ zoom: zoomScale }}
+            className={`w-max min-w-full border-separate border-spacing-0 ${
+              isFullscreen ? 'text-xs sm:text-sm' : 'text-xs'
+            }`}
+          >
             <thead>
               <tr className="bg-[#2F5597] text-white">
-                <th className="sticky top-0 md:left-0 z-40 bg-[#2F5597] border-b border-r border-[#8EA9DB] px-2 py-2.5 w-[52px] min-w-[52px] max-w-[52px] box-border text-center font-bold whitespace-nowrap">
+                <th className="sticky top-0 md:left-0 z-40 bg-[#2F5597] border-b border-r border-[#8EA9DB] px-1.5 sm:px-2 py-2 sm:py-2.5 w-[42px] md:w-[52px] min-w-[42px] md:min-w-[52px] max-w-[42px] md:max-w-[52px] box-border text-center font-bold whitespace-nowrap">
                   項次
                 </th>
-                <th className="sticky top-0 md:left-[52px] z-40 bg-[#2F5597] border-b border-r border-[#8EA9DB] px-2.5 py-2.5 w-[92px] min-w-[92px] max-w-[92px] box-border text-center font-bold whitespace-nowrap">
+                <th className="sticky top-0 md:left-[52px] z-40 bg-[#2F5597] border-b border-r border-[#8EA9DB] px-2 sm:px-2.5 py-2 sm:py-2.5 w-[72px] md:w-[92px] min-w-[72px] md:min-w-[92px] max-w-[72px] md:max-w-[92px] box-border text-center font-bold whitespace-nowrap">
                   工程階段
                 </th>
-                <th className="sticky top-0 md:left-[144px] z-40 bg-[#2F5597] border-b border-r border-[#8EA9DB] px-3 py-2.5 w-[220px] min-w-[220px] max-w-[220px] box-border text-left font-bold whitespace-nowrap">
+                <th className="sticky top-0 md:left-[144px] z-40 bg-[#2F5597] border-b border-r border-[#8EA9DB] px-2.5 sm:px-3 py-2 sm:py-2.5 w-[150px] md:w-[220px] min-w-[150px] md:min-w-[220px] max-w-[150px] md:max-w-[220px] box-border text-left font-bold whitespace-nowrap">
                   工作模組 / 施工工項
                 </th>
-                <th className="sticky top-0 md:left-[364px] z-40 bg-[#2F5597] border-b border-r-2 border-[#8EA9DB] px-3 py-2.5 w-[210px] min-w-[210px] max-w-[210px] box-border text-left font-bold whitespace-nowrap md:shadow-[2px_0_5px_-1px_rgba(0,0,0,0.2)]">
+                <th className="sticky top-0 md:left-[364px] z-40 bg-[#2F5597] border-b border-r-2 border-[#8EA9DB] px-2.5 sm:px-3 py-2 sm:py-2.5 w-[165px] md:w-[210px] min-w-[165px] md:min-w-[210px] max-w-[165px] md:max-w-[210px] box-border text-left font-bold whitespace-nowrap md:shadow-[2px_0_5px_-1px_rgba(0,0,0,0.2)]">
                   預計起訖與檢核目標
                 </th>
 
@@ -681,7 +815,13 @@ const ProjectTimelineInner: React.FC<ProjectTimelineProps> = ({
                   <th
                     key={b.id}
                     className={`sticky top-0 z-30 border-b border-r border-[#8EA9DB] ${
-                      granularity === 'DAY' ? 'px-1.5 py-1.5 min-w-[64px]' : 'px-2 py-2 min-w-[96px]'
+                      granularity === 'DAY'
+                        ? isFullscreen
+                          ? 'px-2 py-2 min-w-[74px]'
+                          : 'px-1.5 py-1.5 min-w-[64px]'
+                        : isFullscreen
+                        ? 'px-2.5 py-2.5 min-w-[110px]'
+                        : 'px-2 py-2 min-w-[96px]'
                     } text-center font-bold whitespace-nowrap leading-tight ${
                       b.isCurrent
                         ? 'bg-[#1b3b6f] ring-2 ring-inset ring-amber-300'
@@ -728,7 +868,7 @@ const ProjectTimelineInner: React.FC<ProjectTimelineProps> = ({
                   >
                     {/* 項次 */}
                     <td
-                      className={`md:sticky md:left-0 z-20 bg-white group-hover:bg-slate-50 border-b border-r border-slate-300 px-2 py-2.5 w-[52px] min-w-[52px] max-w-[52px] box-border text-center font-mono font-bold ${
+                      className={`md:sticky md:left-0 z-20 bg-white group-hover:bg-slate-50 border-b border-r border-slate-300 px-1.5 sm:px-2 py-2 sm:py-2.5 w-[42px] md:w-[52px] min-w-[42px] md:min-w-[52px] max-w-[42px] md:max-w-[52px] box-border text-center font-mono font-bold ${
                         isDelayed ? 'text-[#C00000]' : 'text-slate-700'
                       }`}
                     >
@@ -736,14 +876,14 @@ const ProjectTimelineInner: React.FC<ProjectTimelineProps> = ({
                     </td>
 
                     {/* 工程階段 */}
-                    <td className="md:sticky md:left-[52px] z-20 bg-white group-hover:bg-slate-50 border-b border-r border-slate-300 px-2.5 py-2.5 w-[92px] min-w-[92px] max-w-[92px] box-border text-center font-bold text-slate-700 whitespace-nowrap truncate">
+                    <td className="md:sticky md:left-[52px] z-20 bg-white group-hover:bg-slate-50 border-b border-r border-slate-300 px-2 sm:px-2.5 py-2 sm:py-2.5 w-[72px] md:w-[92px] min-w-[72px] md:min-w-[92px] max-w-[72px] md:max-w-[92px] box-border text-center font-bold text-slate-700 whitespace-nowrap truncate">
                       {row.category}
                     </td>
 
                     {/* 工作模組 / 施工工項 */}
                     <td
                       title={row.name}
-                      className={`md:sticky md:left-[144px] z-20 bg-white group-hover:bg-slate-50 border-b border-r border-slate-300 px-3 py-2.5 w-[220px] min-w-[220px] max-w-[220px] box-border font-bold truncate ${
+                      className={`md:sticky md:left-[144px] z-20 bg-white group-hover:bg-slate-50 border-b border-r border-slate-300 px-2.5 sm:px-3 py-2 sm:py-2.5 w-[150px] md:w-[220px] min-w-[150px] md:min-w-[220px] max-w-[150px] md:max-w-[220px] box-border font-bold truncate ${
                         isDelayed ? 'text-[#C00000]' : 'text-slate-800'
                       }`}
                     >
@@ -753,7 +893,7 @@ const ProjectTimelineInner: React.FC<ProjectTimelineProps> = ({
 
                     {/* 預計起訖與檢核目標 */}
                     <td
-                      className={`md:sticky md:left-[364px] z-20 border-b border-r-2 border-slate-300 px-3 py-2.5 w-[210px] min-w-[210px] max-w-[210px] box-border leading-snug bg-white group-hover:bg-slate-50 md:shadow-[2px_0_5px_-1px_rgba(0,0,0,0.08)] ${
+                      className={`md:sticky md:left-[364px] z-20 border-b border-r-2 border-slate-300 px-2.5 sm:px-3 py-2 sm:py-2.5 w-[165px] md:w-[210px] min-w-[165px] md:min-w-[210px] max-w-[165px] md:max-w-[210px] box-border leading-snug bg-white group-hover:bg-slate-50 md:shadow-[2px_0_5px_-1px_rgba(0,0,0,0.08)] ${
                         isDelayed ? 'text-[#C00000] font-bold' : 'text-slate-700'
                       }`}
                     >
@@ -782,7 +922,9 @@ const ProjectTimelineInner: React.FC<ProjectTimelineProps> = ({
                               ? `${row.category} - ${row.name}\n預計工期：${row.startStr} ~ ${row.endStr}\n目前進度：${row.actualProgress}%\n狀態：${row.remark}`
                               : `${b.topLabel} (${b.subLabel})`
                           }
-                          className={`border-b border-r border-slate-300 p-0 text-center align-middle h-11 ${
+                          className={`border-b border-r border-slate-300 p-0 text-center align-middle ${
+                            isFullscreen ? 'h-12' : 'h-11'
+                          } ${
                             isHit
                               ? blockClass
                               : b.isCurrent
@@ -793,7 +935,11 @@ const ProjectTimelineInner: React.FC<ProjectTimelineProps> = ({
                           }`}
                         >
                           {isHit && (
-                            <div className="w-full h-full px-1 py-2 flex items-center justify-center font-bold text-[11px] tracking-tight whitespace-nowrap select-none">
+                            <div
+                              className={`w-full h-full px-1 py-2 flex items-center justify-center font-bold tracking-tight whitespace-nowrap select-none ${
+                                isFullscreen ? 'text-xs' : 'text-[11px]'
+                              }`}
+                            >
                               {granularity === 'DAY' ? shortDayLabel : row.blockLabel}
                             </div>
                           )}
