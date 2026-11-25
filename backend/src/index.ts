@@ -19,6 +19,7 @@ import laborReportsRoutes from './routes/laborReports';
 import dispatchOrdersRoutes from './routes/dispatchOrders';
 import approvalsRoutes from './routes/approvals';
 import systemLogsRoutes, { systemAuditMiddleware } from './routes/systemLogs';
+import changelogRoutes from './routes/changelog';
 import path from 'path';
 
 dotenv.config();
@@ -52,6 +53,7 @@ app.use('/api/labor-reports', laborReportsRoutes);
 app.use('/api/dispatch-orders', dispatchOrdersRoutes);
 app.use('/api/approvals', approvalsRoutes);
 app.use('/api/system-logs', systemLogsRoutes);
+app.use('/api/changelog', changelogRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });

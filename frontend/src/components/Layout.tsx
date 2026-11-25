@@ -1,16 +1,43 @@
 import { ReactNode } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
-import { LogOut, LayoutDashboard, FolderKanban, Shield, BarChart2, Settings, CheckSquare, Network, Briefcase, Smartphone, Monitor, Menu, Calculator, Lightbulb, ClipboardList, Factory, Key, Terminal, FileSignature } from 'lucide-react';
+import { LogOut, LayoutDashboard, FolderKanban, Shield, BarChart2, Settings, CheckSquare, Network, Briefcase, Smartphone, Monitor, Menu, Calculator, Lightbulb, ClipboardList, Factory, Key, Terminal, FileSignature, History } from 'lucide-react';
 import clsx from 'clsx';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import axios from 'axios';
 import NotificationCenter from './NotificationCenter';
+import ChangelogModal from './ChangelogModal';
 
 const Layout = ({ children }: { children: ReactNode }) => {
   const { user, logout, isMobileView, setMobileView, loginSystem } = useAuthStore();
   const navigate = useNavigate();
   const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isChangelogOpen, setIsChangelogOpen] = useState(false);
+  const [latestCommitHash, setLatestCommitHash] = useState<string>('');
+  const [latestCommitDate, setLatestCommitDate] = useState<string>('');
+  const [hasNewUpdate, setHasNewUpdate] = useState(false);
+
+  useEffect(() => {
+    axios
+      .get('/api/changelog')
+      .then((res) => {
+        const hash = res.data?.latestCommitHash || '';
+        const date = res.data?.latestCommitDate || '';
+        setLatestCommitHash(hash);
+        setLatestCommitDate(date);
+        const seenHash = localStorage.getItem('yrpm_seen_changelog_hash');
+        if (hash && seenHash !== hash) {
+          setHasNewUpdate(true);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleSeenLatestChangelog = (hash: string) => {
+    localStorage.setItem('yrpm_seen_changelog_hash', hash);
+    setHasNewUpdate(false);
+  };
 
   const handleLogout = () => {
     logout();
@@ -67,6 +94,20 @@ const Layout = ({ children }: { children: ReactNode }) => {
         </div>
         
         <div className="flex items-center gap-4">
+          <button
+            onClick={() => setIsChangelogOpen(true)}
+            className="relative px-2.5 py-1.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors flex items-center gap-1.5 text-xs font-medium border border-slate-700/80 cursor-pointer"
+            title="檢視系統版本更新紀錄 (Changelog)"
+          >
+            <History size={16} className="text-blue-400" />
+            <span className="hidden sm:inline">更新紀錄</span>
+            {latestCommitHash && (
+              <span className="hidden md:inline font-mono text-[11px] text-emerald-400">#{latestCommitHash}</span>
+            )}
+            {hasNewUpdate && (
+              <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+            )}
+          </button>
           <NotificationCenter />
           <div className="hidden md:block h-6 w-px bg-slate-700 mx-2"></div>
           <div className="flex items-center gap-3">
@@ -126,6 +167,36 @@ const Layout = ({ children }: { children: ReactNode }) => {
                 </button>
               )
             })}
+
+            <div className="mt-4 pt-3 border-t border-slate-800">
+              <div className="mb-2 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                系統資訊
+              </div>
+              <button
+                onClick={() => {
+                  setIsSidebarOpen(false);
+                  setIsChangelogOpen(true);
+                }}
+                className="w-full flex items-center justify-between px-4 py-3 rounded-lg transition-all duration-200 text-sm font-medium hover:bg-slate-800 hover:text-white text-slate-300 cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <History size={18} className="text-emerald-400" />
+                  <span>版本更新紀錄</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {latestCommitDate && (
+                    <span className="px-1.5 py-0.5 text-[10px] font-mono bg-slate-800 text-emerald-400 border border-slate-700 rounded">
+                      {latestCommitDate.slice(5)}
+                    </span>
+                  )}
+                  {hasNewUpdate && (
+                    <span className="px-1.5 py-0.5 text-[10px] font-bold bg-rose-500 text-white rounded-full">
+                      NEW
+                    </span>
+                  )}
+                </div>
+              </button>
+            </div>
           </div>
         </aside>
 
@@ -155,6 +226,12 @@ const Layout = ({ children }: { children: ReactNode }) => {
           </div>
         </main>
       </div>
+
+      <ChangelogModal
+        isOpen={isChangelogOpen}
+        onClose={() => setIsChangelogOpen(false)}
+        onSeenLatest={handleSeenLatestChangelog}
+      />
     </div>
   );
 
