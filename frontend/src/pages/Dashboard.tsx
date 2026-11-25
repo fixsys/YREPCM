@@ -15,7 +15,15 @@ import {
   Stamp,
   FileText,
   Printer,
-  X
+  X,
+  HardHat,
+  Factory,
+  Camera,
+  MapPin,
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
+  ZoomIn
 } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
 
@@ -30,6 +38,31 @@ const Dashboard = () => {
   const [approvingOrder, setApprovingOrder] = useState<any | null>(null);
   const [viewingOrder, setViewingOrder] = useState<any | null>(null);
   const [isApproving, setIsApproving] = useState(false);
+  const [previewLightbox, setPreviewLightbox] = useState<{
+    isOpen: boolean;
+    photos: { url: string; label: string; date?: string }[];
+    currentIndex: number;
+    title: string;
+  }>({
+    isOpen: false,
+    photos: [],
+    currentIndex: 0,
+    title: '',
+  });
+
+  const openPhotoLightbox = (
+    photos: { url: string; label: string; date?: string }[],
+    index: number,
+    title: string
+  ) => {
+    if (!photos || photos.length === 0) return;
+    setPreviewLightbox({
+      isOpen: true,
+      photos,
+      currentIndex: index,
+      title,
+    });
+  };
 
   const todayStr = new Date().toISOString().split('T')[0];
   const [approveForm, setApproveForm] = useState({
@@ -209,6 +242,451 @@ const Dashboard = () => {
              })()}
            </div>
         </div>
+      </div>
+    </div>
+  );
+
+  const ongoingOnsiteList: any[] = global?.ongoingOnsiteProgress || [];
+  const ongoingMfgList: any[] = global?.ongoingManufacturingProgress || [];
+
+  const STAGE_META: Record<string, { short: string; badge: string; bar: string }> = {
+    '一次加工': { short: '① 一次加工', badge: 'bg-indigo-100 text-indigo-800 border-indigo-200', bar: 'bg-indigo-500' },
+    '二次加工': { short: '② 二次加工', badge: 'bg-blue-100 text-blue-800 border-blue-200', bar: 'bg-blue-500' },
+    '送至鍍鋅廠': { short: '③ 送至鍍鋅廠', badge: 'bg-amber-100 text-amber-800 border-amber-200', bar: 'bg-amber-500' },
+    '鍍鋅完成出貨至案場': { short: '④ 出貨至案場', badge: 'bg-emerald-100 text-emerald-800 border-emerald-200', bar: 'bg-emerald-500' },
+  };
+
+  // Render Live Engineering & Manufacturing Progress + Latest Photos
+  const renderLiveProgressSections = () => (
+    <div className="space-y-10 mt-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {/* 1. 目前正在進行的工程進度以及最新的照片 */}
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-gradient-to-br from-blue-500 to-teal-600 rounded-lg text-white shadow-lg shadow-blue-200">
+              <HardHat size={24} />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-slate-800">目前正在進行的工程進度與最新照片</h2>
+              <p className="text-xs text-slate-500 mt-0.5">即時彙整現場報工之各案場工程進度、施工項目累計完成度與最新現場施工照片</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/onsite')}
+            className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-sm transition-colors cursor-pointer"
+          >
+            前往現場報工 ➔
+          </button>
+        </div>
+
+        {ongoingOnsiteList.length > 0 ? (
+          <div className="grid grid-cols-1 @lg:grid-cols-2 gap-6">
+            {ongoingOnsiteList.map((proj: any, idx: number) => {
+              const items: any[] = Array.isArray(proj.items) ? proj.items : [];
+              const photos: any[] = Array.isArray(proj.latest_photos) ? proj.latest_photos : [];
+
+              return (
+                <div
+                  key={`${proj.project_id}-${idx}`}
+                  className="bg-white/90 backdrop-blur-xl rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden flex flex-col justify-between hover:shadow-md transition-all"
+                >
+                  {/* 卡片頂部：案場名稱與總體進度 */}
+                  <div className="p-5 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-blue-50/30">
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div
+                        onClick={() => proj.project_id && proj.project_id !== 'UNASSIGNED' && navigate(`/projects/${proj.project_id}`)}
+                        className="cursor-pointer group"
+                      >
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {proj.project_code && (
+                            <span className="font-mono text-xs font-extrabold px-2 py-0.5 bg-blue-100 text-blue-800 rounded">
+                              {proj.project_code}
+                            </span>
+                          )}
+                          <h3 className="text-base font-extrabold text-slate-800 group-hover:text-blue-600 transition-colors">
+                            {proj.project_name}
+                          </h3>
+                        </div>
+                      </div>
+                      <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-teal-100 text-teal-800 border border-teal-200 shrink-0">
+                        {proj.project_status || '施工中'}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 mb-3">
+                      {proj.latest_report_date && (
+                        <span className="flex items-center gap-1">
+                          <Calendar size={12} className="text-blue-600" />
+                          最新回報：<strong className="text-slate-700">{proj.latest_report_date}</strong>
+                          {proj.weather ? ` (${proj.weather})` : ''}
+                        </span>
+                      )}
+                      {proj.work_category && (
+                        <span>
+                          工程類別：<strong className="text-slate-700">{proj.work_category}</strong>
+                        </span>
+                      )}
+                      {proj.construction_location && (
+                        <span className="flex items-center gap-1">
+                          <MapPin size={12} className="text-teal-600" />
+                          位置：{proj.construction_location}
+                        </span>
+                      )}
+                      {proj.recorder_name && (
+                        <span>紀錄人：{proj.recorder_name}</span>
+                      )}
+                    </div>
+
+                    {/* 總體進度條 */}
+                    <div>
+                      <div className="flex justify-between items-center text-xs font-bold mb-1">
+                        <span className="text-slate-600">案場整體工程進度</span>
+                        <span className="text-blue-700 font-mono text-sm">{proj.overall_pct || 0}%</span>
+                      </div>
+                      <div className="w-full bg-slate-200/80 rounded-full h-2.5 overflow-hidden">
+                        <div
+                          className="bg-gradient-to-r from-blue-500 to-teal-500 h-2.5 rounded-full transition-all duration-500"
+                          style={{ width: `${Math.min(100, proj.overall_pct || 0)}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 卡片中段：進行中施工工項進度明細 */}
+                  <div className="p-5 space-y-4 flex-1">
+                    <div>
+                      <div className="text-xs font-extrabold text-slate-700 mb-2 flex items-center justify-between">
+                        <span>📋 進行中工項進度明細</span>
+                        <span className="text-[11px] font-normal text-slate-400">共 {items.length} 項工項</span>
+                      </div>
+                      {items.length > 0 ? (
+                        <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                          {items.slice(0, 6).map((it: any, iIdx: number) => (
+                            <div key={iIdx} className="bg-slate-50 border border-slate-200/70 rounded-xl p-2.5 text-xs">
+                              <div className="flex items-center justify-between gap-2 mb-1">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <span className="px-1.5 py-0.5 bg-blue-100/80 text-blue-800 font-bold rounded text-[10px] shrink-0">
+                                    {it.category}
+                                  </span>
+                                  <span className="font-bold text-slate-800 truncate" title={it.name}>
+                                    {it.name}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0 font-mono">
+                                  <span className="text-slate-600">
+                                    已完 <strong className="text-slate-800">{it.accumulated}{it.unitSuffix}</strong> / {it.targetNum}{it.unitSuffix}
+                                  </span>
+                                  <span className="font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+                                    {it.pct}%
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                                <div
+                                  className="bg-emerald-500 h-1.5 rounded-full"
+                                  style={{ width: `${Math.min(100, it.pct || 0)}%` }}
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-xs text-slate-400 italic bg-slate-50 rounded-xl p-3 text-center">
+                          尚無填報工項進度明細
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 卡片底部：最新現場施工照片 */}
+                    <div>
+                      <div className="text-xs font-extrabold text-slate-700 mb-2 flex items-center justify-between">
+                        <span className="flex items-center gap-1.5">
+                          <Camera size={14} className="text-blue-600" />
+                          最新現場施工照片
+                        </span>
+                        {photos.length > 0 && (
+                          <span className="text-[11px] font-normal text-slate-400">點擊照片可放大檢視 ({photos.length} 張)</span>
+                        )}
+                      </div>
+                      {photos.length > 0 ? (
+                        <div className="grid grid-cols-4 gap-2">
+                          {photos.slice(0, 4).map((ph: any, pIdx: number) => (
+                            <div
+                              key={pIdx}
+                              onClick={() => openPhotoLightbox(photos, pIdx, `${proj.project_name} — 最新現場施工照片`)}
+                              className="group relative aspect-square rounded-xl overflow-hidden border border-slate-200 bg-slate-100 cursor-zoom-in shadow-2xs"
+                            >
+                              <img
+                                src={ph.url}
+                                alt={ph.label || '施工照片'}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                              />
+                              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 via-black/40 to-transparent px-1.5 py-1 text-[10px] text-white font-bold truncate">
+                                {ph.label}
+                              </div>
+                              {pIdx === 3 && photos.length > 4 && (
+                                <div className="absolute inset-0 bg-black/55 flex items-center justify-center text-white font-extrabold text-sm">
+                                  +{photos.length - 4}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center gap-2 py-4 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-xs text-slate-400">
+                          <Camera size={15} /> 尚無上傳現場施工照片
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="bg-white/80 rounded-2xl border border-slate-200 p-8 text-center text-slate-400">
+            目前尚無進行中的現場工程報工紀錄
+          </div>
+        )}
+      </div>
+
+      {/* 2. 目前正在進行的生產製造進度以及最新的照片 */}
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-gradient-to-br from-indigo-600 to-violet-600 rounded-lg text-white shadow-lg shadow-indigo-200">
+              <Factory size={24} />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-slate-800">目前正在進行的生產製造進度與最新照片</h2>
+              <p className="text-xs text-slate-500 mt-0.5">即時追蹤各派工單 4 階段工序（① 一次加工 ➔ ② 二次加工 ➔ ③ 送至鍍鋅廠 ➔ ④ 出貨至案場）進度與最新廠內製造照片</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/manufacturing')}
+            className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow-sm transition-colors cursor-pointer"
+          >
+            前往製造報工 ➔
+          </button>
+        </div>
+
+        {ongoingMfgList.length > 0 ? (
+          <div className="grid grid-cols-1 @lg:grid-cols-2 gap-6">
+            {ongoingMfgList.map((mfg: any, idx: number) => {
+              const items: any[] = Array.isArray(mfg.items) ? mfg.items : [];
+              const stageSummary: any[] = Array.isArray(mfg.stageSummary) ? mfg.stageSummary : [];
+              const photos: any[] = Array.isArray(mfg.latest_photos) ? mfg.latest_photos : [];
+
+              return (
+                <div
+                  key={`${mfg.group_key}-${idx}`}
+                  className="bg-white/90 backdrop-blur-xl rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden flex flex-col justify-between hover:shadow-md transition-all"
+                >
+                  {/* 卡片頂部：派工單號、所屬專案與 4 階段總覽 */}
+                  <div className="p-5 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-indigo-50/40">
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {mfg.dispatch_no && (
+                            <span className="font-mono text-xs font-extrabold px-2.5 py-0.5 bg-indigo-600 text-white rounded shadow-2xs">
+                              派工單：{mfg.dispatch_no}
+                            </span>
+                          )}
+                          {mfg.project_code && (
+                            <span className="font-mono text-xs font-bold px-2 py-0.5 bg-slate-200 text-slate-700 rounded">
+                              {mfg.project_code}
+                            </span>
+                          )}
+                          <h3 className="text-base font-extrabold text-slate-800">
+                            {mfg.project_name}
+                          </h3>
+                        </div>
+                      </div>
+                      <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200 shrink-0">
+                        {mfg.target_dept || '鋼構部'}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 mb-3">
+                      {mfg.latest_report_date && (
+                        <span className="flex items-center gap-1">
+                          <Calendar size={12} className="text-indigo-600" />
+                          最新生產回報：<strong className="text-slate-700">{mfg.latest_report_date}</strong>
+                        </span>
+                      )}
+                      {mfg.construction_location && (
+                        <span className="flex items-center gap-1">
+                          <MapPin size={12} className="text-indigo-600" />
+                          廠區/位置：{mfg.construction_location}
+                        </span>
+                      )}
+                      {mfg.recorder_name && (
+                        <span>紀錄人：{mfg.recorder_name}</span>
+                      )}
+                    </div>
+
+                    {/* 4 階段工序進度橫列 (Stage Summary Cards) */}
+                    {stageSummary.length > 0 && (
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                        {stageSummary.map((st: any) => {
+                          const meta = STAGE_META[st.stage] || {
+                            short: st.stage,
+                            badge: 'bg-slate-100 text-slate-700 border-slate-200',
+                            bar: 'bg-indigo-500',
+                          };
+                          return (
+                            <div
+                              key={st.stage}
+                              className="bg-white border border-slate-200/90 rounded-xl p-2 shadow-2xs flex flex-col justify-between"
+                            >
+                              <div className="text-[11px] font-extrabold text-slate-700 whitespace-nowrap truncate">
+                                {meta.short}
+                              </div>
+                              <div className="flex items-baseline justify-between mt-1">
+                                <span className="text-xs font-extrabold font-mono text-indigo-700">
+                                  {st.pct}%
+                                </span>
+                                <span className="text-[10px] font-mono text-slate-400">
+                                  {st.completedCount}/{st.totalCount}件
+                                </span>
+                              </div>
+                              <div className="w-full bg-slate-100 rounded-full h-1.5 mt-1 overflow-hidden">
+                                <div
+                                  className={`${meta.bar} h-1.5 rounded-full transition-all`}
+                                  style={{ width: `${Math.min(100, st.pct || 0)}%` }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 卡片中段：各構件 4 道工序進度明細 */}
+                  <div className="p-5 space-y-4 flex-1">
+                    <div>
+                      <div className="text-xs font-extrabold text-slate-700 mb-2 flex items-center justify-between">
+                        <span>🔩 生產構件工序進度明細</span>
+                        <span className="text-[11px] font-normal text-slate-400">共 {items.length} 項構件</span>
+                      </div>
+                      {items.length > 0 ? (
+                        <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                          {items.slice(0, 6).map((it: any, iIdx: number) => (
+                            <div key={iIdx} className="bg-slate-50 border border-slate-200/70 rounded-xl p-2.5 text-xs space-y-1.5">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <span className="px-1.5 py-0.5 bg-indigo-100 text-indigo-800 font-bold rounded text-[10px] shrink-0">
+                                    {it.category}
+                                  </span>
+                                  <span className="font-bold text-slate-800 truncate" title={it.name}>
+                                    {it.name}
+                                  </span>
+                                </div>
+                                <span
+                                  className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold shrink-0 ${
+                                    it.isReadyToHoist
+                                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                      : 'bg-amber-50 text-amber-800 border border-amber-200'
+                                  }`}
+                                >
+                                  {it.isReadyToHoist ? '✅ 現場可吊裝' : `最新：${STAGE_META[it.latestStage]?.short || it.latestStage}`}
+                                </span>
+                              </div>
+
+                              <div className="grid grid-cols-4 gap-1.5 pt-0.5">
+                                {(it.stageDetails || []).map((sd: any) => {
+                                  const isDone = sd.done >= sd.target && sd.target > 0;
+                                  return (
+                                    <div
+                                      key={sd.stage}
+                                      className={`px-1.5 py-1 rounded border text-[10px] font-mono flex flex-col ${
+                                        isDone
+                                          ? 'bg-emerald-50/80 border-emerald-300 text-emerald-800 font-bold'
+                                          : sd.done > 0
+                                          ? 'bg-indigo-50/70 border-indigo-200 text-indigo-800 font-bold'
+                                          : 'bg-white border-slate-200 text-slate-400'
+                                      }`}
+                                    >
+                                      <span className="truncate text-[9px]">
+                                        {STAGE_META[sd.stage]?.short || sd.stage}
+                                      </span>
+                                      <span className="whitespace-nowrap">
+                                        {sd.done}/{sd.target}{it.unitSuffix} ({sd.pct}%)
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-xs text-slate-400 italic bg-slate-50 rounded-xl p-3 text-center">
+                          尚無構件生產進度明細
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 卡片底部：最新生產製造照片 */}
+                    <div>
+                      <div className="text-xs font-extrabold text-slate-700 mb-2 flex items-center justify-between">
+                        <span className="flex items-center gap-1.5">
+                          <Camera size={14} className="text-indigo-600" />
+                          最新生產製造照片
+                        </span>
+                        {photos.length > 0 && (
+                          <span className="text-[11px] font-normal text-slate-400">點擊照片可放大檢視 ({photos.length} 張)</span>
+                        )}
+                      </div>
+                      {photos.length > 0 ? (
+                        <div className="grid grid-cols-4 gap-2">
+                          {photos.slice(0, 4).map((ph: any, pIdx: number) => (
+                            <div
+                              key={pIdx}
+                              onClick={() =>
+                                openPhotoLightbox(
+                                  photos,
+                                  pIdx,
+                                  `${mfg.dispatch_no ? `${mfg.dispatch_no} ` : ''}${mfg.project_name} — 最新生產製造照片`
+                                )
+                              }
+                              className="group relative aspect-square rounded-xl overflow-hidden border border-slate-200 bg-slate-100 cursor-zoom-in shadow-2xs"
+                            >
+                              <img
+                                src={ph.url}
+                                alt={ph.label || '生產製造照片'}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                              />
+                              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 via-black/40 to-transparent px-1.5 py-1 text-[10px] text-white font-bold truncate">
+                                {ph.label}
+                              </div>
+                              {pIdx === 3 && photos.length > 4 && (
+                                <div className="absolute inset-0 bg-black/55 flex items-center justify-center text-white font-extrabold text-sm">
+                                  +{photos.length - 4}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center gap-2 py-4 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-xs text-slate-400">
+                          <Camera size={15} /> 尚無上傳生產製造照片
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="bg-white/80 rounded-2xl border border-slate-200 p-8 text-center text-slate-400">
+            目前尚無進行中的生產製造報工紀錄
+          </div>
+        )}
       </div>
     </div>
   );
@@ -534,8 +1012,110 @@ const Dashboard = () => {
       </div>
 
       {isManager && renderGlobalView()}
+      {renderLiveProgressSections()}
       {isManager && renderManagerView()}
       {renderEmployeeView()}
+
+      {/* Lightbox Modal: 檢視工程 / 生產製造最新照片 */}
+      {previewLightbox.isOpen && previewLightbox.photos.length > 0 && (
+        <div
+          className="fixed inset-0 bg-black/90 backdrop-blur-sm z-[200] flex flex-col select-none"
+          onClick={() => setPreviewLightbox(prev => ({ ...prev, isOpen: false }))}
+        >
+          <div
+            className="flex items-center justify-between px-6 py-4 bg-slate-900/80 border-b border-white/10 text-white"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3">
+              <Camera size={18} className="text-indigo-400" />
+              <span className="font-bold text-sm md:text-base">{previewLightbox.title}</span>
+              <span className="text-xs bg-white/15 px-2.5 py-0.5 rounded-full font-mono">
+                {previewLightbox.currentIndex + 1} / {previewLightbox.photos.length}
+              </span>
+              {previewLightbox.photos[previewLightbox.currentIndex]?.label && (
+                <span className="text-xs text-indigo-300 font-bold">
+                  【{previewLightbox.photos[previewLightbox.currentIndex].label}】
+                </span>
+              )}
+              {previewLightbox.photos[previewLightbox.currentIndex]?.date && (
+                <span className="text-xs text-slate-400">
+                  ({previewLightbox.photos[previewLightbox.currentIndex].date})
+                </span>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => setPreviewLightbox(prev => ({ ...prev, isOpen: false }))}
+              className="p-2 rounded-lg bg-red-500/80 hover:bg-red-500 text-white cursor-pointer"
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          <div
+            className="relative flex-1 flex items-center justify-center p-4 overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            {previewLightbox.photos.length > 1 && (
+              <button
+                type="button"
+                onClick={() =>
+                  setPreviewLightbox(prev => ({
+                    ...prev,
+                    currentIndex: (prev.currentIndex - 1 + prev.photos.length) % prev.photos.length,
+                  }))
+                }
+                className="absolute left-4 z-20 p-3 rounded-full bg-black/60 hover:bg-black/80 text-white border border-white/20 cursor-pointer"
+              >
+                <ChevronLeft size={24} />
+              </button>
+            )}
+
+            <img
+              src={previewLightbox.photos[previewLightbox.currentIndex]?.url}
+              alt="現場最新照片預覽"
+              className="max-w-[90vw] max-h-[78vh] object-contain rounded-lg shadow-2xl"
+            />
+
+            {previewLightbox.photos.length > 1 && (
+              <button
+                type="button"
+                onClick={() =>
+                  setPreviewLightbox(prev => ({
+                    ...prev,
+                    currentIndex: (prev.currentIndex + 1) % prev.photos.length,
+                  }))
+                }
+                className="absolute right-4 z-20 p-3 rounded-full bg-black/60 hover:bg-black/80 text-white border border-white/20 cursor-pointer"
+              >
+                <ChevronRight size={24} />
+              </button>
+            )}
+          </div>
+
+          {previewLightbox.photos.length > 1 && (
+            <div
+              className="flex items-center justify-center gap-2 px-4 py-3 bg-slate-900/80 border-t border-white/10 overflow-x-auto"
+              onClick={e => e.stopPropagation()}
+            >
+              {previewLightbox.photos.map((ph, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => setPreviewLightbox(prev => ({ ...prev, currentIndex: idx }))}
+                  className={`w-14 h-14 rounded-lg overflow-hidden border-2 transition-all shrink-0 cursor-pointer ${
+                    idx === previewLightbox.currentIndex
+                      ? 'border-indigo-400 scale-105'
+                      : 'border-transparent opacity-60 hover:opacity-100'
+                  }`}
+                >
+                  <img src={ph.url} alt={ph.label} className="w-full h-full object-cover" />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Modal: 檢視 / 列印「元融公司 內部派工委託單」 */}
       {viewingOrder && (() => {
