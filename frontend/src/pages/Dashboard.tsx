@@ -219,6 +219,54 @@ const Dashboard = () => {
   const ongoingOnsiteList: any[] = global?.ongoingOnsiteProgress || [];
   const ongoingMfgList: any[] = global?.ongoingManufacturingProgress || [];
 
+  // 依完成進度百分比自動回傳對應的分級顏色主題 (0% 未開始 / 1~29% 起步紅橘 / 30~69% 推進琥珀黃 / 70~99% 衝刺靛藍 / 100% 完成翠綠)
+  const getProgressColorTheme = (pct: number) => {
+    const val = Number(pct) || 0;
+    if (val >= 100) {
+      return {
+        label: '已完成',
+        barBg: 'linear-gradient(90deg, #10b981 0%, #059669 100%)',
+        badgeClass: 'text-emerald-800 bg-emerald-100 border-emerald-300',
+        textClass: 'text-emerald-700',
+        dotClass: 'bg-emerald-500',
+      };
+    }
+    if (val >= 70) {
+      return {
+        label: '收尾衝刺',
+        barBg: 'linear-gradient(90deg, #3b82f6 0%, #4f46e5 100%)',
+        badgeClass: 'text-indigo-800 bg-indigo-100 border-indigo-300',
+        textClass: 'text-indigo-700',
+        dotClass: 'bg-indigo-500',
+      };
+    }
+    if (val >= 30) {
+      return {
+        label: '穩定推進',
+        barBg: 'linear-gradient(90deg, #f59e0b 0%, #ea580c 100%)',
+        badgeClass: 'text-amber-800 bg-amber-100 border-amber-300',
+        textClass: 'text-amber-700',
+        dotClass: 'bg-amber-500',
+      };
+    }
+    if (val > 0) {
+      return {
+        label: '初期起步',
+        barBg: 'linear-gradient(90deg, #f43f5e 0%, #e11d48 100%)',
+        badgeClass: 'text-rose-800 bg-rose-100 border-rose-300',
+        textClass: 'text-rose-700',
+        dotClass: 'bg-rose-500',
+      };
+    }
+    return {
+      label: '待啟動',
+      barBg: 'linear-gradient(90deg, #94a3b8 0%, #64748b 100%)',
+      badgeClass: 'text-slate-600 bg-slate-100 border-slate-300',
+      textClass: 'text-slate-500',
+      dotClass: 'bg-slate-400',
+    };
+  };
+
   const STAGE_META: Record<string, { short: string; badge: string; bar: string; ring: string }> = {
     '一次加工': { short: '① 一次加工', badge: 'bg-indigo-100 text-indigo-800 border-indigo-200', bar: 'from-indigo-500 to-blue-500', ring: 'border-indigo-400 shadow-indigo-100' },
     '二次加工': { short: '② 二次加工', badge: 'bg-blue-100 text-blue-800 border-blue-200', bar: 'from-blue-500 to-cyan-500', ring: 'border-blue-400 shadow-blue-100' },
@@ -229,6 +277,28 @@ const Dashboard = () => {
   // Render Live Engineering & Manufacturing Progress + Latest Photos
   const renderLiveProgressSections = () => (
     <div className="space-y-12 mt-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {/* 進度顏色分級圖例 */}
+      <div className="bg-white/85 backdrop-blur-md border border-slate-200/80 rounded-xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs shadow-2xs">
+        <span className="font-extrabold text-slate-700">🎨 進度顏色階段說明：</span>
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="inline-flex items-center gap-1.5 font-bold text-slate-600">
+            <span className="w-3 h-3 rounded-full bg-slate-400 inline-block" /> 0% 待啟動
+          </span>
+          <span className="inline-flex items-center gap-1.5 font-bold text-rose-700">
+            <span className="w-3 h-3 rounded-full bg-rose-500 inline-block" /> 1%~29% 初期起步
+          </span>
+          <span className="inline-flex items-center gap-1.5 font-bold text-amber-700">
+            <span className="w-3 h-3 rounded-full bg-amber-500 inline-block" /> 30%~69% 穩定推進
+          </span>
+          <span className="inline-flex items-center gap-1.5 font-bold text-indigo-700">
+            <span className="w-3 h-3 rounded-full bg-indigo-600 inline-block" /> 70%~99% 收尾衝刺
+          </span>
+          <span className="inline-flex items-center gap-1.5 font-bold text-emerald-700">
+            <span className="w-3 h-3 rounded-full bg-emerald-500 inline-block" /> 100% 已完成
+          </span>
+        </div>
+      </div>
+
       {/* 1. 目前正在進行的工程進度以及最新的照片 */}
       <div className="space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4">
@@ -263,6 +333,7 @@ const Dashboard = () => {
               const photos: any[] = Array.isArray(proj.latest_photos) ? proj.latest_photos : [];
               const activePhotoIdx = photos.length > 0 ? (photoTick + idx) % Math.min(4, photos.length) : -1;
               const targetOverallPct = Math.min(100, proj.overall_pct || 0);
+              const overallTheme = getProgressColorTheme(targetOverallPct);
 
               return (
                 <div
@@ -327,15 +398,21 @@ const Dashboard = () => {
                       <div className="flex justify-between items-center text-xs font-bold mb-1.5">
                         <span className="text-slate-600 flex items-center gap-1.5">
                           案場整體工程進度
+                          <span className={`text-[10px] px-1.5 py-0.2 rounded border font-extrabold ${overallTheme.badgeClass}`}>
+                            {overallTheme.label}
+                          </span>
                         </span>
-                        <span className="text-blue-700 font-mono text-sm font-black bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200/60">
+                        <span className={`font-mono text-sm font-black px-2 py-0.5 rounded-md border ${overallTheme.badgeClass}`}>
                           {proj.overall_pct || 0}%
                         </span>
                       </div>
                       <div className="w-full bg-slate-200/80 rounded-full h-3 overflow-hidden shadow-inner p-0.5">
                         <div
-                          className="relative bg-gradient-to-r from-blue-500 via-teal-500 to-emerald-500 h-full rounded-full transition-all duration-1000 ease-out overflow-hidden animate-progress-stripes"
-                          style={{ width: `${animReady ? targetOverallPct : 0}%` }}
+                          className="relative h-full rounded-full transition-all duration-1000 ease-out overflow-hidden animate-progress-stripes"
+                          style={{
+                            width: `${animReady ? targetOverallPct : 0}%`,
+                            background: overallTheme.barBg,
+                          }}
                         >
                           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent animate-progress-shimmer" />
                         </div>
@@ -359,6 +436,7 @@ const Dashboard = () => {
                           {items.slice(0, 6).map((it: any, iIdx: number) => {
                             const itemPct = Math.min(100, it.pct || 0);
                             const isItemDone = itemPct >= 100;
+                            const itemTheme = getProgressColorTheme(itemPct);
                             return (
                               <div
                                 key={iIdx}
@@ -378,25 +456,20 @@ const Dashboard = () => {
                                       已完 <strong className="text-slate-800">{it.accumulated}{it.unitSuffix}</strong> / {it.targetNum}{it.unitSuffix}
                                     </span>
                                     <span
-                                      className={`font-extrabold px-1.5 py-0.5 rounded border ${
-                                        isItemDone
-                                          ? 'text-emerald-700 bg-emerald-100/80 border-emerald-300'
-                                          : 'text-blue-700 bg-blue-50 border-blue-200'
-                                      }`}
+                                      className={`font-extrabold px-1.5 py-0.5 rounded border ${itemTheme.badgeClass}`}
                                     >
                                       {it.pct}%
                                     </span>
                                   </div>
                                 </div>
-                                <div className="w-full bg-slate-200/90 rounded-full h-2 overflow-hidden">
+                                <div className="w-full bg-slate-200/90 rounded-full h-2.5 overflow-hidden">
                                   <div
                                     className={`relative h-full rounded-full transition-all duration-1000 ease-out overflow-hidden ${
-                                      isItemDone
-                                        ? 'bg-gradient-to-r from-emerald-500 to-teal-500'
-                                        : 'bg-gradient-to-r from-blue-500 to-teal-500 animate-progress-stripes'
+                                      isItemDone ? '' : 'animate-progress-stripes'
                                     }`}
                                     style={{
                                       width: `${animReady ? itemPct : 0}%`,
+                                      background: itemTheme.barBg,
                                       transitionDelay: `${iIdx * 120}ms`,
                                     }}
                                   >
@@ -575,7 +648,7 @@ const Dashboard = () => {
                       )}
                     </div>
 
-                    {/* 4 階段工序進度橫列 (含流水動畫進度條) */}
+                    {/* 4 階段工序進度橫列 (含流水動畫進度條與進度分級顏色) */}
                     {stageSummary.length > 0 && (
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 relative">
                         {stageSummary.map((st: any, stIdx: number) => {
@@ -588,6 +661,7 @@ const Dashboard = () => {
                           const stPct = Math.min(100, st.pct || 0);
                           const isActiveStage = stPct > 0 && stPct < 100;
                           const isStageDone = stPct >= 100 && st.totalCount > 0;
+                          const stTheme = getProgressColorTheme(stPct);
 
                           return (
                             <div
@@ -612,20 +686,21 @@ const Dashboard = () => {
                                 )}
                               </div>
                               <div className="flex items-baseline justify-between mt-1">
-                                <span className="text-xs font-extrabold font-mono text-indigo-700">
+                                <span className={`text-xs font-extrabold font-mono ${stTheme.textClass}`}>
                                   {st.pct}%
                                 </span>
                                 <span className="text-[10px] font-mono text-slate-400">
                                   {st.completedCount}/{st.totalCount}件
                                 </span>
                               </div>
-                              <div className="w-full bg-slate-100 rounded-full h-2 mt-1.5 overflow-hidden">
+                              <div className="w-full bg-slate-200/80 rounded-full h-2 mt-1.5 overflow-hidden">
                                 <div
-                                  className={`relative bg-gradient-to-r ${meta.bar} h-full rounded-full transition-all duration-1000 ease-out overflow-hidden ${
+                                  className={`relative h-full rounded-full transition-all duration-1000 ease-out overflow-hidden ${
                                     isActiveStage ? 'animate-progress-stripes' : ''
                                   }`}
                                   style={{
                                     width: `${animReady ? stPct : 0}%`,
+                                    background: stTheme.barBg,
                                     transitionDelay: `${stIdx * 120}ms`,
                                   }}
                                 >
@@ -682,6 +757,7 @@ const Dashboard = () => {
                                 {(it.stageDetails || []).map((sd: any) => {
                                   const isDone = sd.done >= sd.target && sd.target > 0;
                                   const isWorking = sd.done > 0 && !isDone;
+                                  const sdTheme = getProgressColorTheme(sd.pct || 0);
                                   return (
                                     <div
                                       key={sd.stage}
@@ -689,7 +765,7 @@ const Dashboard = () => {
                                         isDone
                                           ? 'bg-emerald-50/90 border-emerald-300 text-emerald-800 font-bold'
                                           : isWorking
-                                          ? 'bg-indigo-50/90 border-indigo-300 text-indigo-800 font-bold shadow-2xs'
+                                          ? `${sdTheme.badgeClass} font-bold shadow-2xs`
                                           : 'bg-white border-slate-200 text-slate-400'
                                       }`}
                                     >
@@ -699,12 +775,13 @@ const Dashboard = () => {
                                       <span className="whitespace-nowrap mt-0.5">
                                         {sd.done}/{sd.target}{it.unitSuffix} ({sd.pct}%)
                                       </span>
-                                      <div className="w-full bg-slate-200/70 rounded-full h-1 mt-1 overflow-hidden">
+                                      <div className="w-full bg-slate-200/80 rounded-full h-1.5 mt-1 overflow-hidden">
                                         <div
-                                          className={`h-full rounded-full transition-all duration-1000 ${
-                                            isDone ? 'bg-emerald-500' : isWorking ? 'bg-indigo-500 animate-pulse' : 'bg-slate-300'
-                                          }`}
-                                          style={{ width: `${animReady ? Math.min(100, sd.pct || 0) : 0}%` }}
+                                          className="h-full rounded-full transition-all duration-1000"
+                                          style={{
+                                            width: `${animReady ? Math.min(100, sd.pct || 0) : 0}%`,
+                                            background: sdTheme.barBg,
+                                          }}
                                         />
                                       </div>
                                     </div>
