@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Edit2, Trash2, FileText, Printer, X, Factory, Hash, Layers, UploadCloud, Download, CheckCircle2, Stamp } from 'lucide-react';
+import { Plus, Edit2, Trash2, FileText, Printer, X, Factory, Hash, Layers, UploadCloud, Download, CheckCircle2, Stamp, Maximize2, Minimize2, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 
 export interface DispatchOrderItem {
@@ -66,8 +66,32 @@ const DispatchOrdersTab: React.FC<DispatchOrdersTabProps> = ({ project }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<any | null>(null);
   const [viewingOrder, setViewingOrder] = useState<any | null>(null);
+  const [fullscreenOrderId, setFullscreenOrderId] = useState<string | null>(null);
+  const [zoomScale, setZoomScale] = useState<number>(1);
   const [submitError, setSubmitError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const toggleOrderFullscreen = (orderId: string) => {
+    if (fullscreenOrderId === orderId) {
+      setFullscreenOrderId(null);
+      setZoomScale(1);
+    } else {
+      setFullscreenOrderId(orderId);
+      const isMobile = window.innerWidth < 768;
+      setZoomScale(isMobile ? 0.9 : 1.05);
+    }
+  };
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && fullscreenOrderId) {
+        setFullscreenOrderId(null);
+        setZoomScale(1);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [fullscreenOrderId]);
 
   const [customCategories, setCustomCategories] = useState<string[]>([]);
   const [newCategoryInput, setNewCategoryInput] = useState('');
@@ -503,13 +527,18 @@ const DispatchOrdersTab: React.FC<DispatchOrdersTabProps> = ({ project }) => {
             const itemProgressList = orderItems.map(it => getItemProductionProgress(order, it));
             const totalCompletedQty = Math.round(itemProgressList.reduce((acc, p) => acc + p.completedQty, 0) * 100) / 100;
             const overallPct = totals.totalQty > 0 ? Math.min(100, Math.round((totalCompletedQty / totals.totalQty) * 1000) / 10) : 0;
+            const isFs = fullscreenOrderId === order.id;
 
             return (
               <div
                 key={order.id}
-                className="border border-slate-200 rounded-xl p-5 hover:border-blue-300 transition-all bg-slate-50/40 space-y-4"
+                className={
+                  isFs
+                    ? 'fixed inset-0 z-[200] bg-white p-3 sm:p-5 md:p-6 flex flex-col space-y-3 overflow-hidden w-screen h-screen'
+                    : 'border border-slate-200 rounded-xl p-4 sm:p-5 hover:border-blue-300 transition-all bg-slate-50/40 space-y-4'
+                }
               >
-                <div className="flex flex-wrap justify-between items-start gap-3">
+                <div className="flex flex-wrap justify-between items-start gap-3 shrink-0">
                   <div className="space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="px-2.5 py-1 bg-blue-600 text-white text-xs font-bold rounded-md flex items-center gap-1">
@@ -568,6 +597,58 @@ const DispatchOrdersTab: React.FC<DispatchOrdersTabProps> = ({ project }) => {
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
+                    {isFs && (
+                      <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg text-xs font-bold text-slate-700">
+                        <button
+                          type="button"
+                          onClick={() => setZoomScale(prev => Math.max(0.7, Math.round((prev - 0.1) * 100) / 100))}
+                          title="縮小表格比例 (-10%)"
+                          className="p-1 hover:bg-white rounded text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
+                        >
+                          <ZoomOut size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setZoomScale(1)}
+                          title="重設為預設大小 (100%)"
+                          className="px-1.5 py-0.5 font-mono text-[11px] hover:bg-white rounded transition-colors cursor-pointer min-w-[44px] text-center"
+                        >
+                          {Math.round(zoomScale * 100)}%
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setZoomScale(prev => Math.min(1.4, Math.round((prev + 0.1) * 100) / 100))}
+                          title="放大表格比例 (+10%)"
+                          className="p-1 hover:bg-white rounded text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
+                        >
+                          <ZoomIn size={14} />
+                        </button>
+                        {zoomScale !== 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setZoomScale(1)}
+                            title="還原 100%"
+                            className="p-1 hover:bg-white rounded text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+                          >
+                            <RotateCcw size={13} />
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => toggleOrderFullscreen(order.id)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-extrabold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer whitespace-nowrap ${
+                        isFs
+                          ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                          : 'bg-[#1F4E78] hover:bg-[#163a5c] text-white'
+                      }`}
+                    >
+                      {isFs ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+                      <span>{isFs ? '退出全螢幕 (Esc)' : '全螢幕檢視'}</span>
+                    </button>
+
                     <button
                       onClick={() => setViewingOrder(order)}
                       className="px-3 py-1.5 bg-white border border-slate-300 hover:border-blue-400 hover:text-blue-600 text-slate-700 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
@@ -592,24 +673,33 @@ const DispatchOrdersTab: React.FC<DispatchOrdersTabProps> = ({ project }) => {
 
                 {/* Items Table (含鋼構構件四階工序追蹤) */}
                 {orderItems.length > 0 && (
-                  <div className="overflow-x-auto bg-white rounded-lg border border-slate-200 max-h-96 overflow-y-auto">
-                    <table className="w-max min-w-full text-xs text-left border-collapse">
+                  <div
+                    className={`overflow-auto bg-white rounded-lg border border-slate-200 w-full max-w-full [-webkit-overflow-scrolling:touch] ${
+                      isFs ? 'flex-1 min-h-0' : 'max-h-96'
+                    }`}
+                  >
+                    <table
+                      style={isFs ? { zoom: zoomScale } : undefined}
+                      className={`w-max min-w-full text-left border-collapse ${
+                        isFs ? 'text-xs sm:text-sm' : 'text-xs'
+                      }`}
+                    >
                       <thead className="sticky top-0 z-10">
                         <tr className="bg-slate-100 text-slate-700 border-b border-slate-200 whitespace-nowrap">
-                          <th className="py-2.5 px-3 min-w-[96px]">項目</th>
-                          <th className="py-2.5 px-3 min-w-[96px]">構件編號</th>
-                          <th className="py-2.5 px-3 min-w-[76px] text-right">目標總數</th>
-                          <th className="py-2.5 px-3 min-w-[104px] text-center bg-indigo-50/70 text-indigo-900">① 一次加工</th>
-                          <th className="py-2.5 px-3 min-w-[104px] text-center bg-indigo-50/70 text-indigo-900">② 二次加工</th>
-                          <th className="py-2.5 px-3 min-w-[108px] text-center bg-amber-50/70 text-amber-900">③ 送至鍍鋅廠</th>
-                          <th className="py-2.5 px-3 min-w-[112px] text-center bg-emerald-50/70 text-emerald-900">④ 出貨至案場</th>
-                          <th className="py-2.5 px-3 min-w-[140px] text-center">現場可吊裝狀態</th>
-                          <th className="py-2.5 px-3 min-w-[140px]">規格尺寸</th>
-                          <th className="py-2.5 px-3 min-w-[76px] text-right">長度</th>
-                          <th className="py-2.5 px-3 min-w-[80px]">材質</th>
-                          <th className="py-2.5 px-3 min-w-[88px] text-right">單重(Kg)</th>
-                          <th className="py-2.5 px-3 min-w-[96px] text-right">總量(Kgs)</th>
-                          <th className="py-2.5 px-3 min-w-[140px]">備註</th>
+                          <th className="sticky top-0 bg-slate-100 py-2.5 px-3 min-w-[96px]">項目</th>
+                          <th className="sticky top-0 bg-slate-100 py-2.5 px-3 min-w-[96px]">構件編號</th>
+                          <th className="sticky top-0 bg-slate-100 py-2.5 px-3 min-w-[76px] text-right">目標總數</th>
+                          <th className="sticky top-0 py-2.5 px-3 min-w-[104px] text-center bg-indigo-50 text-indigo-900">① 一次加工</th>
+                          <th className="sticky top-0 py-2.5 px-3 min-w-[104px] text-center bg-indigo-50 text-indigo-900">② 二次加工</th>
+                          <th className="sticky top-0 py-2.5 px-3 min-w-[108px] text-center bg-amber-50 text-amber-900">③ 送至鍍鋅廠</th>
+                          <th className="sticky top-0 py-2.5 px-3 min-w-[112px] text-center bg-emerald-50 text-emerald-900">④ 出貨至案場</th>
+                          <th className="sticky top-0 bg-slate-100 py-2.5 px-3 min-w-[140px] text-center">現場可吊裝狀態</th>
+                          <th className="sticky top-0 bg-slate-100 py-2.5 px-3 min-w-[140px]">規格尺寸</th>
+                          <th className="sticky top-0 bg-slate-100 py-2.5 px-3 min-w-[76px] text-right">長度</th>
+                          <th className="sticky top-0 bg-slate-100 py-2.5 px-3 min-w-[80px]">材質</th>
+                          <th className="sticky top-0 bg-slate-100 py-2.5 px-3 min-w-[88px] text-right">單重(Kg)</th>
+                          <th className="sticky top-0 bg-slate-100 py-2.5 px-3 min-w-[96px] text-right">總量(Kgs)</th>
+                          <th className="sticky top-0 bg-slate-100 py-2.5 px-3 min-w-[140px]">備註</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
