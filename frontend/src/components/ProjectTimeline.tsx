@@ -662,25 +662,25 @@ const ProjectTimelineInner: React.FC<ProjectTimelineProps> = ({
         </div>
         <div className="overflow-auto max-h-[620px] w-full max-w-full [-webkit-overflow-scrolling:touch]">
           <table className="w-max min-w-full border-separate border-spacing-0 text-xs">
-            <thead className="sticky top-0 z-30">
+            <thead>
               <tr className="bg-[#2F5597] text-white">
-                <th className="md:sticky md:left-0 z-40 bg-[#2F5597] border-b border-r border-[#8EA9DB] px-2 py-2.5 w-[52px] min-w-[52px] max-w-[52px] box-border text-center font-bold whitespace-nowrap">
+                <th className="sticky top-0 md:left-0 z-40 bg-[#2F5597] border-b border-r border-[#8EA9DB] px-2 py-2.5 w-[52px] min-w-[52px] max-w-[52px] box-border text-center font-bold whitespace-nowrap">
                   項次
                 </th>
-                <th className="md:sticky md:left-[52px] z-40 bg-[#2F5597] border-b border-r border-[#8EA9DB] px-2.5 py-2.5 w-[92px] min-w-[92px] max-w-[92px] box-border text-center font-bold whitespace-nowrap">
+                <th className="sticky top-0 md:left-[52px] z-40 bg-[#2F5597] border-b border-r border-[#8EA9DB] px-2.5 py-2.5 w-[92px] min-w-[92px] max-w-[92px] box-border text-center font-bold whitespace-nowrap">
                   工程階段
                 </th>
-                <th className="md:sticky md:left-[144px] z-40 bg-[#2F5597] border-b border-r-2 border-[#8EA9DB] px-3 py-2.5 w-[180px] sm:w-[220px] min-w-[180px] sm:min-w-[220px] max-w-[180px] sm:max-w-[220px] box-border text-left font-bold md:shadow-[2px_0_5px_-1px_rgba(0,0,0,0.2)]">
+                <th className="sticky top-0 md:left-[144px] z-40 bg-[#2F5597] border-b border-r border-[#8EA9DB] px-3 py-2.5 w-[220px] min-w-[220px] max-w-[220px] box-border text-left font-bold whitespace-nowrap">
                   工作模組 / 施工工項
                 </th>
-                <th className="bg-[#2F5597] border-b border-r border-[#8EA9DB] px-3 py-2.5 min-w-[210px] text-left font-bold whitespace-nowrap">
+                <th className="sticky top-0 md:left-[364px] z-40 bg-[#2F5597] border-b border-r-2 border-[#8EA9DB] px-3 py-2.5 w-[210px] min-w-[210px] max-w-[210px] box-border text-left font-bold whitespace-nowrap md:shadow-[2px_0_5px_-1px_rgba(0,0,0,0.2)]">
                   預計起訖與檢核目標
                 </th>
 
                 {buckets.map(b => (
                   <th
                     key={b.id}
-                    className={`border-b border-r border-[#8EA9DB] ${
+                    className={`sticky top-0 z-30 border-b border-r border-[#8EA9DB] ${
                       granularity === 'DAY' ? 'px-1.5 py-1.5 min-w-[64px]' : 'px-2 py-2 min-w-[96px]'
                     } text-center font-bold whitespace-nowrap leading-tight ${
                       b.isCurrent
@@ -706,10 +706,10 @@ const ProjectTimelineInner: React.FC<ProjectTimelineProps> = ({
                   </th>
                 ))}
 
-                <th className="bg-[#2F5597] border-b border-r border-[#8EA9DB] px-2.5 py-2.5 w-16 min-w-[64px] text-center font-bold whitespace-nowrap">
+                <th className="sticky top-0 z-30 bg-[#2F5597] border-b border-r border-[#8EA9DB] px-2.5 py-2.5 w-16 min-w-[64px] text-center font-bold whitespace-nowrap">
                   進度%
                 </th>
-                <th className="bg-[#2F5597] border-b border-[#8EA9DB] px-3 py-2.5 min-w-[180px] text-left font-bold whitespace-nowrap">
+                <th className="sticky top-0 z-30 bg-[#2F5597] border-b border-[#8EA9DB] px-3 py-2.5 min-w-[180px] text-left font-bold whitespace-nowrap">
                   備註 / 狀態
                 </th>
               </tr>
@@ -743,7 +743,7 @@ const ProjectTimelineInner: React.FC<ProjectTimelineProps> = ({
                     {/* 工作模組 / 施工工項 */}
                     <td
                       title={row.name}
-                      className={`md:sticky md:left-[144px] z-20 bg-white group-hover:bg-slate-50 border-b border-r-2 border-slate-300 px-3 py-2.5 w-[180px] sm:w-[220px] min-w-[180px] sm:min-w-[220px] max-w-[180px] sm:max-w-[220px] box-border font-bold truncate md:shadow-[2px_0_5px_-1px_rgba(0,0,0,0.08)] ${
+                      className={`md:sticky md:left-[144px] z-20 bg-white group-hover:bg-slate-50 border-b border-r border-slate-300 px-3 py-2.5 w-[220px] min-w-[220px] max-w-[220px] box-border font-bold truncate ${
                         isDelayed ? 'text-[#C00000]' : 'text-slate-800'
                       }`}
                     >
@@ -753,14 +753,14 @@ const ProjectTimelineInner: React.FC<ProjectTimelineProps> = ({
 
                     {/* 預計起訖與檢核目標 */}
                     <td
-                      className={`border-b border-r border-slate-300 px-3 py-2.5 min-w-[210px] leading-snug bg-white group-hover:bg-slate-50 ${
+                      className={`md:sticky md:left-[364px] z-20 border-b border-r-2 border-slate-300 px-3 py-2.5 w-[210px] min-w-[210px] max-w-[210px] box-border leading-snug bg-white group-hover:bg-slate-50 md:shadow-[2px_0_5px_-1px_rgba(0,0,0,0.08)] ${
                         isDelayed ? 'text-[#C00000] font-bold' : 'text-slate-700'
                       }`}
                     >
                       <div className="font-mono text-[11px]">
                         {formatMD(new Date(row.startTs))} ~ {formatMD(new Date(row.endTs))}
                       </div>
-                      <div className="text-[11px]">{row.gateText}</div>
+                      <div className="text-[11px] truncate" title={row.gateText}>{row.gateText}</div>
                     </td>
 
                     {/* 時間區間色塊欄位 */}
