@@ -2844,16 +2844,16 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                               />
                             </div>
 
-                            <div className={`flex items-center bg-white border-2 rounded-lg px-3 py-1.5 focus-within:ring-2 ${
+                            <div className={`flex items-center justify-between gap-2 bg-white border-2 rounded-lg px-3 py-1.5 focus-within:ring-2 ${
                               isOverTarget
                                 ? 'border-red-500 focus-within:ring-red-500 bg-red-50/30'
                                 : 'border-indigo-300 focus-within:ring-indigo-500'
                             }`}>
-                              <span className={`text-xs font-bold mr-2 shrink-0 ${isOverTarget ? 'text-red-700' : 'text-indigo-700'}`}>
+                              <span className={`text-xs font-bold shrink-0 whitespace-nowrap ${isOverTarget ? 'text-red-700' : 'text-indigo-700'}`}>
                                 {isPctMode
                                   ? '今日完成度 *：'
                                   : isManufacturing
-                                  ? `今日完成數量 (${currentStage}) *：`
+                                  ? '今日生產數量 *：'
                                   : '今日完成數量 *：'}
                               </span>
                               <input
@@ -2882,9 +2882,9 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                                   newItems[idx].progress = nextValStr;
                                   setWorkItems(newItems);
                                 }}
-                                placeholder={isPctMode ? '輸入完成度 (0~100)' : '請輸入數量'}
+                                placeholder={isPctMode ? '0~100' : '輸入數量'}
                                 required
-                                className={`w-full text-sm font-extrabold outline-none bg-transparent text-right ${
+                                className={`flex-1 min-w-[72px] text-sm font-extrabold outline-none bg-transparent text-right ${
                                   isOverTarget ? 'text-red-700' : 'text-indigo-700'
                                 }`}
                               />
@@ -2895,17 +2895,16 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                               )}
                             </div>
 
-                            <div className={`flex items-center justify-between border rounded-lg px-3 py-1.5 text-xs ${
+                            <div className={`flex items-center justify-between gap-2 border rounded-lg px-3 py-1.5 text-xs ${
                               isOverTarget
                                 ? 'bg-red-50 border-red-300 text-red-800'
                                 : 'bg-emerald-50 border-emerald-200 text-slate-600'
                             }`}>
-                              <span>
-                                {isManufacturing ? `(${currentStage}) 累計：` : '累計完成：'}
-                                <strong className={isOverTarget ? 'text-red-700' : 'text-slate-800'}>{totalAccumulatedQty}{unitSuffix}</strong>
+                              <span className="whitespace-nowrap">
+                                累計完成：<strong className={isOverTarget ? 'text-red-700' : 'text-slate-800'}>{totalAccumulatedQty}{unitSuffix}</strong>
                                 {` / ${targetNum}${unitSuffix}`}
                               </span>
-                              <span className={`font-extrabold text-sm ${isOverTarget ? 'text-red-700' : 'text-emerald-700'}`}>
+                              <span className={`font-extrabold text-sm whitespace-nowrap ${isOverTarget ? 'text-red-700' : 'text-emerald-700'}`}>
                                 進度：{`${completionPct}%`}
                               </span>
                             </div>
