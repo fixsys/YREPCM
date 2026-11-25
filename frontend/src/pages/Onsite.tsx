@@ -1030,7 +1030,8 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
     }
 
     // 檢查是否有任何工項累計完成數量超過目標數量 (若無目標數量則以目標完成度 100% 為上限)
-    for (const w of workItems) {
+    for (let wIdx = 0; wIdx < workItems.length; wIdx++) {
+      const w = workItems[wIdx];
       if (!w.name || !w.progress) continue;
       const cat = w.category || laborForm.work_category || WORK_CATEGORIES[0] || '土木';
       const targetStr = getTargetQuantityForItem(cat, w.name) || w.target_quantity || '';
@@ -1039,19 +1040,49 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
       const effectiveTargetNum = isPctMode ? 100 : rawTargetNum;
       const todayNum = parseFloat(String(w.progress || '').replace(/[,%]/g, ''));
 
+      // 自動解析此列實際綁定的工序（若原預設工序已 100% 完成，與 UI 同步跳至第一個未完成工序）
+      let effStage = isManufacturing ? (w.stage || '一次加工') : undefined;
+      if (isManufacturing && effStage) {
+        const candPast = getPastAccumulatedQty(
+          w.name,
+          laborForm.project_id,
+          laborForm.dispatch_order_id,
+          editingLaborId,
+          laborForm.report_date,
+          effStage
+        );
+        if (candPast >= effectiveTargetNum && effectiveTargetNum > 0) {
+          const firstOpen = MANUFACTURING_STAGES.find(st => {
+            const p = getPastAccumulatedQty(
+              w.name,
+              laborForm.project_id,
+              laborForm.dispatch_order_id,
+              editingLaborId,
+              laborForm.report_date,
+              st.key
+            );
+            return p < effectiveTargetNum;
+          });
+          if (firstOpen) effStage = firstOpen.key;
+        }
+      }
+
       if (!Number.isNaN(todayNum)) {
         const pastQty = getPastAccumulatedQty(
           w.name,
           laborForm.project_id,
           laborForm.dispatch_order_id,
           editingLaborId,
-          laborForm.report_date
+          laborForm.report_date,
+          effStage
         );
         const totalAcc = Math.round((pastQty + todayNum) * 100) / 100;
         if (totalAcc > effectiveTargetNum) {
           const unitSuffix = isPctMode ? '%' : '';
           return alert(
             `⚠️ 超過${isPctMode ? '目標完成度 (100%)' : '目標數量'}警示：\n工項「${normalizeItemKey(w.name)}」${
+              isManufacturing && effStage ? `於工序【${effStage}】` : ''
+            }${
               isPctMode ? '目標完成度為 100%' : `目標數量為 ${effectiveTargetNum}`
             }（先前已累計：${pastQty}${unitSuffix}，今日填寫：${todayNum}${unitSuffix}，合計：${totalAcc}${unitSuffix}），已超過上限，請修正後再送出！`
           );
@@ -1099,10 +1130,41 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
           w.target_quantity !== undefined && w.target_quantity !== ''
             ? w.target_quantity
             : getTargetQuantityForItem(cat, w.name);
+        const rawT = parseFloat(String(resolvedTarget).replace(/[,%]/g, ''));
+        const isPct = String(resolvedTarget).includes('%') || Number.isNaN(rawT) || rawT <= 0;
+        const effTargetNum = isPct ? 100 : rawT;
+
+        let effStage = isManufacturing ? (w.stage || '一次加工') : w.stage;
+        if (isManufacturing && effStage) {
+          const candPast = getPastAccumulatedQty(
+            w.name,
+            laborForm.project_id,
+            laborForm.dispatch_order_id,
+            editingLaborId,
+            laborForm.report_date,
+            effStage
+          );
+          if (candPast >= effTargetNum && effTargetNum > 0) {
+            const firstOpen = MANUFACTURING_STAGES.find(st => {
+              const p = getPastAccumulatedQty(
+                w.name,
+                laborForm.project_id,
+                laborForm.dispatch_order_id,
+                editingLaborId,
+                laborForm.report_date,
+                st.key
+              );
+              return p < effTargetNum;
+            });
+            if (firstOpen) effStage = firstOpen.key;
+          }
+        }
+
         const itemCopy = {
           ...w,
           name: normalizeItemKey(w.name),
           category: cat,
+          stage: effStage,
           target_quantity: resolvedTarget,
           worker_count: isOutsourcedMode ? '' : w.worker_count,
           work_hours: isOutsourcedMode ? '' : w.work_hours,
@@ -2519,40 +2581,15 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                       const rowCat = item.category || (laborForm.work_category || '').split('、')[0] || WORK_CATEGORIES[0] || (isManufacturing ? 'RH鋼/柱' : '土木');
                       const rowCategoryOptions = Array.from(new Set([rowCat, ...WORK_CATEGORIES])).filter(Boolean);
                       const itemsForRowCat = categoryToItems[rowCat] || [];
-                      const currentStage = isManufacturing ? (item.stage || '一次加工') : undefined;
-                      const currentStageMeta = isManufacturing
-                        ? MANUFACTURING_STAGES.find(s => s.key === currentStage) || MANUFACTURING_STAGES[0]
-                        : null;
-
                       const resolvedTargetQtyStr = getTargetQuantityForItem(rowCat, item.name) || item.target_quantity || '';
                       const rawTargetNum = parseFloat(String(resolvedTargetQtyStr).replace(/[,%]/g, ''));
                       const isPctMode = String(resolvedTargetQtyStr).includes('%') || Number.isNaN(rawTargetNum) || rawTargetNum <= 0;
                       const targetNum = isPctMode ? 100 : rawTargetNum;
                       const todayNum = parseFloat(String(item.progress || '').replace(/[,%]/g, ''));
-                      const pastQty = getPastAccumulatedQty(
-                        item.name,
-                        laborForm.project_id,
-                        laborForm.dispatch_order_id,
-                        editingLaborId,
-                        laborForm.report_date,
-                        currentStage
-                      );
-                      // 若同張報表內有相同構件+相同工序的其他列，一併計入
-                      const sameFormOtherRowsQty = workItems.reduce((sum, other, oIdx) => {
-                        if (oIdx === idx) return sum;
-                        if (normalizeItemKey(other.name) !== normalizeItemKey(item.name)) return sum;
-                        if (isManufacturing && (other.stage || '一次加工') !== currentStage) return sum;
-                        const v = parseFloat(String(other.progress || '').replace(/[,%]/g, ''));
-                        return sum + (Number.isNaN(v) ? 0 : v);
-                      }, 0);
-
-                      const effectivePastQty = Math.round((pastQty + sameFormOtherRowsQty) * 100) / 100;
-                      const totalAccumulatedQty = Math.round(((Number.isNaN(todayNum) ? 0 : todayNum) + effectivePastQty) * 100) / 100;
-                      const isOverTarget = totalAccumulatedQty > targetNum;
-                      const completionPct = Math.round((totalAccumulatedQty / targetNum) * 1000) / 10;
                       const unitSuffix = isPctMode ? '%' : '';
 
-                      // 計算此構件在 4 道工序各自的累計完成數 (歷史 + 今日同表其他列)
+                      // 計算此構件在 4 道工序各自的歷史與累計完成數 (歷史 + 今日同表其他列)
+                      const stagePriorTotalsMap: Record<string, number> = {};
                       const stageTotalsMap: Record<string, number> = {};
                       if (isManufacturing) {
                         MANUFACTURING_STAGES.forEach(st => {
@@ -2564,15 +2601,67 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                             laborForm.report_date,
                             st.key
                           );
-                          const todayInForm = workItems.reduce((sum, wRow) => {
+                          const otherRowsInForm = workItems.reduce((sum, wRow, wIdx) => {
+                            if (wIdx === idx) return sum;
                             if (normalizeItemKey(wRow.name) !== normalizeItemKey(item.name)) return sum;
                             if ((wRow.stage || '一次加工') !== st.key) return sum;
                             const v = parseFloat(String(wRow.progress || '').replace(/[,%]/g, ''));
                             return sum + (Number.isNaN(v) ? 0 : v);
                           }, 0);
-                          stageTotalsMap[st.key] = Math.round((hist + todayInForm) * 100) / 100;
+                          const priorTotal = Math.round((hist + otherRowsInForm) * 100) / 100;
+                          stagePriorTotalsMap[st.key] = priorTotal;
                         });
                       }
+
+                      // 若目前選取的工序在先前已經 100% 完成，自動跳至第一個尚未完成的工序
+                      const currentStage = (() => {
+                        if (!isManufacturing) return undefined;
+                        const candidate = item.stage || '一次加工';
+                        if ((stagePriorTotalsMap[candidate] || 0) >= targetNum && targetNum > 0) {
+                          const firstOpen = MANUFACTURING_STAGES.find(
+                            st => (stagePriorTotalsMap[st.key] || 0) < targetNum
+                          );
+                          if (firstOpen) return firstOpen.key;
+                        }
+                        return candidate;
+                      })();
+
+                      const currentStageMeta = isManufacturing
+                        ? MANUFACTURING_STAGES.find(s => s.key === currentStage) || MANUFACTURING_STAGES[0]
+                        : null;
+
+                      if (isManufacturing) {
+                        MANUFACTURING_STAGES.forEach(st => {
+                          const priorTotal = stagePriorTotalsMap[st.key] || 0;
+                          const thisRowVal = currentStage === st.key && !Number.isNaN(todayNum) ? todayNum : 0;
+                          stageTotalsMap[st.key] = Math.round((priorTotal + thisRowVal) * 100) / 100;
+                        });
+                      }
+
+                      const pastQty = isManufacturing
+                        ? stagePriorTotalsMap[currentStage || '一次加工'] || 0
+                        : getPastAccumulatedQty(
+                            item.name,
+                            laborForm.project_id,
+                            laborForm.dispatch_order_id,
+                            editingLaborId,
+                            laborForm.report_date,
+                            currentStage
+                          );
+                      // 若同張報表內有相同構件+相同工序的其他列，一併計入
+                      const sameFormOtherRowsQty = isManufacturing
+                        ? 0
+                        : workItems.reduce((sum, other, oIdx) => {
+                            if (oIdx === idx) return sum;
+                            if (normalizeItemKey(other.name) !== normalizeItemKey(item.name)) return sum;
+                            const v = parseFloat(String(other.progress || '').replace(/[,%]/g, ''));
+                            return sum + (Number.isNaN(v) ? 0 : v);
+                          }, 0);
+
+                      const effectivePastQty = Math.round((pastQty + sameFormOtherRowsQty) * 100) / 100;
+                      const totalAccumulatedQty = Math.round(((Number.isNaN(todayNum) ? 0 : todayNum) + effectivePastQty) * 100) / 100;
+                      const isOverTarget = totalAccumulatedQty > targetNum;
+                      const completionPct = Math.round((totalAccumulatedQty / targetNum) * 1000) / 10;
 
                       // 前道工序防呆檢查（例如報「② 二次加工」時，檢查「① 一次加工」已完數量）
                       let prevStageMismatchWarning = '';
@@ -2733,10 +2822,16 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    // 自動挑選下一個工序，為同一構件新增一張工序報工卡
+                                    // 自動挑選下一個尚未完成的工序，為同一構件新增一張工序報工卡
                                     const curIdx = MANUFACTURING_STAGES.findIndex(s => s.key === currentStage);
-                                    const nextStageKey =
-                                      MANUFACTURING_STAGES[(curIdx + 1) % MANUFACTURING_STAGES.length].key;
+                                    let nextStageKey = MANUFACTURING_STAGES[(curIdx + 1) % MANUFACTURING_STAGES.length].key;
+                                    for (let offset = 1; offset <= MANUFACTURING_STAGES.length; offset++) {
+                                      const candidate = MANUFACTURING_STAGES[(curIdx + offset) % MANUFACTURING_STAGES.length];
+                                      if ((stageTotalsMap[candidate.key] || 0) < targetNum) {
+                                        nextStageKey = candidate.key;
+                                        break;
+                                      }
+                                    }
                                     const nextItem: WorkItem = {
                                       category: rowCat,
                                       name: item.name,
@@ -2760,19 +2855,27 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                               <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
                                 {MANUFACTURING_STAGES.map((st, sIdx) => {
                                   const isSelected = currentStage === st.key;
+                                  const stPriorDoneQty = stagePriorTotalsMap[st.key] || 0;
                                   const stDoneQty = stageTotalsMap[st.key] || 0;
                                   const stDonePct =
                                     targetNum > 0
                                       ? Math.min(100, Math.round((stDoneQty / targetNum) * 1000) / 10)
                                       : 0;
+                                  const isStageLocked = stPriorDoneQty >= targetNum && targetNum > 0;
                                   const isStageCompleted = stDoneQty >= targetNum && targetNum > 0;
 
                                   return (
                                     <div key={st.key} className="flex items-center gap-1 min-w-0">
                                       <button
                                         type="button"
-                                        title={st.label}
+                                        disabled={isStageLocked}
+                                        title={
+                                          isStageLocked
+                                            ? `${st.label} 已 100% 完成，無法再次選取報工`
+                                            : st.label
+                                        }
                                         onClick={() => {
+                                          if (isStageLocked) return;
                                           const newItems = [...workItems];
                                           newItems[idx] = {
                                             ...newItems[idx],
@@ -2780,33 +2883,46 @@ const Onsite = ({ mode = 'ONSITE' }: { mode?: 'ONSITE' | 'MANUFACTURING' }) => {
                                           };
                                           setWorkItems(newItems);
                                         }}
-                                        className={`w-full min-w-0 text-left px-2.5 py-2 rounded-lg border-2 transition-all cursor-pointer flex flex-col justify-between ${
+                                        className={`w-full min-w-0 text-left px-3 py-2 rounded-lg border-2 transition-all flex flex-col justify-between gap-1 ${
                                           isSelected
-                                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm ring-2 ring-indigo-200'
+                                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm ring-2 ring-indigo-200 cursor-pointer'
+                                            : isStageLocked
+                                            ? 'bg-emerald-50/80 text-emerald-900 border-emerald-300 opacity-85 cursor-not-allowed'
                                             : isStageCompleted
-                                            ? 'bg-emerald-50/70 text-emerald-900 border-emerald-300 hover:border-emerald-400'
-                                            : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
+                                            ? 'bg-emerald-50/70 text-emerald-900 border-emerald-300 hover:border-emerald-400 cursor-pointer'
+                                            : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 hover:border-slate-300 cursor-pointer'
                                         }`}
                                       >
+                                        {/* 第一行：工序名稱 */}
                                         <div className="flex items-center justify-between gap-1 whitespace-nowrap">
                                           <span className="text-xs font-extrabold tracking-tight whitespace-nowrap">
                                             {st.shortLabel}
                                           </span>
+                                        </div>
+
+                                        {/* 第二行：完成狀態 / 報工中 標籤 */}
+                                        <div className="min-h-[20px] flex items-center">
                                           {isSelected ? (
-                                            <span className="text-[10px] font-extrabold bg-white text-indigo-700 px-1.5 py-0.5 rounded-full whitespace-nowrap shrink-0">
+                                            <span className="inline-flex items-center text-[10px] font-extrabold bg-white text-indigo-700 px-2 py-0.5 rounded-full whitespace-nowrap">
                                               ● 報工中
                                             </span>
-                                          ) : isStageCompleted ? (
-                                            <span className="text-[10px] font-extrabold bg-emerald-600 text-white px-1.5 py-0.5 rounded-full whitespace-nowrap shrink-0">
-                                              ✓ 完成
+                                          ) : isStageLocked || isStageCompleted ? (
+                                            <span className="inline-flex items-center text-[10px] font-extrabold bg-emerald-600 text-white px-2 py-0.5 rounded-full whitespace-nowrap">
+                                              ✓ 完成 (已鎖定)
                                             </span>
-                                          ) : null}
+                                          ) : (
+                                            <span className="inline-flex items-center text-[10px] font-semibold bg-slate-200/70 text-slate-600 px-2 py-0.5 rounded-full whitespace-nowrap">
+                                              待報工
+                                            </span>
+                                          )}
                                         </div>
+
+                                        {/* 第三行：累計進度 */}
                                         <div
-                                          className={`text-[11px] font-mono mt-1.5 flex items-center justify-between gap-1 whitespace-nowrap ${
+                                          className={`text-[11px] font-mono flex items-center justify-between gap-1 whitespace-nowrap ${
                                             isSelected
                                               ? 'text-indigo-100 font-bold'
-                                              : isStageCompleted
+                                              : isStageLocked || isStageCompleted
                                               ? 'text-emerald-700 font-bold'
                                               : 'text-slate-500'
                                           }`}
