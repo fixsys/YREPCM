@@ -534,17 +534,17 @@ const ProjectDetails = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <button onClick={() => navigate('/projects')} className="p-2 hover:bg-slate-200 rounded-lg text-slate-600 transition-colors">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+        <button onClick={() => navigate('/projects')} className="p-2 hover:bg-slate-200 rounded-lg text-slate-600 transition-colors shrink-0">
           <ArrowLeft size={20} />
         </button>
-        <h1 className="text-2xl font-bold text-slate-800">{project.project_code} - {project.name}</h1>
-        <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">{project.status}</span>
+        <h1 className="text-lg sm:text-2xl font-bold text-slate-800 break-words min-w-0 flex-1">{project.project_code} - {project.name}</h1>
+        <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs sm:text-sm font-medium shrink-0">{project.status}</span>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6">
         {/* Project Info */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 space-y-4 lg:col-span-1">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-5 space-y-4 lg:col-span-1 min-w-0">
           <div className="flex justify-between items-center border-b pb-2">
             <h3 className="text-lg font-semibold text-slate-800">專案資訊</h3>
             <button onClick={openEditProjectModal} className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center gap-1">
@@ -598,16 +598,16 @@ const ProjectDetails = () => {
         </div>
 
         {/* Right side content (Tabs) */}
-        <div className="lg:col-span-3 space-y-4">
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-2 flex gap-2 overflow-x-auto">
-            {/* <button onClick={() => setActiveTab('workflow')} className={`px-4 py-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors flex-1 ${activeTab === 'workflow' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}>專案工作流</button> */}
-            <button onClick={() => setActiveTab('requirements')} className={`px-4 py-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors flex-1 ${activeTab === 'requirements' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}>客戶需求單</button>
-            <button onClick={() => setActiveTab('logs')} className={`px-4 py-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors flex-1 ${activeTab === 'logs' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}>施工日誌</button>
-            <button onClick={() => setActiveTab('tasks')} className={`px-4 py-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors flex-1 ${activeTab === 'tasks' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}>任務與工時</button>
-            <button onClick={() => setActiveTab('performance')} className={`px-4 py-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors flex-1 ${activeTab === 'performance' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}>生產派工</button>
-            <button onClick={() => setActiveTab('files')} className={`px-4 py-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors flex-1 ${activeTab === 'files' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}>開案執行書</button>
-            <button onClick={() => setActiveTab('work_items')} className={`px-4 py-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors flex-1 ${activeTab === 'work_items' ? 'bg-teal-50 text-teal-700' : 'text-slate-600 hover:bg-slate-50'}`}>施工細項設定</button>
-            <button onClick={() => setActiveTab('timeline')} className={`px-4 py-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors flex-1 ${activeTab === 'timeline' ? 'bg-teal-50 text-teal-700' : 'text-slate-600 hover:bg-slate-50'}`}>專案時間軸</button>
+        <div className="lg:col-span-3 space-y-4 min-w-0">
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-2 flex gap-1.5 sm:gap-2 overflow-x-auto max-w-full">
+            {/* <button onClick={() => setActiveTab('workflow')} className={`px-3 sm:px-4 py-2 whitespace-nowrap rounded-lg text-xs sm:text-sm font-medium transition-colors shrink-0 sm:flex-1 ${activeTab === 'workflow' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}>專案工作流</button> */}
+            <button onClick={() => setActiveTab('requirements')} className={`px-3 sm:px-4 py-2 whitespace-nowrap rounded-lg text-xs sm:text-sm font-medium transition-colors shrink-0 sm:flex-1 ${activeTab === 'requirements' ? 'bg-blue-50 text-blue-700 font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>客戶需求單</button>
+            <button onClick={() => setActiveTab('logs')} className={`px-3 sm:px-4 py-2 whitespace-nowrap rounded-lg text-xs sm:text-sm font-medium transition-colors shrink-0 sm:flex-1 ${activeTab === 'logs' ? 'bg-blue-50 text-blue-700 font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>施工日誌</button>
+            <button onClick={() => setActiveTab('tasks')} className={`px-3 sm:px-4 py-2 whitespace-nowrap rounded-lg text-xs sm:text-sm font-medium transition-colors shrink-0 sm:flex-1 ${activeTab === 'tasks' ? 'bg-blue-50 text-blue-700 font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>任務與工時</button>
+            <button onClick={() => setActiveTab('performance')} className={`px-3 sm:px-4 py-2 whitespace-nowrap rounded-lg text-xs sm:text-sm font-medium transition-colors shrink-0 sm:flex-1 ${activeTab === 'performance' ? 'bg-blue-50 text-blue-700 font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>生產派工</button>
+            <button onClick={() => setActiveTab('files')} className={`px-3 sm:px-4 py-2 whitespace-nowrap rounded-lg text-xs sm:text-sm font-medium transition-colors shrink-0 sm:flex-1 ${activeTab === 'files' ? 'bg-blue-50 text-blue-700 font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>開案執行書</button>
+            <button onClick={() => setActiveTab('work_items')} className={`px-3 sm:px-4 py-2 whitespace-nowrap rounded-lg text-xs sm:text-sm font-medium transition-colors shrink-0 sm:flex-1 ${activeTab === 'work_items' ? 'bg-teal-50 text-teal-700 font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>施工細項設定</button>
+            <button onClick={() => setActiveTab('timeline')} className={`px-3 sm:px-4 py-2 whitespace-nowrap rounded-lg text-xs sm:text-sm font-medium transition-colors shrink-0 sm:flex-1 ${activeTab === 'timeline' ? 'bg-teal-50 text-teal-700 font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>專案時間軸</button>
           </div>
 
           {/* activeTab === 'workflow' && (
@@ -1059,74 +1059,76 @@ const ProjectDetails = () => {
               </button>
             </div>
           </div>
-          <table className="w-full text-left">
-            <thead className="bg-slate-50 border-b">
-              <tr>
-                <th className="p-3 text-slate-600">工項名稱</th>
-                <th className="p-3 text-slate-600 w-32">契約數量</th>
-                <th className="p-3 text-slate-600 w-24">單位</th>
-                <th className="p-3 text-slate-600 w-40">開始日期</th>
-                <th className="p-3 text-slate-600 w-40">結束日期</th>
-                <th className="p-3 text-slate-600 text-center w-24 whitespace-nowrap">操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(workItemsConfig[category] || []).length === 0 ? (
+          <div className="overflow-x-auto w-full">
+            <table className="w-max min-w-full text-left">
+              <thead className="bg-slate-50 border-b">
                 <tr>
-                  <td colSpan={6} className="p-6 text-center text-slate-400 text-sm">
-                    尚無工項，請點擊右上角「+ 新增 {category} 工項」自行建立
-                  </td>
+                  <th className="p-3 text-slate-600 min-w-[180px] whitespace-nowrap">工項名稱</th>
+                  <th className="p-3 text-slate-600 w-32 min-w-[110px] whitespace-nowrap">契約數量</th>
+                  <th className="p-3 text-slate-600 w-24 min-w-[90px] whitespace-nowrap">單位</th>
+                  <th className="p-3 text-slate-600 w-40 min-w-[140px] whitespace-nowrap">開始日期</th>
+                  <th className="p-3 text-slate-600 w-40 min-w-[140px] whitespace-nowrap">結束日期</th>
+                  <th className="p-3 text-slate-600 text-center w-24 min-w-[80px] whitespace-nowrap">操作</th>
                 </tr>
-              ) : (
-                (workItemsConfig[category] || []).map((item: any, idx: number) => (
-                  <tr key={idx} className="border-b">
-                    <td className="p-2">
-                      <input type="text" value={item.name} placeholder="請輸入工項名稱" onChange={e => {
-                        const newConfig = { ...workItemsConfig };
-                        newConfig[category][idx].name = e.target.value;
-                        setWorkItemsConfig(newConfig);
-                      }} className="w-full border rounded px-2 py-1" />
-                    </td>
-                    <td className="p-2">
-                      <input type="number" value={item.contractQuantity} onChange={e => {
-                        const newConfig = { ...workItemsConfig };
-                        newConfig[category][idx].contractQuantity = Number(e.target.value);
-                        setWorkItemsConfig(newConfig);
-                      }} className="w-full border rounded px-2 py-1" />
-                    </td>
-                    <td className="p-2">
-                      <input type="text" value={item.unit} onChange={e => {
-                        const newConfig = { ...workItemsConfig };
-                        newConfig[category][idx].unit = e.target.value;
-                        setWorkItemsConfig(newConfig);
-                      }} className="w-full border rounded px-2 py-1" />
-                    </td>
-                    <td className="p-2">
-                      <input type="date" value={item.startDate || ''} onChange={e => {
-                        const newConfig = { ...workItemsConfig };
-                        newConfig[category][idx].startDate = e.target.value;
-                        setWorkItemsConfig(newConfig);
-                      }} className="w-full border rounded px-2 py-1" />
-                    </td>
-                    <td className="p-2">
-                      <input type="date" value={item.endDate || ''} onChange={e => {
-                        const newConfig = { ...workItemsConfig };
-                        newConfig[category][idx].endDate = e.target.value;
-                        setWorkItemsConfig(newConfig);
-                      }} className="w-full border rounded px-2 py-1" />
-                    </td>
-                    <td className="p-2 text-center whitespace-nowrap">
-                      <button onClick={() => {
-                        const newConfig = { ...workItemsConfig };
-                        newConfig[category] = newConfig[category].filter((_: any, i: number) => i !== idx);
-                        setWorkItemsConfig(newConfig);
-                      }} className="text-red-500 hover:text-red-700 font-bold p-1">刪除</button>
+              </thead>
+              <tbody>
+                {(workItemsConfig[category] || []).length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="p-6 text-center text-slate-400 text-sm">
+                      尚無工項，請點擊右上角「+ 新增 {category} 工項」自行建立
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  (workItemsConfig[category] || []).map((item: any, idx: number) => (
+                    <tr key={idx} className="border-b">
+                      <td className="p-2">
+                        <input type="text" value={item.name} placeholder="請輸入工項名稱" onChange={e => {
+                          const newConfig = { ...workItemsConfig };
+                          newConfig[category][idx].name = e.target.value;
+                          setWorkItemsConfig(newConfig);
+                        }} className="w-full border rounded px-2 py-1" />
+                      </td>
+                      <td className="p-2">
+                        <input type="number" value={item.contractQuantity} onChange={e => {
+                          const newConfig = { ...workItemsConfig };
+                          newConfig[category][idx].contractQuantity = Number(e.target.value);
+                          setWorkItemsConfig(newConfig);
+                        }} className="w-full border rounded px-2 py-1" />
+                      </td>
+                      <td className="p-2">
+                        <input type="text" value={item.unit} onChange={e => {
+                          const newConfig = { ...workItemsConfig };
+                          newConfig[category][idx].unit = e.target.value;
+                          setWorkItemsConfig(newConfig);
+                        }} className="w-full border rounded px-2 py-1" />
+                      </td>
+                      <td className="p-2">
+                        <input type="date" value={item.startDate || ''} onChange={e => {
+                          const newConfig = { ...workItemsConfig };
+                          newConfig[category][idx].startDate = e.target.value;
+                          setWorkItemsConfig(newConfig);
+                        }} className="w-full border rounded px-2 py-1" />
+                      </td>
+                      <td className="p-2">
+                        <input type="date" value={item.endDate || ''} onChange={e => {
+                          const newConfig = { ...workItemsConfig };
+                          newConfig[category][idx].endDate = e.target.value;
+                          setWorkItemsConfig(newConfig);
+                        }} className="w-full border rounded px-2 py-1" />
+                      </td>
+                      <td className="p-2 text-center whitespace-nowrap">
+                        <button onClick={() => {
+                          const newConfig = { ...workItemsConfig };
+                          newConfig[category] = newConfig[category].filter((_: any, i: number) => i !== idx);
+                          setWorkItemsConfig(newConfig);
+                        }} className="text-red-500 hover:text-red-700 font-bold p-1">刪除</button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       ))
     )}
@@ -1161,8 +1163,11 @@ const ProjectDetails = () => {
               </div>
 
               {/* 開案執行書目錄與分項協作總表 (對照 新目錄v7.docx) */}
-              <div className="overflow-x-auto border border-slate-200 rounded-xl">
-                <table className="w-full text-left border-collapse">
+              <div className="text-xs text-slate-400 sm:hidden flex items-center gap-1">
+                <span>💡 手機版提示：表格可左右滑動檢視完整欄位與上傳紀錄</span>
+              </div>
+              <div className="overflow-x-auto w-full max-w-full border border-slate-200 rounded-xl [-webkit-overflow-scrolling:touch]">
+                <table className="w-max min-w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-100 border-b border-slate-200 text-slate-700 text-sm font-bold">
                       <th className="py-3 px-3 w-16 min-w-[60px] text-center whitespace-nowrap border-r border-slate-200">項次</th>

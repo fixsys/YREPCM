@@ -568,8 +568,8 @@ const ProjectTimelineInner: React.FC<ProjectTimelineProps> = ({
           </div>
 
           {/* 時間顆粒度切換 */}
-          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg text-xs font-bold">
-            <Calendar size={14} className="text-slate-500 ml-1.5 mr-1" />
+          <div className="flex flex-wrap items-center gap-1 bg-slate-100 p-1 rounded-lg text-xs font-bold">
+            <Calendar size={14} className="text-slate-500 ml-1.5 mr-1 shrink-0" />
             {(
               [
                 { id: 'DAY', label: '單日' },
@@ -582,7 +582,7 @@ const ProjectTimelineInner: React.FC<ProjectTimelineProps> = ({
                 key={g.id}
                 type="button"
                 onClick={() => setGranularity(g.id)}
-                className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer ${
+                className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer whitespace-nowrap ${
                   granularity === g.id
                     ? 'bg-[#1F4E78] text-white shadow-sm'
                     : 'text-slate-600 hover:text-slate-900'
@@ -657,17 +657,20 @@ const ProjectTimelineInner: React.FC<ProjectTimelineProps> = ({
         </div>
 
         {/* 第三列起：甘特圖色塊矩陣表格 */}
-        <div className="overflow-auto max-h-[620px]">
+        <div className="bg-amber-50/70 border-b border-[#B4C6E7] px-3 py-1.5 text-[11px] font-bold text-[#1F4E78] md:hidden flex items-center gap-1.5">
+          <span>👉 手機瀏覽提示：表格可左右滑動查看完整甘特圖時程色塊與進度</span>
+        </div>
+        <div className="overflow-auto max-h-[620px] w-full max-w-full [-webkit-overflow-scrolling:touch]">
           <table className="w-max min-w-full border-separate border-spacing-0 text-xs">
             <thead className="sticky top-0 z-30">
               <tr className="bg-[#2F5597] text-white">
-                <th className="sticky left-0 z-40 bg-[#2F5597] border-b border-r border-[#8EA9DB] px-2 py-2.5 w-[52px] min-w-[52px] max-w-[52px] box-border text-center font-bold whitespace-nowrap">
+                <th className="md:sticky md:left-0 z-40 bg-[#2F5597] border-b border-r border-[#8EA9DB] px-2 py-2.5 w-[52px] min-w-[52px] max-w-[52px] box-border text-center font-bold whitespace-nowrap">
                   項次
                 </th>
-                <th className="sticky left-[52px] z-40 bg-[#2F5597] border-b border-r border-[#8EA9DB] px-2.5 py-2.5 w-[92px] min-w-[92px] max-w-[92px] box-border text-center font-bold whitespace-nowrap">
+                <th className="md:sticky md:left-[52px] z-40 bg-[#2F5597] border-b border-r border-[#8EA9DB] px-2.5 py-2.5 w-[92px] min-w-[92px] max-w-[92px] box-border text-center font-bold whitespace-nowrap">
                   工程階段
                 </th>
-                <th className="sticky left-[144px] z-40 bg-[#2F5597] border-b border-r-2 border-[#8EA9DB] px-3 py-2.5 w-[220px] min-w-[220px] max-w-[220px] box-border text-left font-bold shadow-[2px_0_5px_-1px_rgba(0,0,0,0.2)]">
+                <th className="md:sticky md:left-[144px] z-40 bg-[#2F5597] border-b border-r-2 border-[#8EA9DB] px-3 py-2.5 w-[180px] sm:w-[220px] min-w-[180px] sm:min-w-[220px] max-w-[180px] sm:max-w-[220px] box-border text-left font-bold md:shadow-[2px_0_5px_-1px_rgba(0,0,0,0.2)]">
                   工作模組 / 施工工項
                 </th>
                 <th className="bg-[#2F5597] border-b border-r border-[#8EA9DB] px-3 py-2.5 min-w-[210px] text-left font-bold whitespace-nowrap">
@@ -725,7 +728,7 @@ const ProjectTimelineInner: React.FC<ProjectTimelineProps> = ({
                   >
                     {/* 項次 */}
                     <td
-                      className={`sticky left-0 z-20 bg-white group-hover:bg-slate-50 border-b border-r border-slate-300 px-2 py-2.5 w-[52px] min-w-[52px] max-w-[52px] box-border text-center font-mono font-bold ${
+                      className={`md:sticky md:left-0 z-20 bg-white group-hover:bg-slate-50 border-b border-r border-slate-300 px-2 py-2.5 w-[52px] min-w-[52px] max-w-[52px] box-border text-center font-mono font-bold ${
                         isDelayed ? 'text-[#C00000]' : 'text-slate-700'
                       }`}
                     >
@@ -733,14 +736,14 @@ const ProjectTimelineInner: React.FC<ProjectTimelineProps> = ({
                     </td>
 
                     {/* 工程階段 */}
-                    <td className="sticky left-[52px] z-20 bg-white group-hover:bg-slate-50 border-b border-r border-slate-300 px-2.5 py-2.5 w-[92px] min-w-[92px] max-w-[92px] box-border text-center font-bold text-slate-700 whitespace-nowrap truncate">
+                    <td className="md:sticky md:left-[52px] z-20 bg-white group-hover:bg-slate-50 border-b border-r border-slate-300 px-2.5 py-2.5 w-[92px] min-w-[92px] max-w-[92px] box-border text-center font-bold text-slate-700 whitespace-nowrap truncate">
                       {row.category}
                     </td>
 
                     {/* 工作模組 / 施工工項 */}
                     <td
                       title={row.name}
-                      className={`sticky left-[144px] z-20 bg-white group-hover:bg-slate-50 border-b border-r-2 border-slate-300 px-3 py-2.5 w-[220px] min-w-[220px] max-w-[220px] box-border font-bold truncate shadow-[2px_0_5px_-1px_rgba(0,0,0,0.08)] ${
+                      className={`md:sticky md:left-[144px] z-20 bg-white group-hover:bg-slate-50 border-b border-r-2 border-slate-300 px-3 py-2.5 w-[180px] sm:w-[220px] min-w-[180px] sm:min-w-[220px] max-w-[180px] sm:max-w-[220px] box-border font-bold truncate md:shadow-[2px_0_5px_-1px_rgba(0,0,0,0.08)] ${
                         isDelayed ? 'text-[#C00000]' : 'text-slate-800'
                       }`}
                     >

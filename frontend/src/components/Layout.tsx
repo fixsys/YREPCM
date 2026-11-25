@@ -138,18 +138,18 @@ const Layout = ({ children }: { children: ReactNode }) => {
         )}
 
         {/* Main Content */}
-        <main className="flex-1 flex flex-col overflow-auto bg-slate-50 relative @container">
-          <header className="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm shrink-0 sticky top-0 z-20">
-            <h2 className="text-xl font-semibold text-slate-800">
+        <main className="flex-1 min-w-0 flex flex-col overflow-x-hidden overflow-y-auto bg-slate-50 relative @container">
+          <header className="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-6 md:px-8 shadow-sm shrink-0 sticky top-0 z-20">
+            <h2 className="text-lg sm:text-xl font-semibold text-slate-800 truncate">
               {navItems.find(item => item.path === location.pathname || (item.path !== '/' && location.pathname.startsWith(item.path)))?.name || '系統'}
             </h2>
           </header>
-          <div className="flex-1 p-8 relative">
+          <div className="flex-1 p-3 sm:p-5 md:p-8 relative min-w-0">
             {/* Faint Logo Watermark Background */}
             <div className="absolute inset-0 z-0 flex items-center justify-center opacity-[0.03] pointer-events-none overflow-hidden">
               <img src="/logo.png" alt="Watermark" className="w-[80%] h-[80%] object-contain" />
             </div>
-            <div className="h-full relative max-w-7xl mx-auto">
+            <div className="h-full relative max-w-7xl mx-auto w-full min-w-0">
               {children}
             </div>
           </div>
