@@ -99,4 +99,34 @@ router.post('/change-password', authenticateToken, async (req: AuthRequest, res)
   }
 });
 
+// Get current user's latest profile & department permissions
+router.get('/me', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: '未授權' });
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { role: true, department: true }
+    });
+    if (!user || !user.is_active) {
+      return res.status(403).json({ error: '帳號不存在或已停用' });
+    }
+
+    res.json({
+      user: {
+        id: user.id,
+        name: user.name,
+        department: user.department?.name || '',
+        role: user.role?.name || '',
+        level: user.role?.level || 0,
+        permissions: (user.department?.permissions as string[]) || []
+      }
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: '取得使用者權限失敗' });
+  }
+});
+
 export default router;

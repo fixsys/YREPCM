@@ -17,6 +17,7 @@ interface AuthState {
 
   loginSystem: string;
   setAuth: (token: string, user: User, requirePasswordChange: boolean, loginSystem?: string) => void;
+  updateUser: (user: User) => void;
   logout: () => void;
 
 }
@@ -30,6 +31,7 @@ export const useAuthStore = create<AuthState>()(
 
       loginSystem: '1',
       setAuth: (token, user, requirePasswordChange, loginSystem = '1') => set({ token, user, requirePasswordChange, loginSystem }),
+      updateUser: (user) => set({ user }),
       logout: () => set({ token: null, user: null, requirePasswordChange: false, loginSystem: '1' }),
 
     }),

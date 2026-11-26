@@ -161,7 +161,15 @@ const Dashboard = () => {
   }
 
   const { global, employee, manager } = data;
-  const isManager = user?.level && user.level >= 50;
+  const isManager = Boolean(user?.level && user.level >= 50);
+  const canAccessProjects = Boolean(
+    (user?.level && user.level >= 100) ||
+      (Array.isArray(user?.permissions) && user.permissions.includes('projects'))
+  );
+  const canAccessTasks = Boolean(
+    (user?.level && user.level >= 100) ||
+      (Array.isArray(user?.permissions) && user.permissions.includes('tasks'))
+  );
 
   // Render Global View (For Top Management and Managers)
   const renderGlobalView = () => (
@@ -174,7 +182,10 @@ const Dashboard = () => {
       </div>
 
       <div className="grid grid-cols-1 @md:grid-cols-3 gap-6">
-        <div onClick={() => navigate('/projects')} className="cursor-pointer bg-white/80 backdrop-blur-xl rounded-2xl shadow-sm border border-white/40 p-6 relative overflow-hidden group hover:shadow-md transition-all">
+        <div
+          onClick={() => canAccessProjects && navigate('/projects')}
+          className={`${canAccessProjects ? 'cursor-pointer hover:shadow-md' : 'cursor-default'} bg-white/80 backdrop-blur-xl rounded-2xl shadow-sm border border-white/40 p-6 relative overflow-hidden group transition-all`}
+        >
           <div className="absolute top-0 right-0 -mr-8 -mt-8 w-32 h-32 rounded-full bg-blue-500/10 blur-2xl group-hover:bg-blue-500/20 transition-all"></div>
           <div className="flex items-center justify-between">
             <div>
@@ -187,7 +198,10 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div onClick={() => navigate('/projects')} className="cursor-pointer bg-white/80 backdrop-blur-xl rounded-2xl shadow-sm border border-white/40 p-6 relative overflow-hidden group hover:shadow-md transition-all">
+        <div
+          onClick={() => canAccessProjects && navigate('/projects')}
+          className={`${canAccessProjects ? 'cursor-pointer hover:shadow-md' : 'cursor-default'} bg-white/80 backdrop-blur-xl rounded-2xl shadow-sm border border-white/40 p-6 relative overflow-hidden group transition-all`}
+        >
           <div className="absolute top-0 right-0 -mr-8 -mt-8 w-32 h-32 rounded-full bg-emerald-500/10 blur-2xl group-hover:bg-emerald-500/20 transition-all"></div>
           <div className="flex items-center justify-between">
             <div>
@@ -200,7 +214,10 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div onClick={() => navigate('/projects')} className="cursor-pointer bg-white/80 backdrop-blur-xl rounded-2xl shadow-sm border border-white/40 p-6 relative overflow-hidden group hover:shadow-md transition-all">
+        <div
+          onClick={() => canAccessProjects && navigate('/projects')}
+          className={`${canAccessProjects ? 'cursor-pointer hover:shadow-md' : 'cursor-default'} bg-white/80 backdrop-blur-xl rounded-2xl shadow-sm border border-white/40 p-6 relative overflow-hidden group transition-all`}
+        >
           <div className="absolute top-0 right-0 -mr-8 -mt-8 w-32 h-32 rounded-full bg-slate-500/10 blur-2xl group-hover:bg-slate-500/20 transition-all"></div>
           <div className="flex items-center justify-between">
             <div>
@@ -346,8 +363,13 @@ const Dashboard = () => {
                     <div className="absolute -right-10 -top-10 w-32 h-32 rounded-full bg-gradient-to-br from-blue-400/10 to-teal-400/10 blur-2xl group-hover/card:scale-150 transition-transform duration-700 pointer-events-none" />
                     <div className="flex items-start justify-between gap-2 mb-2 relative">
                       <div
-                        onClick={() => proj.project_id && proj.project_id !== 'UNASSIGNED' && navigate(`/projects/${proj.project_id}`)}
-                        className="cursor-pointer group"
+                        onClick={() =>
+                          canAccessProjects &&
+                          proj.project_id &&
+                          proj.project_id !== 'UNASSIGNED' &&
+                          navigate(`/projects/${proj.project_id}`)
+                        }
+                        className={canAccessProjects ? 'cursor-pointer group' : 'cursor-default'}
                       >
                         <div className="flex items-center gap-2 flex-wrap">
                           {proj.project_code && (
@@ -355,7 +377,11 @@ const Dashboard = () => {
                               {proj.project_code}
                             </span>
                           )}
-                          <h3 className="text-base font-extrabold text-slate-800 group-hover:text-blue-600 transition-colors">
+                          <h3
+                            className={`text-base font-extrabold text-slate-800 transition-colors ${
+                              canAccessProjects ? 'group-hover:text-blue-600' : ''
+                            }`}
+                          >
                             {proj.project_name}
                           </h3>
                         </div>
@@ -1134,7 +1160,7 @@ const Dashboard = () => {
           {employee.myActiveTasks.length > 0 ? (
             <div className="space-y-3">
               {employee.myActiveTasks.slice(0,5).map((task: any) => (
-                <div key={task.id} onClick={() => navigate('/tasks')} className="flex items-center gap-4 p-3 hover:bg-slate-50 rounded-xl transition-colors cursor-pointer border border-transparent hover:border-slate-100">
+                <div key={task.id} onClick={() => canAccessTasks && navigate('/tasks')} className={`flex items-center gap-4 p-3 rounded-xl transition-colors border border-transparent ${canAccessTasks ? 'hover:bg-slate-50 cursor-pointer hover:border-slate-100' : 'cursor-default'}`}>
                   <div className="w-5 h-5 rounded-full border-2 border-slate-300 flex-shrink-0"></div>
                   <div className="flex-1">
                     <p className="font-semibold text-slate-700">{task.name}</p>
@@ -1159,7 +1185,7 @@ const Dashboard = () => {
           {employee.myOverdueTasks.length > 0 ? (
             <div className="space-y-3">
               {employee.myOverdueTasks.map((task: any) => (
-                <div key={task.id} onClick={() => navigate('/tasks')} className="flex items-center gap-4 p-3 bg-red-50/50 rounded-xl border border-red-100 cursor-pointer hover:bg-red-100 transition-colors">
+                <div key={task.id} onClick={() => canAccessTasks && navigate('/tasks')} className={`flex items-center gap-4 p-3 bg-red-50/50 rounded-xl border border-red-100 transition-colors ${canAccessTasks ? 'cursor-pointer hover:bg-red-100' : 'cursor-default'}`}>
                   <AlertCircle className="text-red-500 flex-shrink-0" size={20} />
                   <div className="flex-1">
                     <p className="font-semibold text-red-900">{task.name}</p>

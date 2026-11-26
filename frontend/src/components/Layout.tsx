@@ -9,7 +9,7 @@ import NotificationCenter from './NotificationCenter';
 import ChangelogModal from './ChangelogModal';
 
 const Layout = ({ children }: { children: ReactNode }) => {
-  const { user, logout, isMobileView, setMobileView, loginSystem } = useAuthStore();
+  const { token, user, updateUser, logout, isMobileView, setMobileView, loginSystem } = useAuthStore();
   const navigate = useNavigate();
   const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -17,6 +17,24 @@ const Layout = ({ children }: { children: ReactNode }) => {
   const [latestCommitHash, setLatestCommitHash] = useState<string>('');
   const [latestCommitDate, setLatestCommitDate] = useState<string>('');
   const [hasNewUpdate, setHasNewUpdate] = useState(false);
+
+  // Sync latest user role, level, and department permissions from server on load & route changes
+  useEffect(() => {
+    if (!token) return;
+    axios
+      .get('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } })
+      .then((res) => {
+        if (res.data?.user) {
+          updateUser(res.data.user);
+        }
+      })
+      .catch((err) => {
+        if (err?.response?.status === 401 || err?.response?.status === 403) {
+          logout();
+          navigate('/login');
+        }
+      });
+  }, [token, location.pathname]);
 
   useEffect(() => {
     axios
@@ -57,8 +75,8 @@ const Layout = ({ children }: { children: ReactNode }) => {
     { id: 'analytics', name: '報表與分析', path: '/analytics', icon: BarChart2 },
   ];
 
-  if (user?.level && user.level < 100) {
-    const allowed = user.permissions || [];
+  if (!user?.level || user.level < 100) {
+    const allowed = Array.isArray(user?.permissions) ? user.permissions : [];
     navItems = navItems.filter(item => item.id === 'approvals' || item.id === 'dashboard' || allowed.includes(item.id));
   }
 

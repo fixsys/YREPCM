@@ -29,6 +29,24 @@ const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
   return children;
 };
 
+export const canUserAccessModule = (user: any, moduleId: string): boolean => {
+  if (!user) return false;
+  if (user.level && user.level >= 100) return true;
+  if (moduleId === 'dashboard' || moduleId === 'approvals') return true;
+  const allowed: string[] = Array.isArray(user.permissions) ? user.permissions : [];
+  return allowed.includes(moduleId);
+};
+
+const ModuleRoute = ({ moduleId, children }: { moduleId: string; children: JSX.Element }) => {
+  const { user, loginSystem } = useAuthStore();
+  if (loginSystem === '2' && moduleId !== 'onsite') return <Navigate to="/onsite" replace />;
+  if (loginSystem === '3' && moduleId !== 'manufacturing') return <Navigate to="/manufacturing" replace />;
+  if (!canUserAccessModule(user, moduleId)) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+};
+
 function App() {
   const { user } = useAuthStore();
   return (
@@ -42,24 +60,24 @@ function App() {
           <ProtectedRoute>
             <Layout>
               <Routes>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/tasks" element={<Tasks />} />
-                <Route path="/projects" element={<Projects />} />
-                <Route path="/projects/:id" element={<ProjectDetails />} />
-                <Route path="/users" element={<Users />} />
-                <Route path="/settings" element={<SystemSettings />} />
-                <Route path="/analytics" element={<AnalyticsReports />} />
-                <Route path="/crm/leads" element={<Leads />} />
-                <Route path="/crm/leads/:id" element={<LeadDetail />} />
-                <Route path="/budget" element={<Budget />} />
-                <Route path="/budget/:id" element={<BudgetDetail />} />
-                <Route path="/onsite" element={<Onsite mode="ONSITE" />} />
-                <Route path="/manufacturing" element={<Onsite mode="MANUFACTURING" />} />
-                <Route path="/approvals" element={<ElectronicApprovals />} />
-                <Route path="/simulators" element={<SimulatorsDashboard />} />
-                <Route path="/simulators/solar" element={<SolarModuleSim />} />
-                <Route path="/system-logs" element={(user?.level && user.level >= 100) ? <SystemLogs /> : <Navigate to="/" />} />
-                <Route path="*" element={<Navigate to="/" />} />
+                <Route path="/" element={<ModuleRoute moduleId="dashboard"><Dashboard /></ModuleRoute>} />
+                <Route path="/tasks" element={<ModuleRoute moduleId="tasks"><Tasks /></ModuleRoute>} />
+                <Route path="/projects" element={<ModuleRoute moduleId="projects"><Projects /></ModuleRoute>} />
+                <Route path="/projects/:id" element={<ModuleRoute moduleId="projects"><ProjectDetails /></ModuleRoute>} />
+                <Route path="/users" element={(user?.level && user.level >= 100) ? <Users /> : <Navigate to="/" replace />} />
+                <Route path="/settings" element={(user?.level && user.level >= 100) ? <SystemSettings /> : <Navigate to="/" replace />} />
+                <Route path="/analytics" element={<ModuleRoute moduleId="analytics"><AnalyticsReports /></ModuleRoute>} />
+                <Route path="/crm/leads" element={<ModuleRoute moduleId="crm"><Leads /></ModuleRoute>} />
+                <Route path="/crm/leads/:id" element={<ModuleRoute moduleId="crm"><LeadDetail /></ModuleRoute>} />
+                <Route path="/budget" element={<ModuleRoute moduleId="budget"><Budget /></ModuleRoute>} />
+                <Route path="/budget/:id" element={<ModuleRoute moduleId="budget"><BudgetDetail /></ModuleRoute>} />
+                <Route path="/onsite" element={<ModuleRoute moduleId="onsite"><Onsite mode="ONSITE" /></ModuleRoute>} />
+                <Route path="/manufacturing" element={<ModuleRoute moduleId="manufacturing"><Onsite mode="MANUFACTURING" /></ModuleRoute>} />
+                <Route path="/approvals" element={<ModuleRoute moduleId="approvals"><ElectronicApprovals /></ModuleRoute>} />
+                <Route path="/simulators" element={<ModuleRoute moduleId="simulators"><SimulatorsDashboard /></ModuleRoute>} />
+                <Route path="/simulators/solar" element={<ModuleRoute moduleId="simulators"><SolarModuleSim /></ModuleRoute>} />
+                <Route path="/system-logs" element={(user?.level && user.level >= 100) ? <SystemLogs /> : <Navigate to="/" replace />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </Layout>
           </ProtectedRoute>
