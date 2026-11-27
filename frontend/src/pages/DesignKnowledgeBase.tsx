@@ -970,38 +970,40 @@ const DesignKnowledgeBase: React.FC = () => {
               </div>
             </div>
 
-            {/* 資料夾階段快速切換按鈕 */}
-            <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-100">
-              <span className="text-xs font-bold text-slate-500 mr-1">依設計階段篩選：</span>
-              <button
-                type="button"
-                onClick={() => setSelectedFolderKey('ALL')}
-                className={`px-2.5 py-1 rounded-md text-xs font-bold transition-colors cursor-pointer ${
-                  selectedFolderKey === 'ALL'
-                    ? 'bg-indigo-100 text-indigo-800 font-extrabold'
-                    : 'text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                顯示全部階段 ({categoryScopedFiles.length})
-              </button>
-              {folders.map(fd => {
-                const countInCat = categoryScopedFiles.filter(f => f.folderKey === fd.key).length;
-                return (
-                  <button
-                    key={fd.key}
-                    type="button"
-                    onClick={() => setSelectedFolderKey(fd.key === selectedFolderKey ? 'ALL' : fd.key)}
-                    className={`px-2.5 py-1 rounded-md text-xs font-bold transition-colors cursor-pointer ${
-                      selectedFolderKey === fd.key
-                        ? 'bg-indigo-100 text-indigo-800 font-extrabold'
-                        : 'text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    {fd.key} ({countInCat})
-                  </button>
-                );
-              })}
-            </div>
+            {/* 資料夾階段快速切換按鈕（僅在檢視「六大產品」時顯示；三大工程項目直接歸類為知識庫不分階段） */}
+            {!isCurrentDiscipline && (
+              <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-100">
+                <span className="text-xs font-bold text-slate-500 mr-1">依設計階段篩選：</span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedFolderKey('ALL')}
+                  className={`px-2.5 py-1 rounded-md text-xs font-bold transition-colors cursor-pointer ${
+                    selectedFolderKey === 'ALL'
+                      ? 'bg-indigo-100 text-indigo-800 font-extrabold'
+                      : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  顯示全部階段 ({categoryScopedFiles.length})
+                </button>
+                {folders.map(fd => {
+                  const countInCat = categoryScopedFiles.filter(f => f.folderKey === fd.key).length;
+                  return (
+                    <button
+                      key={fd.key}
+                      type="button"
+                      onClick={() => setSelectedFolderKey(fd.key === selectedFolderKey ? 'ALL' : fd.key)}
+                      className={`px-2.5 py-1 rounded-md text-xs font-bold transition-colors cursor-pointer ${
+                        selectedFolderKey === fd.key
+                          ? 'bg-indigo-100 text-indigo-800 font-extrabold'
+                          : 'text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      {fd.key} ({countInCat})
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* 若該獨立分類尚無任何檔案時的空狀態引導 */}
@@ -1012,10 +1014,10 @@ const DesignKnowledgeBase: React.FC = () => {
               </div>
               <div className="space-y-1 max-w-md mx-auto">
                 <h3 className="text-base sm:text-lg font-extrabold text-slate-800">
-                  【{currentCategoryTitle}】目前尚無上傳之專屬圖說或母版檔案
+                  【{currentCategoryTitle}】知識庫目前尚無上傳之圖說或母版檔案
                 </h3>
                 <p className="text-xs text-slate-500 leading-relaxed">
-                  各產品與三大工程項目（土木 / 鋼構 / 機電）之檔案彼此獨立不混用。請點擊下方按鈕上傳屬於【{currentCategoryShortName}】的圖說或母版檔案，也可以先啟動 3D 模擬演示。
+                  請點擊下方按鈕直接上傳【{currentCategoryShortName}】圖說或母版檔案，上傳後將直接歸類於此知識庫供同仁預覽與下載。
                 </p>
               </div>
               <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
@@ -1024,7 +1026,7 @@ const DesignKnowledgeBase: React.FC = () => {
                   onClick={() => handleOpenUploadForCategory(selectedCategoryId)}
                   className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs sm:text-sm font-extrabold flex items-center gap-2 shadow-sm cursor-pointer"
                 >
-                  <Upload size={16} /> 立即上傳【{currentCategoryShortName}】圖說 / 母版
+                  <Upload size={16} /> 直接上傳【{currentCategoryShortName}】知識庫檔案
                 </button>
                 {isCurrentDiscipline ? (
                   <button
@@ -1045,8 +1047,100 @@ const DesignKnowledgeBase: React.FC = () => {
                 )}
               </div>
             </div>
+          ) : isCurrentDiscipline ? (
+            /* 三大工程項目（土木 / 鋼構 / 機電）：不用再分階段資料夾，直接歸類為該工程知識庫清單 */
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="p-4 sm:p-5 bg-gradient-to-r from-slate-50 via-indigo-50/30 to-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="px-2.5 py-0.5 bg-indigo-600 text-white rounded-md text-xs font-extrabold">
+                      工程知識庫
+                    </span>
+                    <h3 className="text-base sm:text-lg font-extrabold text-slate-800">
+                      【{currentCategoryTitle}】知識庫圖說與母版清單
+                    </h3>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">{currentCategoryKb.benchmarkCase}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono font-bold text-slate-500 bg-white px-2.5 py-1 rounded-lg border border-slate-200">
+                    共 {filteredFiles.length} 個知識庫檔案
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenUploadForCategory(selectedCategoryId)}
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-extrabold flex items-center gap-1 cursor-pointer"
+                  >
+                    <Upload size={13} /> 直接上傳檔案
+                  </button>
+                </div>
+              </div>
+
+              <div className="divide-y divide-slate-100">
+                {filteredFiles.map(file => (
+                  <div
+                    key={file.id}
+                    className="p-3.5 sm:px-5 flex flex-wrap items-center justify-between gap-3 hover:bg-indigo-50/30 transition-colors"
+                  >
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <span
+                        className={`px-2.5 py-1 rounded-lg text-xs font-black font-mono border shrink-0 min-w-[54px] text-center ${getExtBadgeClass(
+                          file.ext
+                        )}`}
+                      >
+                        .{file.ext}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-bold text-sm text-slate-800 break-all" title={file.name}>
+                            {file.name}
+                          </span>
+                          <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded text-[10px] font-extrabold">
+                            {currentCategoryShortName} 知識庫
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400 mt-0.5">
+                          <span>類型：{file.typeCategory}</span>
+                          <span>大小：{formatFileSize(file.sizeBytes)}</span>
+                          {file.note && <span className="text-indigo-600 font-semibold">說明：{file.note}</span>}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      {file.isCustomUpload && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteCustomFile(file)}
+                          className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg border border-transparent hover:border-rose-200 transition-colors cursor-pointer"
+                          title="刪除此檔案"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      )}
+                      {file.previewable && (
+                        <button
+                          type="button"
+                          onClick={() => setPreviewFile(file)}
+                          className="px-3 py-1.5 bg-white border border-slate-300 hover:border-indigo-400 hover:text-indigo-600 text-slate-700 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                        >
+                          <Eye size={14} /> 線上預覽
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadFile(file)}
+                        className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-extrabold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+                      >
+                        <Download size={14} /> 下載檔案
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           ) : (
-            /* 依資料夾分組顯示該獨立分類之檔案 */
+            /* 六大產品：依資料夾分組顯示該獨立產品之檔案 */
             <div className="space-y-5">
               {folders
                 .filter(fd => selectedFolderKey === 'ALL' || fd.key === selectedFolderKey)
@@ -1375,42 +1469,44 @@ const DesignKnowledgeBase: React.FC = () => {
                 </div>
               </div>
 
-              {/* 2. 歸檔設計階段資料夾 */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-extrabold text-slate-700 mb-1">
-                    2. 歸檔設計階段資料夾
-                  </label>
-                  <select
-                    value={uploadFolderKey}
-                    onChange={e => setUploadFolderKey(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs sm:text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                  >
-                    {folders.map(f => (
-                      <option key={f.key} value={f.key}>
-                        {f.title}
-                      </option>
-                    ))}
-                  </select>
+              {/* 2. 歸檔設計階段資料夾（僅在選擇「六大產品」時顯示；三大工程不用分類直接歸入知識庫） */}
+              {!isDisciplineCategory(uploadCategoryId) && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-extrabold text-slate-700 mb-1">
+                      2. 歸檔設計階段資料夾
+                    </label>
+                    <select
+                      value={uploadFolderKey}
+                      onChange={e => setUploadFolderKey(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs sm:text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      {folders.map(f => (
+                        <option key={f.key} value={f.key}>
+                          {f.title}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block font-extrabold text-slate-700 mb-1">
+                      子分類標籤（選填）
+                    </label>
+                    <input
+                      type="text"
+                      value={uploadSubFolder}
+                      onChange={e => setUploadSubFolder(e.target.value)}
+                      placeholder="例如：模配圖、簽證圖..."
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs sm:text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="block font-extrabold text-slate-700 mb-1">
-                    子分類標籤（選填）
-                  </label>
-                  <input
-                    type="text"
-                    value={uploadSubFolder}
-                    onChange={e => setUploadSubFolder(e.target.value)}
-                    placeholder="例如：連續基礎配筋、Tekla拆料、單線圖..."
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs sm:text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                </div>
-              </div>
+              )}
 
-              {/* 3. 選擇檔案與備註 */}
+              {/* 選擇檔案與備註 */}
               <div>
                 <label className="block font-extrabold text-slate-700 mb-1">
-                  3. 選擇圖說或母版檔案 (.dwg / .pdf / .xlsx / .png / .step / .fcstd) <span className="text-rose-500">*</span>
+                  {isDisciplineCategory(uploadCategoryId) ? '2.' : '3.'} 選擇圖說或母版檔案 (.dwg / .pdf / .xlsx / .png / .step / .fcstd) <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="file"
@@ -1422,7 +1518,7 @@ const DesignKnowledgeBase: React.FC = () => {
 
               <div>
                 <label className="block font-extrabold text-slate-700 mb-1">
-                  4. 圖說說明或設計檢核備註（選填）
+                  {isDisciplineCategory(uploadCategoryId) ? '3.' : '4.'} 圖說說明或設計檢核備註（選填）
                 </label>
                 <input
                   type="text"

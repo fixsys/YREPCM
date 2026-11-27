@@ -248,16 +248,18 @@ router.get('/', authenticateToken, async (_req, res) => {
 
     // 載入各獨立分類（六大產品 或 土木/鋼構/機電）自訂上傳之專屬檔案
     const customMeta = readCustomMetadata();
+    const customDirectFiles: KnowledgeFileItem[] = [];
     for (const item of customMeta) {
       const fullCustomPath = path.join(CUSTOM_UPLOAD_DIR, item.storedFileName);
       if (!fs.existsSync(fullCustomPath)) continue;
 
       const tInfo = getFileTypeInfo(item.originalName);
+      const isDiscipline = item.categoryId === 'CIVIL' || item.categoryId === 'STEEL' || item.categoryId === 'MEP';
       const kbItem: KnowledgeFileItem = {
         id: item.id,
         name: item.originalName,
         relativePath: `custom:${item.storedFileName}`,
-        folderKey: item.folderKey || '1.預算書及模配圖',
+        folderKey: isDiscipline ? '知識庫' : item.folderKey || '1.預算書及模配圖',
         subFolder: item.subFolder || '',
         sizeBytes: item.sizeBytes,
         updatedAt: item.uploadedAt,
@@ -269,14 +271,16 @@ router.get('/', authenticateToken, async (_req, res) => {
         note: item.note,
       };
 
-      const targetFolder = folders.find(f => f.key === kbItem.folderKey) || folders[0];
+      const targetFolder = folders.find(f => f.key === kbItem.folderKey);
       if (targetFolder) {
         targetFolder.files.unshift(kbItem);
+      } else {
+        customDirectFiles.push(kbItem);
       }
     }
 
     folders.sort((a, b) => a.order - b.order);
-    const allFiles = folders.flatMap(f => f.files);
+    const allFiles = [...customDirectFiles, ...folders.flatMap(f => f.files)];
 
     res.json({
       templateName: '元融集團 設計知識庫與 3D 模擬中心',
@@ -301,17 +305,9 @@ router.post('/upload', authenticateToken, upload.single('file'), async (req, res
     const originalName = rawOriginalName || req.file.originalname;
 
     const categoryId = (req.body.categoryId as IndependentCategoryId) || 'CIVIL';
-    const defaultFolder =
-      categoryId === 'CIVIL'
-        ? '1.預算書及模配圖'
-        : categoryId === 'STEEL'
-        ? '5.拆料圖及組裝圖'
-        : categoryId === 'MEP'
-        ? '3.台電送審圖及施工圖'
-        : '1.預算書及模配圖';
-
-    const folderKey = req.body.folderKey || defaultFolder;
-    const subFolder = req.body.subFolder || '';
+    const isDiscipline = categoryId === 'CIVIL' || categoryId === 'STEEL' || categoryId === 'MEP';
+    const folderKey = isDiscipline ? '知識庫' : req.body.folderKey || '1.預算書及模配圖';
+    const subFolder = isDiscipline ? '' : req.body.subFolder || '';
     const note = req.body.note || '';
 
     const newEntry: CustomUploadedEntry = {
