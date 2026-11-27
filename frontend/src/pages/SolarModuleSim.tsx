@@ -589,11 +589,11 @@ export default function SolarModuleSim() {
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => navigate('/simulators')}
-            className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors"
-            title="返回設計模擬器列表"
+            onClick={() => navigate(`/simulators?product=${productType}`)}
+            className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs md:text-sm font-medium flex items-center gap-1.5 border border-white/20 transition-colors cursor-pointer"
+            title="返回設計知識庫與範例下載"
           >
-            <ArrowLeft size={18} />
+            <ArrowLeft size={16} /> 返回知識庫與範例下載
           </button>
           <Zap className="text-yellow-400 shrink-0" size={26} fill="currentColor" />
           <div>

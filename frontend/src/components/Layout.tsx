@@ -65,20 +65,19 @@ const Layout = ({ children }: { children: ReactNode }) => {
   let navItems = [
     { id: 'dashboard', name: '總覽看板', path: '/', icon: LayoutDashboard },
     { id: 'approvals', name: '電子簽核', path: '/approvals', icon: FileSignature },
-    { id: 'knowledge_base', name: '設計知識庫', path: '/knowledge-base', icon: BookOpen },
+    { id: 'simulators', name: '設計知識庫與模擬器', path: '/simulators', icon: BookOpen },
     { id: 'crm', name: '業務開發', path: '/crm/leads', icon: Briefcase },
     { id: 'onsite', name: '現場報工', path: '/onsite', icon: ClipboardList },
     { id: 'manufacturing', name: '製造報工', path: '/manufacturing', icon: Factory },
     { id: 'budget', name: '預算分析', path: '/budget', icon: Calculator },
     { id: 'tasks', name: '個人任務', path: '/tasks', icon: CheckSquare },
     { id: 'projects', name: '專案管理', path: '/projects', icon: FolderKanban },
-    { id: 'simulators', name: '設計模擬器', path: '/simulators', icon: Lightbulb },
     { id: 'analytics', name: '報表與分析', path: '/analytics', icon: BarChart2 },
   ];
 
   if (!user?.level || user.level < 100) {
     const allowed = Array.isArray(user?.permissions) ? user.permissions : [];
-    navItems = navItems.filter(item => item.id === 'approvals' || item.id === 'dashboard' || item.id === 'knowledge_base' || allowed.includes(item.id));
+    navItems = navItems.filter(item => item.id === 'approvals' || item.id === 'dashboard' || item.id === 'simulators' || allowed.includes(item.id));
   }
 
   if (user?.level && user.level >= 100) {

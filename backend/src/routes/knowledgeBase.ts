@@ -102,6 +102,45 @@ const getFileTypeInfo = (filename: string) => {
   }
 };
 
+// 判斷每個範例檔案適用之六大太陽能產品線
+// (sport_court: 風雨球場為完整母版，而預算書母版、台電送審、3P4W附CT電錶箱、串併及線槽填充率、鋁擠支架通用標準、竣工報告書等亦可供其他五大產品通用參考)
+const getApplicableProducts = (filename: string, folderKey: string): { products: string[]; isUniversal: boolean } => {
+  const universalKeywords = [
+    '工程預算書(參數化母版)',
+    '3P4W附CT電錶箱結構圖',
+    '串併及線槽填充率檢討表',
+    '台電送審圖(範例)',
+    '機電施工圖(範例)',
+    '結構技師簽章定稿',
+    '鋁擠支架安裝詳圖(通用標準)',
+    '铝挤支架安装详图',
+    '32.[案號]-[案名]-台電審訖圖',
+    '33.[案號]-[案名]-竣工照及掛錶紀錄',
+  ];
+  const isUniversal = universalKeywords.some(kw => filename.includes(kw));
+  if (isUniversal) {
+    return {
+      products: ['fish_outdoor', 'fish_indoor', 'sport_court', 'roof_canopy', 'roof_flush', 'ground_mount'],
+      isUniversal: true,
+    };
+  }
+  // 鋼構拆料、一次/二次/板加工、風拉桿亦適用於棚架類產品 (魚電室外、魚電室內、風雨球場、屋頂棚架、地面棚架)
+  if (
+    folderKey === '5.拆料圖及組裝圖' ||
+    folderKey === '4.結構簽證圖' ||
+    filename.includes('結構計算書')
+  ) {
+    return {
+      products: ['sport_court', 'fish_outdoor', 'fish_indoor', 'roof_canopy'],
+      isUniversal: false,
+    };
+  }
+  return {
+    products: ['sport_court'],
+    isUniversal: false,
+  };
+};
+
 interface KnowledgeFileItem {
   id: string;
   name: string;
@@ -113,6 +152,8 @@ interface KnowledgeFileItem {
   ext: string;
   typeCategory: string;
   previewable: boolean;
+  products: string[];
+  isUniversal: boolean;
 }
 
 const scanFilesRecursive = (dirPath: string, folderKey: string, baseRel = ''): KnowledgeFileItem[] => {
@@ -132,6 +173,7 @@ const scanFilesRecursive = (dirPath: string, folderKey: string, baseRel = ''): K
     } else if (entry.isFile()) {
       const stat = fs.statSync(fullPath);
       const typeInfo = getFileTypeInfo(entry.name);
+      const appInfo = getApplicableProducts(entry.name, folderKey);
       results.push({
         id: Buffer.from(relFromRoot, 'utf8').toString('base64url'),
         name: entry.name,
@@ -143,6 +185,8 @@ const scanFilesRecursive = (dirPath: string, folderKey: string, baseRel = ''): K
         ext: typeInfo.ext,
         typeCategory: typeInfo.category,
         previewable: typeInfo.previewable,
+        products: appInfo.products,
+        isUniversal: appInfo.isUniversal,
       });
     }
   }
@@ -193,6 +237,8 @@ router.get('/', authenticateToken, async (_req, res) => {
         ext: tInfo.ext,
         typeCategory: tInfo.category,
         previewable: tInfo.previewable,
+        products: ['sport_court', 'fish_outdoor', 'fish_indoor', 'roof_canopy', 'roof_flush', 'ground_mount'],
+        isUniversal: true,
       });
     }
     const meta0 = STAGE_DESCRIPTIONS['0.設計規範與總覽'];

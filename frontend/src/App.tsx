@@ -14,7 +14,6 @@ import Budget from './pages/Budget';
 import BudgetDetail from './pages/BudgetDetail';
 import Leads from './pages/crm/Leads';
 import LeadDetail from './pages/crm/LeadDetail';
-import SimulatorsDashboard from './pages/SimulatorsDashboard';
 import SolarModuleSim from './pages/SolarModuleSim';
 import Onsite from './pages/Onsite';
 import SystemLogs from './pages/SystemLogs';
@@ -33,7 +32,7 @@ const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
 export const canUserAccessModule = (user: any, moduleId: string): boolean => {
   if (!user) return false;
   if (user.level && user.level >= 100) return true;
-  if (moduleId === 'dashboard' || moduleId === 'approvals' || moduleId === 'knowledge_base') return true;
+  if (moduleId === 'dashboard' || moduleId === 'approvals' || moduleId === 'knowledge_base' || moduleId === 'simulators') return true;
   const allowed: string[] = Array.isArray(user.permissions) ? user.permissions : [];
   return allowed.includes(moduleId);
 };
@@ -75,8 +74,8 @@ function App() {
                 <Route path="/onsite" element={<ModuleRoute moduleId="onsite"><Onsite mode="ONSITE" /></ModuleRoute>} />
                 <Route path="/manufacturing" element={<ModuleRoute moduleId="manufacturing"><Onsite mode="MANUFACTURING" /></ModuleRoute>} />
                 <Route path="/approvals" element={<ModuleRoute moduleId="approvals"><ElectronicApprovals /></ModuleRoute>} />
-                <Route path="/knowledge-base" element={<ModuleRoute moduleId="knowledge_base"><DesignKnowledgeBase /></ModuleRoute>} />
-                <Route path="/simulators" element={<ModuleRoute moduleId="simulators"><SimulatorsDashboard /></ModuleRoute>} />
+                <Route path="/knowledge-base" element={<Navigate to="/simulators" replace />} />
+                <Route path="/simulators" element={<ModuleRoute moduleId="simulators"><DesignKnowledgeBase /></ModuleRoute>} />
                 <Route path="/simulators/solar" element={<ModuleRoute moduleId="simulators"><SolarModuleSim /></ModuleRoute>} />
                 <Route path="/system-logs" element={(user?.level && user.level >= 100) ? <SystemLogs /> : <Navigate to="/" replace />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
