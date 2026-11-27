@@ -848,7 +848,7 @@ const DesignKnowledgeBase: React.FC = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 pt-2">
               {[
-                { step: 'STEP 1', title: '現場收方與套圖', folder: '7.收方圖', desc: '確認場域邊界、既有設施、周邊建物遮陰樓高與地下管溝位置' },
+                { step: 'STEP 1', title: '現場收方與套圖', folder: '1.預算書及模配圖', desc: '確認場域邊界、既有設施、周邊建物遮陰樓高與地下管溝位置（收方及柱位圖）' },
                 { step: 'STEP 2', title: '模配與預算試算', folder: '1.預算書及模配圖', desc: '套疊地籍圖、排佈模組、留設檢修步道與參數化預算母版' },
                 { step: 'STEP 3', title: '業主簽確與結構簽證', folder: '4.結構簽證圖', desc: '先出業主/校方簽確圖確認跨距與高程，再出Midas計算書與簽證圖' },
                 { step: 'STEP 4', title: 'Tekla拆料與製造圖', folder: '5.拆料圖及組裝圖', desc: '鋼構拆料總圖、設備平台補強、一二次/板加工圖與鋁支架分料單' },

@@ -11,10 +11,10 @@ const TEMPLATE_ROOT = path.resolve(__dirname, '../../../風雨球場設計模板
 const STAGE_DESCRIPTIONS: Record<string, { title: string; subtitle: string; badge: string; order: number; checkPoint: string }> = {
   '1.預算書及模配圖': {
     title: '1. 預算書及模配圖（提案與成本階段）',
-    subtitle: '工程預算書參數化母版 (.xlsx)、模組配置圖 (.dwg/.pdf) 與航拍底圖 (.png)',
-    badge: '提案與預算',
+    subtitle: '現場收方及柱位圖 (.dwg)、工程預算書參數化母版 (.xlsx)、模組配置圖 (.dwg/.pdf) 與航拍底圖 (.png)',
+    badge: '收方、提案與預算',
     order: 1,
-    checkPoint: '套疊地籍圖、確認指北針方位、模組排佈（19 排 × 15 列 = 285 片）、中央留設檢修走道與安全爬梯位置。',
+    checkPoint: '現場收方確認場域邊界、周邊遮陰樓高與地下管溝位置（避開柱位開挖）；套疊地籍圖、確認指北針方位、模組排佈（19 排 × 15 列 = 285 片）、中央留設檢修走道與安全爬梯位置。',
   },
   '2.客戶資料': {
     title: '2. 客戶資料（業主與校方基本文件）',
@@ -50,13 +50,6 @@ const STAGE_DESCRIPTIONS: Record<string, { title: string; subtitle: string; badg
     badge: '竣工定稿',
     order: 6,
     checkPoint: '彙整 Midas Gen 3D 結構計算書、台電審訖圖與現場竣工照片及掛錶紀錄供驗收結案。',
-  },
-  '7.收方圖': {
-    title: '7. 現場收方及柱位圖（先期勘查階段）',
-    subtitle: '收方及柱位圖 (.dwg)',
-    badge: '先期勘查',
-    order: 7,
-    checkPoint: '標示既有籃球場邊線、籃球架位置、階梯/出口動線、周邊建物樓高（2F 教室遮陰）、草地與地下暗溝位置（避開柱位開挖）。',
   },
 };
 
@@ -197,7 +190,8 @@ router.get('/', authenticateToken, async (_req, res) => {
       files: KnowledgeFileItem[];
     }[] = [];
 
-    // 1..7 Stage directories (排除第 0 項與第 8 項 FreeCAD_3D模型)
+    // 1..6 Stage directories (排除第 0 項與第 8 項，並將 7.收方圖 內的檔案併入 1.預算書及模配圖)
+    const extraFilesForStage1: KnowledgeFileItem[] = [];
     for (const entry of rootEntries) {
       if (entry.isDirectory()) {
         const folderKey = entry.name;
@@ -205,6 +199,11 @@ router.get('/', authenticateToken, async (_req, res) => {
           continue;
         }
         const fullDir = path.join(TEMPLATE_ROOT, folderKey);
+        if (folderKey === '7.收方圖') {
+          const stage7Files = scanFilesRecursive(fullDir, '1.預算書及模配圖', '');
+          extraFilesForStage1.push(...stage7Files);
+          continue;
+        }
         const files = scanFilesRecursive(fullDir, folderKey, '');
         const meta = STAGE_DESCRIPTIONS[folderKey] || {
           title: folderKey,
@@ -218,6 +217,13 @@ router.get('/', authenticateToken, async (_req, res) => {
           ...meta,
           files,
         });
+      }
+    }
+
+    if (extraFilesForStage1.length > 0) {
+      const stage1 = folders.find(f => f.key === '1.預算書及模配圖');
+      if (stage1) {
+        stage1.files.push(...extraFilesForStage1);
       }
     }
 
