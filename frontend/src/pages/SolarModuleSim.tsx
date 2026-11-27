@@ -71,13 +71,13 @@ export const SOLAR_PRODUCTS: SolarProductSpec[] = [
     id: 'sport_court',
     code: '3',
     name: '風雨球場',
-    subtitle: '具頂棚遮蔽、可運動的多功能球場',
+    subtitle: '具頂棚遮蔽、可運動的多功能球場（嵵裡國小 156.75kWp 標準母版）',
     application: '運動設施＋發電',
-    features: '遮陽避雨、提升場地使用率、兼具綠電效益',
+    features: '22m大跨距無中柱、雙坡山形鋼構、+4.5m設備平台、護籠爬梯與母索步道',
     suitableFor: '校園、社區、公園、企業園區',
-    defaultDripHeight: 6.5,
-    defaultTiltAngle: 10,
-    defaultSlopeType: 'single',
+    defaultDripHeight: 7.0,
+    defaultTiltAngle: 6,
+    defaultSlopeType: 'gable',
     defaultBuildingHeight: 0,
     defaultGroundStyle: 'canopy',
     badgeColor: 'from-indigo-600 to-blue-900',
@@ -181,7 +181,7 @@ export default function SolarModuleSim() {
     [productType]
   );
 
-  // 當切換產品時，自動套用該產品的預設結構參數
+  // 當切換產品時，自動套用該產品的預設結構與範例母版參數
   const handleSelectProduct = (prod: SolarProductSpec) => {
     setProductType(prod.id);
     setDripHeight(prod.defaultDripHeight);
@@ -191,7 +191,20 @@ export default function SolarModuleSim() {
       setBuildingHeight(prod.defaultBuildingHeight);
     }
     setGroundMountStyle(prod.defaultGroundStyle);
-    if (prod.id === 'ground_mount' && hWalkwayCount === 0) {
+    if (prod.id === 'sport_court') {
+      // 對齊《風雨球場設計模板》（澎湖嵵裡國小 156.75kWp：19排 × 15列 = 285片 × 550Wp）
+      setSiteWidth(34.2);
+      setSiteLength(23.0);
+      setEdgeClearance(0.4);
+      setPanelWidth(1.34);
+      setPanelLength(1.72);
+      setPanelPower(550);
+      setPanelSpacing(0.04);
+      setOrientation('landscape');
+      setHWalkwayCount(1);
+      setHWalkwayWidth(0.8);
+      setVWalkwayCount(0);
+    } else if (prod.id === 'ground_mount' && hWalkwayCount === 0) {
       setHWalkwayCount(1);
       setHWalkwayWidth(1.2);
     }

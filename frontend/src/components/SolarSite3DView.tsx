@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { RotateCcw, Camera, Eye, Play, Pause, Layers } from 'lucide-react';
+import { RotateCcw, Camera, Eye, Play, Pause, Layers, Zap } from 'lucide-react';
 
 export type ProductTypeId =
   | 'fish_outdoor'
@@ -39,6 +39,79 @@ export interface SolarSite3DProps {
   totalCapacityKW: number;
 }
 
+/**
+ * Helper: Build a 3D beam/cylinder/box connecting point p1 to p2
+ */
+function createMemberBetween(
+  p1: THREE.Vector3,
+  p2: THREE.Vector3,
+  width: number,
+  height: number,
+  material: THREE.Material,
+  isCylinder = false
+): THREE.Mesh {
+  const dir = new THREE.Vector3().subVectors(p2, p1);
+  const len = dir.length();
+  const geo = isCylinder
+    ? new THREE.CylinderGeometry(width / 2, width / 2, len, 10)
+    : new THREE.BoxGeometry(width, height, len);
+
+  const mesh = new THREE.Mesh(geo, material);
+  const mid = new THREE.Vector3().addVectors(p1, p2).multiplyScalar(0.5);
+  mesh.position.copy(mid);
+
+  if (isCylinder) {
+    const up = new THREE.Vector3(0, 1, 0);
+    mesh.quaternion.setFromUnitVectors(up, dir.clone().normalize());
+  } else {
+    mesh.lookAt(p2);
+  }
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  return mesh;
+}
+
+/**
+ * Helper: Build realistic H-Beam (I-Beam) with top flange, bottom flange, and web between p1 and p2
+ */
+function createHBeamBetween(
+  p1: THREE.Vector3,
+  p2: THREE.Vector3,
+  H: number,
+  B: number,
+  tw: number,
+  tf: number,
+  material: THREE.Material
+): THREE.Group {
+  const dir = new THREE.Vector3().subVectors(p2, p1);
+  const len = dir.length();
+  const grp = new THREE.Group();
+  if (len < 0.01) return grp;
+
+  const mid = new THREE.Vector3().addVectors(p1, p2).multiplyScalar(0.5);
+  grp.position.copy(mid);
+  grp.lookAt(p2);
+
+  // Web (腹板)
+  const webGeo = new THREE.BoxGeometry(tw, H - 2 * tf, len);
+  const webMesh = new THREE.Mesh(webGeo, material);
+  webMesh.castShadow = true;
+
+  // Top flange (上翼板)
+  const flGeo = new THREE.BoxGeometry(B, tf, len);
+  const topFl = new THREE.Mesh(flGeo, material);
+  topFl.position.y = (H - tf) / 2;
+  topFl.castShadow = true;
+
+  // Bottom flange (下翼板)
+  const botFl = new THREE.Mesh(flGeo, material);
+  botFl.position.y = -(H - tf) / 2;
+  botFl.castShadow = true;
+
+  grp.add(webMesh, topFl, botFl);
+  return grp;
+}
+
 export default function SolarSite3DView({
   productType,
   siteWidth,
@@ -65,11 +138,12 @@ export default function SolarSite3DView({
 
   const [autoRotate, setAutoRotate] = useState(false);
   const [showStructure, setShowStructure] = useState(true);
+  const [showMepAndRoof, setShowMepAndRoof] = useState(true);
   const [showEnvironment, setShowEnvironment] = useState(true);
 
   const W = Math.max(2, Number(siteWidth) || 20);
   const L = Math.max(2, Number(siteLength) || 15);
-  const tiltRad = (Math.max(0, Math.min(45, Number(tiltAngle) || 10)) * Math.PI) / 180;
+  const tiltRad = (Math.max(0, Math.min(45, Number(tiltAngle) || 6)) * Math.PI) / 180;
   const clearH = Math.max(0.2, Number(dripHeight) || 3);
   const bldgH = Math.max(3, Number(buildingHeight) || 7);
 
@@ -79,16 +153,16 @@ export default function SolarSite3DView({
     if (!container) return;
 
     const width = container.clientWidth || 800;
-    const height = container.clientHeight || 500;
+    const height = container.clientHeight || 520;
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0xeaf2f8);
-    scene.fog = new THREE.FogExp2(0xeaf2f8, 0.0025);
+    scene.fog = new THREE.FogExp2(0xeaf2f8, 0.0022);
     sceneRef.current = scene;
 
-    const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 2000);
+    const camera = new THREE.PerspectiveCamera(42, width / height, 0.1, 2000);
     const maxDim = Math.max(W, L);
-    camera.position.set(maxDim * 1.15, maxDim * 0.85, maxDim * 1.25);
+    camera.position.set(maxDim * 1.05, maxDim * 0.75, maxDim * 1.15);
     cameraRef.current = camera;
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
@@ -103,28 +177,28 @@ export default function SolarSite3DView({
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.06;
-    controls.maxPolarAngle = Math.PI / 2 - 0.02;
+    controls.maxPolarAngle = Math.PI / 2 - 0.01;
     controls.minDistance = 3;
     controls.maxDistance = 800;
-    controls.target.set(0, 2, 0);
+    controls.target.set(0, 3.2, 0);
     controlsRef.current = controls;
 
     // Lights
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.78);
     scene.add(ambientLight);
 
-    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x94a3b8, 0.45);
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x94a3b8, 0.5);
     hemiLight.position.set(0, 80, 0);
     scene.add(hemiLight);
 
-    const dirLight = new THREE.DirectionalLight(0xfffbeb, 1.25);
-    dirLight.position.set(60, 90, 50);
+    const dirLight = new THREE.DirectionalLight(0xfffbeb, 1.35);
+    dirLight.position.set(60, 95, 55);
     dirLight.castShadow = true;
     dirLight.shadow.mapSize.width = 2048;
     dirLight.shadow.mapSize.height = 2048;
     dirLight.shadow.camera.near = 0.5;
     dirLight.shadow.camera.far = 350;
-    const d = 80;
+    const d = 85;
     dirLight.shadow.camera.left = -d;
     dirLight.shadow.camera.right = d;
     dirLight.shadow.camera.top = d;
@@ -168,7 +242,7 @@ export default function SolarSite3DView({
   useEffect(() => {
     if (controlsRef.current) {
       controlsRef.current.autoRotate = autoRotate;
-      controlsRef.current.autoRotateSpeed = 1.5;
+      controlsRef.current.autoRotateSpeed = 1.4;
     }
   }, [autoRotate]);
 
@@ -177,7 +251,6 @@ export default function SolarSite3DView({
     const group = contentGroupRef.current;
     if (!group) return;
 
-    // Clear previous meshes
     while (group.children.length > 0) {
       const child = group.children[0] as any;
       group.remove(child);
@@ -187,7 +260,6 @@ export default function SolarSite3DView({
     const cw = Math.min(cutoutWidth, W);
     const cl = Math.min(cutoutLength, L);
 
-    // Helper: check if a 2D point (0..W, 0..L) is inside the site footprint
     const isInsideFootprint = (px: number, py: number) => {
       if (siteShape === 'l-shape') {
         if (px > W - cw && py < cl) return false;
@@ -199,8 +271,6 @@ export default function SolarSite3DView({
       return true;
     };
 
-    // Helper: create footprintExtrudeGeometry in XZ plane (centered at 0,0)
-    // Mapping: 2D (x: 0..W, y: 0..L) -> 3D (x: x - W/2, z: y - L/2)
     const createFootprintShape = (inset = 0) => {
       const s = new THREE.Shape();
       const w0 = inset;
@@ -274,12 +344,9 @@ export default function SolarSite3DView({
     (gridHelper.material as THREE.Material).transparent = true;
     group.add(gridHelper);
 
-    // Compute roof height function: given 2D y (0 = North/Back, L = South/Front)
-    // Wait: let's make z = y - L/2 where y = L is South (front, lower eave) and y = 0 is North (back, higher ridge)
     const isRoofProduct = productType === 'roof_canopy' || productType === 'roof_flush';
     const baseElevation = isRoofProduct ? bldgH : 0;
 
-    // Effective roof slope type per product
     const effectiveSlope: 'single' | 'gable' =
       productType === 'fish_indoor'
         ? 'gable'
@@ -294,11 +361,9 @@ export default function SolarSite3DView({
       }
       const eaveY = baseElevation + (productType === 'roof_flush' ? 0.25 : clearH);
       if (effectiveSlope === 'gable') {
-        // Ridge at y2d = L / 2
         const distFromEdge = Math.min(y2d, L - y2d);
         return eaveY + distFromEdge * Math.tan(tiltRad);
       } else {
-        // Single slope: front (y2d = L) is lower eave, back (y2d = 0) is higher
         return eaveY + (L - y2d) * Math.tan(tiltRad);
       }
     };
@@ -318,14 +383,13 @@ export default function SolarSite3DView({
     // =========================================================================
     if (showEnvironment) {
       if (productType === 'fish_outdoor') {
-        // ① 魚電共生室外型：戶外養殖池 + 池岸土堤 + 水車增氧機
-        const bankOuter = buildExtrudedSlab(0.7, 0, 0x94a3b8, -0.6);
+        // ① 魚電共生室外型：戶外養殖池 + 池岸土堤 + 水車增氧機 + 走道棧橋
+        const bankOuter = buildExtrudedSlab(0.7, 0, 0x94a3b8, -0.8);
         group.add(bankOuter);
 
-        const waterSlab = buildExtrudedSlab(0.55, 0.02, 0x0284c7, 0.3, 0.82);
+        const waterSlab = buildExtrudedSlab(0.55, 0.02, 0x0284c7, 0.3, 0.84);
         group.add(waterSlab);
 
-        // Aerators (水車增氧機) inside pond
         const aeratorMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5 });
         const floatMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.4 });
         const foamMat = new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.75 });
@@ -353,11 +417,10 @@ export default function SolarSite3DView({
           }
         }
       } else if (productType === 'fish_indoor') {
-        // ② 魚電共生室內型：室內溫室/養殖棚 + 半透明圍牆 + 捲門 + 室內養殖池與藍色養殖桶
+        // ② 魚電共生室內型：室內溫室/養殖棚 + 半透明圍牆 + 捲門 + 室內圓形養殖桶與中央步道
         const floorSlab = buildExtrudedSlab(0.3, 0, 0xcbd5e1, 0);
         group.add(floorSlab);
 
-        // Indoor water pool on left half + circular blue breeding tanks on right half
         const tankMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.35 });
         const tankWaterMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.2 });
         const tankRadius = Math.min(1.6, Math.max(0.8, Math.min(W, L) * 0.08));
@@ -378,7 +441,6 @@ export default function SolarSite3DView({
           }
         }
 
-        // Translucent greenhouse walls + rolling door
         const wallMat = new THREE.MeshStandardMaterial({
           color: 0xe2e8f0,
           transparent: true,
@@ -387,12 +449,10 @@ export default function SolarSite3DView({
           side: THREE.DoubleSide,
         });
         const wallH = clearH;
-        // Front & Back walls
         const frontWall = new THREE.Mesh(new THREE.PlaneGeometry(W, wallH), wallMat);
         frontWall.position.set(0, wallH / 2, L / 2);
         const backWall = frontWall.clone();
         backWall.position.set(0, wallH / 2, -L / 2);
-        // Left & Right walls
         const leftWall = new THREE.Mesh(new THREE.PlaneGeometry(L, wallH), wallMat);
         leftWall.rotation.y = Math.PI / 2;
         leftWall.position.set(-W / 2, wallH / 2, 0);
@@ -400,7 +460,6 @@ export default function SolarSite3DView({
         rightWall.position.set(W / 2, wallH / 2, 0);
         group.add(frontWall, backWall, leftWall, rightWall);
 
-        // Gable triangular wall ends (left & right)
         const ridgeH = getCanopySurfaceY(L / 2) - wallH;
         if (ridgeH > 0.05) {
           const triShape = new THREE.Shape();
@@ -418,7 +477,6 @@ export default function SolarSite3DView({
           group.add(leftGable, rightGable);
         }
 
-        // Rolling shutter door on right/front
         const doorW = Math.min(3.5, W * 0.25);
         const doorH = Math.min(3.2, wallH * 0.85);
         const doorMesh = new THREE.Mesh(
@@ -428,103 +486,149 @@ export default function SolarSite3DView({
         doorMesh.position.set(W / 2 - doorW * 0.8, doorH / 2, L / 2 + 0.02);
         group.add(doorMesh);
       } else if (productType === 'sport_court') {
-        // ③ 風雨球場：運動球場 (藍紅雙色籃球場 + 白色球線 + 籃球架 + 圍網)
-        const outerApron = buildExtrudedSlab(0.15, 0, 0x16a34a, -0.8);
+        // =====================================================================
+        // ③ 風雨球場：嚴格依據上傳之《風雨球場設計模板》(澎湖嵵裡國小 156.75kWp) 建模
+        // 包含：外圍球場地坪、縱向 800×700 連續基礎地梁、標準籃球場線 (中圈/禁區/三分線/邊線)、2座籃球架
+        // =====================================================================
+        const outerApron = buildExtrudedSlab(0.15, 0, 0x15803d, -1.6);
         group.add(outerApron);
-        const mainCourt = buildExtrudedSlab(0.18, 0.01, 0x1d4ed8, 0.2);
+        const mainCourt = buildExtrudedSlab(0.18, 0.01, 0x1d4ed8, -0.3);
         group.add(mainCourt);
 
-        // Court markings & key areas
-        const cwCourt = Math.max(4, W * 0.78);
-        const clCourt = Math.max(4, L * 0.78);
-        const lineMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
-        const redMat = new THREE.MeshStandardMaterial({ color: 0xb91c1c, roughness: 0.7 });
-
-        // Center circle & paint areas
-        const centerCircle = new THREE.Mesh(new THREE.RingGeometry(Math.min(cwCourt, clCourt) * 0.11, Math.min(cwCourt, clCourt) * 0.12, 32), lineMat);
-        centerCircle.rotation.x = -Math.PI / 2;
-        centerCircle.position.set(0, 0.21, 0);
-        const centerFill = new THREE.Mesh(new THREE.CircleGeometry(Math.min(cwCourt, clCourt) * 0.11, 32), redMat);
-        centerFill.rotation.x = -Math.PI / 2;
-        centerFill.position.set(0, 0.205, 0);
-        group.add(centerCircle, centerFill);
-
-        // Border lines
-        const borderRing = new THREE.Mesh(new THREE.PlaneGeometry(cwCourt, clCourt), new THREE.MeshStandardMaterial({ color: 0x2563eb, roughness: 0.6 }));
-        borderRing.rotation.x = -Math.PI / 2;
-        borderRing.position.set(0, 0.195, 0);
-        group.add(borderRing);
-
-        // Red key zones at left/right or front/back along longer axis
+        // 標準籃球場尺寸比例 (沿長軸排佈球場)
         const alongX = W >= L;
-        const keyLen = (alongX ? cwCourt : clCourt) * 0.22;
-        const keyWid = (alongX ? clCourt : cwCourt) * 0.32;
-        const key1 = new THREE.Mesh(new THREE.PlaneGeometry(alongX ? keyLen : keyWid, alongX ? keyWid : keyLen), redMat);
-        key1.rotation.x = -Math.PI / 2;
-        key1.position.set(
-          alongX ? -cwCourt / 2 + keyLen / 2 : 0,
-          0.205,
-          alongX ? 0 : -clCourt / 2 + keyLen / 2
-        );
-        const key2 = key1.clone();
-        key2.position.set(
-          alongX ? cwCourt / 2 - keyLen / 2 : 0,
-          0.205,
-          alongX ? 0 : clCourt / 2 - keyLen / 2
-        );
-        group.add(key1, key2);
+        const cwCourt = alongX ? Math.max(6, W * 0.82) : Math.max(4, W * 0.72);
+        const clCourt = alongX ? Math.max(4, L * 0.72) : Math.max(6, L * 0.82);
+        const lineMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+        const redMat = new THREE.MeshStandardMaterial({ color: 0xb91c1c, roughness: 0.65 });
+        const courtSurfaceMat = new THREE.MeshStandardMaterial({ color: 0x2563eb, roughness: 0.6 });
 
-        // Basketball hoops at both ends
+        // 球場主藍底與白色邊線框
+        const courtBorder = new THREE.Mesh(new THREE.PlaneGeometry(cwCourt + 0.16, clCourt + 0.16), lineMat);
+        courtBorder.rotation.x = -Math.PI / 2;
+        courtBorder.position.set(0, 0.194, 0);
+        const courtInner = new THREE.Mesh(new THREE.PlaneGeometry(cwCourt, clCourt), courtSurfaceMat);
+        courtInner.rotation.x = -Math.PI / 2;
+        courtInner.position.set(0, 0.196, 0);
+        group.add(courtBorder, courtInner);
+
+        // 中場白線與中圈
+        const midLine = new THREE.Mesh(
+          new THREE.PlaneGeometry(alongX ? 0.08 : cwCourt, alongX ? clCourt : 0.08),
+          lineMat
+        );
+        midLine.rotation.x = -Math.PI / 2;
+        midLine.position.set(0, 0.202, 0);
+        const cRad = Math.min(cwCourt, clCourt) * 0.115;
+        const centerCircle = new THREE.Mesh(new THREE.RingGeometry(cRad, cRad + 0.08, 36), lineMat);
+        centerCircle.rotation.x = -Math.PI / 2;
+        centerCircle.position.set(0, 0.203, 0);
+        const centerFill = new THREE.Mesh(new THREE.CircleGeometry(cRad, 36), redMat);
+        centerFill.rotation.x = -Math.PI / 2;
+        centerFill.position.set(0, 0.201, 0);
+        group.add(midLine, centerCircle, centerFill);
+
+        // 兩端紅色禁區、罰球圈與三分球弧線
+        const keyLen = (alongX ? cwCourt : clCourt) * 0.21;
+        const keyWid = (alongX ? clCourt : cwCourt) * 0.33;
+        const threePtRad = Math.min(cwCourt, clCourt) * 0.38;
+
+        for (const side of [-1, 1]) {
+          // 禁區白框 + 紅底
+          const kx = alongX ? side * (cwCourt / 2 - keyLen / 2) : 0;
+          const kz = alongX ? 0 : side * (clCourt / 2 - keyLen / 2);
+          const keyBorder = new THREE.Mesh(
+            new THREE.PlaneGeometry(
+              (alongX ? keyLen : keyWid) + 0.12,
+              (alongX ? keyWid : keyLen) + 0.12
+            ),
+            lineMat
+          );
+          keyBorder.rotation.x = -Math.PI / 2;
+          keyBorder.position.set(kx, 0.201, kz);
+
+          const keyFill = new THREE.Mesh(
+            new THREE.PlaneGeometry(alongX ? keyLen : keyWid, alongX ? keyWid : keyLen),
+            redMat
+          );
+          keyFill.rotation.x = -Math.PI / 2;
+          keyFill.position.set(kx, 0.203, kz);
+
+          // 罰球半圓
+          const ftX = alongX ? side * (cwCourt / 2 - keyLen) : 0;
+          const ftZ = alongX ? 0 : side * (clCourt / 2 - keyLen);
+          const ftRing = new THREE.Mesh(new THREE.RingGeometry(keyWid * 0.35, keyWid * 0.35 + 0.07, 28), lineMat);
+          ftRing.rotation.x = -Math.PI / 2;
+          ftRing.position.set(ftX, 0.204, ftZ);
+
+          // 三分線半圓弧
+          const tpX = alongX ? side * (cwCourt / 2 - 1.2) : 0;
+          const tpZ = alongX ? 0 : side * (clCourt / 2 - 1.2);
+          const startAng = alongX
+            ? side === -1
+              ? -Math.PI / 2
+              : Math.PI / 2
+            : side === -1
+            ? 0
+            : Math.PI;
+          const tpArc = new THREE.Mesh(
+            new THREE.RingGeometry(threePtRad, threePtRad + 0.07, 36, 1, startAng, Math.PI),
+            lineMat
+          );
+          tpArc.rotation.x = -Math.PI / 2;
+          tpArc.position.set(tpX, 0.203, tpZ);
+
+          group.add(keyBorder, keyFill, ftRing, tpArc);
+        }
+
+        // 兩端標準籃球架
         const buildHoop = (x: number, z: number, rotY: number) => {
           const hg = new THREE.Group();
           hg.position.set(x, 0.2, z);
           hg.rotation.y = rotY;
-          const postMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, metalness: 0.4, roughness: 0.3 });
-          const post = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 3.2, 12), postMat);
-          post.position.set(0, 1.6, 0);
-          const arm = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 1.1), postMat);
-          arm.position.set(0, 3.05, 0.5);
-          const board = new THREE.Mesh(
-            new THREE.BoxGeometry(1.8, 1.05, 0.05),
-            new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 })
+          const postMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.45, roughness: 0.3 });
+          const post = new THREE.Mesh(new THREE.BoxGeometry(0.24, 3.25, 0.24), postMat);
+          post.position.set(0, 1.62, 0);
+          const arm = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.18, 1.2), postMat);
+          arm.position.set(0, 3.05, 0.55);
+          const boardFrame = new THREE.Mesh(
+            new THREE.BoxGeometry(1.84, 1.08, 0.04),
+            new THREE.MeshStandardMaterial({ color: 0x1e293b })
           );
-          board.position.set(0, 3.05, 1.05);
+          boardFrame.position.set(0, 3.05, 1.13);
+          const board = new THREE.Mesh(
+            new THREE.BoxGeometry(1.76, 1.0, 0.06),
+            new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.88 })
+          );
+          board.position.set(0, 3.05, 1.15);
           const rim = new THREE.Mesh(
-            new THREE.TorusGeometry(0.23, 0.025, 8, 20),
+            new THREE.TorusGeometry(0.23, 0.025, 10, 24),
             new THREE.MeshStandardMaterial({ color: 0xea580c })
           );
           rim.rotation.x = Math.PI / 2;
-          rim.position.set(0, 2.8, 1.32);
-          hg.add(post, arm, board, rim);
+          rim.position.set(0, 2.82, 1.42);
+          hg.add(post, arm, boardFrame, board, rim);
           return hg;
         };
         if (alongX) {
-          group.add(buildHoop(-cwCourt / 2, 0, Math.PI / 2));
-          group.add(buildHoop(cwCourt / 2, 0, -Math.PI / 2));
+          group.add(buildHoop(-cwCourt / 2 - 0.3, 0, Math.PI / 2));
+          group.add(buildHoop(cwCourt / 2 + 0.3, 0, -Math.PI / 2));
         } else {
-          group.add(buildHoop(0, -clCourt / 2, 0));
-          group.add(buildHoop(0, clCourt / 2, Math.PI));
+          group.add(buildHoop(0, -clCourt / 2 - 0.3, 0));
+          group.add(buildHoop(0, clCourt / 2 + 0.3, Math.PI));
         }
       } else if (productType === 'roof_canopy') {
-        // ④ 屋頂棚架型：RC平屋頂大樓/廠房 + 女兒牆 + 屋頂水泥基座墩
         const buildingMesh = buildExtrudedSlab(bldgH, 0, 0xd6d3d1, 0);
         group.add(buildingMesh);
-
-        // Roof waterproof surface (grayish green/slate)
         const roofTopMesh = buildExtrudedSlab(0.08, bldgH, 0x94a3b8, 0.25);
         group.add(roofTopMesh);
-
-        // Parapet walls (女兒牆) around perimeter
         const parapetOuter = buildExtrudedSlab(0.9, bldgH, 0xe7e5e4, 0);
         group.add(parapetOuter);
       } else if (productType === 'roof_flush') {
-        // ⑤ 屋頂平鋪型：斜屋頂鐵皮廠房 (沿斜屋面鋪設模組)
-        // Build factory walls + sloped roof body matching getCanopySurfaceY
         const wallH = bldgH;
         const factoryBase = buildExtrudedSlab(wallH, 0, 0xcbd5e1, 0);
         group.add(factoryBase);
 
-        // Sloped metal roof deck under the panels
         const roofSamplesZ = 20;
         const roofStripLen = L / roofSamplesZ;
         const deckMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.55, metalness: 0.35 });
@@ -541,202 +645,598 @@ export default function SolarSite3DView({
           group.add(stripMesh);
         }
       } else if (productType === 'ground_mount') {
-        // ⑥ 地面型：碎石基地 + 草地邊界
         const gravelPad = buildExtrudedSlab(0.12, 0, 0x9ca3af, -0.3);
         group.add(gravelPad);
       }
     }
 
     // =========================================================================
-    // 2. STEEL STRUCTURE / RACKING SYSTEM (鋼構棚架 / 支架與水泥基座)
+    // 2. STEEL STRUCTURE & BIM DETAILS (依據《風雨球場設計模板》Tekla & FreeCAD 完整繪製)
     // =========================================================================
     if (showStructure) {
-      const steelColor =
-        productType === 'sport_court'
-          ? 0x334155
-          : productType === 'roof_flush'
-          ? 0x94a3b8
-          : 0x64748b;
-      const steelMat = new THREE.MeshStandardMaterial({
-        color: steelColor,
-        metalness: 0.55,
-        roughness: 0.35,
-      });
-      const pierMat = new THREE.MeshStandardMaterial({
-        color: 0xd6d3d1,
-        roughness: 0.85,
-      });
+      if (productType === 'sport_court') {
+        // =====================================================================
+        // ★ 風雨球場專屬 Tekla 構件級 BIM 3D 模型 (22m 雙柱無中柱大跨距！)
+        // =====================================================================
+        const steelPrimaryMat = new THREE.MeshStandardMaterial({
+          color: 0x334155,
+          metalness: 0.62,
+          roughness: 0.32,
+        });
+        const steelSecondaryMat = new THREE.MeshStandardMaterial({
+          color: 0x475569,
+          metalness: 0.55,
+          roughness: 0.38,
+        });
+        const purlinMat = new THREE.MeshStandardMaterial({
+          color: 0x94a3b8,
+          metalness: 0.5,
+          roughness: 0.4,
+        });
+        const fdnMat = new THREE.MeshStandardMaterial({
+          color: 0x9ca3af,
+          roughness: 0.85,
+        });
+        const basePlateMat = new THREE.MeshStandardMaterial({
+          color: 0x1e293b,
+          metalness: 0.7,
+          roughness: 0.3,
+        });
+        const safetyPadMat = new THREE.MeshStandardMaterial({
+          color: 0xfacc15, // 鮮黃色鋼柱防撞護墊 (14座，高 2.0m)
+          roughness: 0.5,
+        });
+        const braceRodMat = new THREE.MeshStandardMaterial({
+          color: 0x1e293b,
+          metalness: 0.7,
+          roughness: 0.25,
+        });
 
-      if (productType === 'roof_flush') {
-        // ⑤ 屋頂平鋪型：沿屋面鋁擠導軌
-        const colSpan = Math.max(2.5, W / 8);
-        for (let x = 0.8; x <= W - 0.8; x += colSpan) {
-          for (const seg of effectiveSlope === 'gable' ? [0.25, 0.75] : [0.5]) {
-            const yMid = L * seg;
-            if (!isInsideFootprint(x, yMid)) continue;
-            const segLen = effectiveSlope === 'gable' ? L * 0.46 : L * 0.92;
-            const tilt = getCanopyTiltSigned(yMid);
-            const rail = new THREE.Mesh(
-              new THREE.BoxGeometry(0.06, 0.06, segLen / Math.cos(Math.abs(tilt))),
-              steelMat
-            );
-            rail.position.set(x - W / 2, getCanopySurfaceY(yMid) - 0.06, yMid - L / 2);
-            rail.rotation.x = tilt;
-            group.add(rail);
-          }
+        // 柱網設定：沿 X 向 (長邊 31.5m) 設 7 榀框架 (14 支柱)，兩側屋面各懸挑 overhangX
+        // 沿 Z 向 (跨距 22m) 僅在兩端落柱 (zFront, zBack)，中央屋脊 (z=0) 絕不落中柱！
+        const numFrames = 7; // 軸 A ~ G 共 7 榀 (6 跨)
+        const overhangX = Math.min(2.0, W * 0.06);
+        const overhangZ = Math.min(1.0, L * 0.045);
+        const colStartX = overhangX;
+        const colEndX = W - overhangX;
+        const colSpanX = (colEndX - colStartX) / (numFrames - 1);
+
+        const y2dBack = overhangZ; // 軸 1 (北/西側柱列)
+        const y2dFront = L - overhangZ; // 軸 5 (南/東側柱列)
+        const zBack = y2dBack - L / 2;
+        const zFront = y2dFront - L / 2;
+
+        // 1.1 縱向連續基礎地梁 (800×700mm, 沿兩側柱列貫通)
+        for (const zCol of [zBack, zFront]) {
+          const gradeBeam = new THREE.Mesh(
+            new THREE.BoxGeometry(colEndX - colStartX + 1.6, 0.32, 0.8),
+            fdnMat
+          );
+          gradeBeam.position.set(0, 0.14, zCol);
+          gradeBeam.receiveShadow = true;
+          group.add(gradeBeam);
         }
-      } else if (productType === 'ground_mount' && groundMountStyle === 'rows') {
-        // ⑥ 地面型 (分排獨立支架)：依據有效面板的每一列 (y座標分組) 建立前後立柱、水泥基礎墩與斜樑
-        const activePanels = panelsData.filter(p => p.isActive);
-        const rowsByY = new Map<string, PanelItem2D[]>();
-        activePanels.forEach(p => {
-          const key = p.y.toFixed(2);
-          if (!rowsByY.has(key)) rowsByY.set(key, []);
-          rowsByY.get(key)!.push(p);
-        });
 
-        rowsByY.forEach(rowPanels => {
-          if (rowPanels.length === 0) return;
-          const minX = Math.min(...rowPanels.map(p => p.x));
-          const maxX = Math.max(...rowPanels.map(p => p.x + p.w));
-          const y0 = rowPanels[0].y;
-          const ph = rowPanels[0].h;
+        const frameX3DList: number[] = [];
 
-          const lowH = clearH;
-          const highH = clearH + ph * Math.sin(tiltRad);
-          const zFront = y0 + ph * 0.82 - L / 2;
-          const zBack = y0 + ph * 0.18 - L / 2;
-
-          // Concrete piers + front/back posts every ~3.5m
-          const postStep = Math.max(2.5, (maxX - minX) / Math.max(1, Math.ceil((maxX - minX) / 3.5)));
-          for (let px = minX + 0.3; px <= maxX - 0.1; px += postStep) {
-            const x3d = px - W / 2;
-            // Front pier & post
-            const pierF = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.3, 0.35), pierMat);
-            pierF.position.set(x3d, 0.15, zFront);
-            const postF = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, lowH, 8), steelMat);
-            postF.position.set(x3d, lowH / 2, zFront);
-
-            // Back pier & post
-            const pierB = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.3, 0.35), pierMat);
-            pierB.position.set(x3d, 0.15, zBack);
-            const postB = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, highH, 8), steelMat);
-            postB.position.set(x3d, highH / 2, zBack);
-
-            // Rafter connecting front & back post
-            const rafter = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.08, ph * 0.95), steelMat);
-            rafter.position.set(x3d, (lowH + highH) / 2 - 0.04, y0 + ph / 2 - L / 2);
-            rafter.rotation.x = tiltRad;
-
-            group.add(pierF, postF, pierB, postB, rafter);
-          }
-
-          // Longitudinal purlins along the row
-          const rowSpan = maxX - minX;
-          const purlin1 = new THREE.Mesh(new THREE.BoxGeometry(rowSpan, 0.06, 0.06), steelMat);
-          purlin1.position.set((minX + maxX) / 2 - W / 2, lowH + (highH - lowH) * 0.25, zFront);
-          const purlin2 = new THREE.Mesh(new THREE.BoxGeometry(rowSpan, 0.06, 0.06), steelMat);
-          purlin2.position.set((minX + maxX) / 2 - W / 2, lowH + (highH - lowH) * 0.75, zBack);
-          group.add(purlin1, purlin2);
-        });
-      } else {
-        // ① 魚電室外、② 魚電室內、③ 風雨球場、④ 屋頂棚架、⑥ 地面型(連續棚架)
-        // Full canopy columns, concrete piers, sloped rafters, and purlins
-        const numColsX = Math.max(2, Math.round(W / 6) + 1);
-        const numColsZ = Math.max(2, Math.round(L / 6) + 1);
-        const colSpacingX = (W - 1.2) / (numColsX - 1);
-        const colSpacingZ = (L - 1.2) / (numColsZ - 1);
-        const colW = productType === 'sport_court' || productType === 'fish_outdoor' ? 0.24 : 0.18;
-        const pierH = productType === 'fish_outdoor' ? 1.1 : productType === 'roof_canopy' ? 0.65 : 0.45;
-
-        // Columns + concrete piers
-        for (let ix = 0; ix < numColsX; ix++) {
-          const x2d = 0.6 + ix * colSpacingX;
+        // 1.2 建立 7 榀門型剛架：14 支 RH300×300 主鋼柱 (SC1~SC7) + 柱墩 + D1/D2 柱底板錨栓 + 14座防撞護墊 + SG1~SG6 RH400×200 大梁 + H10 斜隅加腋
+        for (let ix = 0; ix < numFrames; ix++) {
+          const x2d = colStartX + ix * colSpanX;
           const x3d = x2d - W / 2;
+          frameX3DList.push(x3d);
 
-          for (let iz = 0; iz < numColsZ; iz++) {
-            // For indoor fish or sport court, keep interior clearer or place along frames
-            const isBoundaryZ = iz === 0 || iz === numColsZ - 1;
-            const isMidRidgeZ = effectiveSlope === 'gable' && iz === Math.floor(numColsZ / 2);
-            if ((productType === 'sport_court' || productType === 'fish_indoor') && !isBoundaryZ && !isMidRidgeZ) {
-              continue;
-            }
+          for (const y2dCol of [y2dBack, y2dFront]) {
+            const zCol = y2dCol - L / 2;
+            const eaveTopY = getCanopySurfaceY(y2dCol) - 0.22;
 
-            const y2d = 0.6 + iz * colSpacingZ;
-            if (!isInsideFootprint(x2d, y2d)) continue;
+            // 混凝土柱墩 (600×600)
+            const ped = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.38, 0.62), fdnMat);
+            ped.position.set(x3d, 0.19, zCol);
+            group.add(ped);
 
-            const topY = getCanopySurfaceY(y2d) - 0.12;
-            const colHeight = Math.max(0.5, topY - baseElevation);
-            const z3d = y2d - L / 2;
+            // 柱底板 D1 (PL20×500×500) + 8-M20 化學錨栓 + D2 加勁板
+            const bp = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.04, 0.5), basePlateMat);
+            bp.position.set(x3d, 0.4, zCol);
+            group.add(bp);
 
-            // Concrete pier
-            const pier = new THREE.Mesh(new THREE.BoxGeometry(colW * 2.2, pierH, colW * 2.2), pierMat);
-            pier.position.set(x3d, baseElevation + pierH / 2, z3d);
-            pier.castShadow = true;
-            group.add(pier);
+            // 鋼柱防撞護墊 (14 座，高 2.0m 鮮黃色包覆)
+            const padMesh = new THREE.Mesh(new THREE.BoxGeometry(0.46, 1.9, 0.46), safetyPadMat);
+            padMesh.position.set(x3d, 0.42 + 0.95, zCol);
+            padMesh.castShadow = true;
+            group.add(padMesh);
 
-            // H-beam column
-            const colMesh = new THREE.Mesh(new THREE.BoxGeometry(colW, colHeight, colW), steelMat);
-            colMesh.position.set(x3d, baseElevation + colHeight / 2, z3d);
-            colMesh.castShadow = true;
-            group.add(colMesh);
+            // 主鋼柱 SC1~SC7 (RH300×300×10×15 真實 H 型鋼斷面)
+            const pBot = new THREE.Vector3(x3d, 0.42, zCol);
+            const pTop = new THREE.Vector3(x3d, eaveTopY, zCol);
+            const hCol = createHBeamBetween(pBot, pTop, 0.32, 0.3, 0.025, 0.035, steelPrimaryMat);
+            group.add(hCol);
           }
 
-          // Sloped Rafters (斜樑) along Z for each X column frame
+          // 橫向雙坡/單坡大梁 SG1~SG6 (RH400×200×8×13) + 兩端柱頭斜隅加腋 Haunch H10
           if (effectiveSlope === 'gable') {
-            const halfL = (L - 0.8) / 2;
-            const hyp = halfL / Math.cos(tiltRad);
-            // Front half rafter (y2d: L/2 -> L)
-            const yMidF = L * 0.75;
-            if (isInsideFootprint(x2d, yMidF)) {
-              const rafF = new THREE.Mesh(new THREE.BoxGeometry(colW * 0.85, 0.22, hyp), steelMat);
-              rafF.position.set(x3d, getCanopySurfaceY(yMidF) - 0.12, yMidF - L / 2);
-              rafF.rotation.x = tiltRad;
-              group.add(rafF);
-            }
-            // Back half rafter (y2d: 0 -> L/2)
-            const yMidB = L * 0.25;
-            if (isInsideFootprint(x2d, yMidB)) {
-              const rafB = new THREE.Mesh(new THREE.BoxGeometry(colW * 0.85, 0.22, hyp), steelMat);
-              rafB.position.set(x3d, getCanopySurfaceY(yMidB) - 0.12, yMidB - L / 2);
-              rafB.rotation.x = -tiltRad;
-              group.add(rafB);
-            }
-            // Horizontal tie beam for gable truss
-            if (isInsideFootprint(x2d, L * 0.5)) {
-              const tieBeam = new THREE.Mesh(new THREE.BoxGeometry(colW * 0.6, 0.14, L - 1.2), steelMat);
-              tieBeam.position.set(x3d, baseElevation + clearH, 0);
-              group.add(tieBeam);
-            }
+            const pWestEave = new THREE.Vector3(x3d, getCanopySurfaceY(0) - 0.26, -L / 2);
+            const pRidge = new THREE.Vector3(x3d, getCanopySurfaceY(L / 2) - 0.26, 0);
+            const pEastEave = new THREE.Vector3(x3d, getCanopySurfaceY(L) - 0.26, L / 2);
+
+            group.add(
+              createHBeamBetween(pWestEave, pRidge, 0.4, 0.2, 0.022, 0.032, steelPrimaryMat),
+              createHBeamBetween(pRidge, pEastEave, 0.4, 0.2, 0.022, 0.032, steelPrimaryMat)
+            );
+
+            // 屋脊中央端板螺栓對接板 (PL19×380×682)
+            const splicePlate = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.62, 0.06), basePlateMat);
+            splicePlate.position.set(x3d, getCanopySurfaceY(L / 2) - 0.32, 0);
+            group.add(splicePlate);
+
+            // 兩端梁柱斜隅加腋 (Haunch H10，長 2.0m)
+            const hLen = Math.min(2.1, L * 0.1);
+            const pHaunchB1 = new THREE.Vector3(x3d, getCanopySurfaceY(y2dBack) - 0.58, zBack + 0.12);
+            const pHaunchB2 = new THREE.Vector3(x3d, getCanopySurfaceY(y2dBack + hLen) - 0.32, zBack + hLen);
+            const pHaunchF1 = new THREE.Vector3(x3d, getCanopySurfaceY(y2dFront) - 0.58, zFront - 0.12);
+            const pHaunchF2 = new THREE.Vector3(x3d, getCanopySurfaceY(y2dFront - hLen) - 0.32, zFront - hLen);
+            group.add(
+              createMemberBetween(pHaunchB1, pHaunchB2, 0.18, 0.22, steelPrimaryMat),
+              createMemberBetween(pHaunchF1, pHaunchF2, 0.18, 0.22, steelPrimaryMat)
+            );
           } else {
-            // Single slope rafter
-            const hyp = (L - 0.8) / Math.cos(tiltRad);
-            const yMid = L * 0.5;
-            if (isInsideFootprint(x2d, yMid)) {
-              const raf = new THREE.Mesh(new THREE.BoxGeometry(colW * 0.85, 0.22, hyp), steelMat);
-              raf.position.set(x3d, getCanopySurfaceY(yMid) - 0.12, 0);
-              raf.rotation.x = tiltRad;
-              group.add(raf);
-            }
+            const pBack = new THREE.Vector3(x3d, getCanopySurfaceY(0) - 0.26, -L / 2);
+            const pFront = new THREE.Vector3(x3d, getCanopySurfaceY(L) - 0.26, L / 2);
+            group.add(createHBeamBetween(pBack, pFront, 0.4, 0.2, 0.022, 0.032, steelPrimaryMat));
           }
         }
 
-        // Longitudinal purlins (橫向檁條) along X
-        const purlinCount = Math.max(4, Math.round(L / 2.2));
-        for (let ip = 0; ip <= purlinCount; ip++) {
-          const y2d = 0.5 + (ip / purlinCount) * (L - 1.0);
-          // Determine valid X segments at this y2d
-          let xStart = 0.4;
-          let xEnd = W - 0.4;
-          if (siteShape === 'l-shape' && y2d < cl) {
-            xEnd = Math.max(xStart, W - cw - 0.4);
+        // 1.3 縱向主繫梁 E1~E4 (軸 1、軸 3 屋脊、軸 5) 與 中間次梁 CP1~CP2 (軸 2、軸 4) + 柱列下層抗風縱梁 CP3~CP4 (+6.0m)
+        const xFirst = frameX3DList[0];
+        const xLast = frameX3DList[frameX3DList.length - 1];
+        const y2dAxes = [
+          y2dBack,
+          y2dBack + (L / 2 - y2dBack) * 0.5,
+          L / 2,
+          L / 2 + (y2dFront - L / 2) * 0.5,
+          y2dFront,
+        ];
+        y2dAxes.forEach((yAxis, idx) => {
+          const zAxis = yAxis - L / 2;
+          const yElev = getCanopySurfaceY(yAxis) - 0.28;
+          const isMainTie = idx === 0 || idx === 2 || idx === 4;
+          group.add(
+            createHBeamBetween(
+              new THREE.Vector3(xFirst, yElev, zAxis),
+              new THREE.Vector3(xLast, yElev, zAxis),
+              isMainTie ? 0.3 : 0.24,
+              0.15,
+              0.018,
+              0.025,
+              steelSecondaryMat
+            )
+          );
+        });
+
+        // 柱列下層抗風縱梁 CP3, CP4 (標高約 clearH * 0.82，雙層縱梁抗風)
+        const lowerBeamY = Math.max(2.5, clearH * 0.84);
+        for (const zCol of [zBack, zFront]) {
+          group.add(
+            createHBeamBetween(
+              new THREE.Vector3(xFirst, lowerBeamY, zCol),
+              new THREE.Vector3(xLast, lowerBeamY, zCol),
+              0.24,
+              0.13,
+              0.016,
+              0.022,
+              steelSecondaryMat
+            )
+          );
+        }
+
+        // 1.4 屋面交叉風拉桿 BK1, BK2 (Ø16 圓鋼，配置於第 1 跨、中央第 3 跨、最末第 6 跨的 4 個坡段區間 = 共 24 支交叉風拉桿)
+        const bracedBays = [0, Math.floor((numFrames - 1) / 2), numFrames - 2];
+        bracedBays.forEach(bayIdx => {
+          if (bayIdx < 0 || bayIdx >= frameX3DList.length - 1) return;
+          const xa = frameX3DList[bayIdx];
+          const xb = frameX3DList[bayIdx + 1];
+          for (let sIdx = 0; sIdx < y2dAxes.length - 1; sIdx++) {
+            const ya = y2dAxes[sIdx];
+            const yb = y2dAxes[sIdx + 1];
+            const za = ya - L / 2;
+            const zb = yb - L / 2;
+            const elevA = getCanopySurfaceY(ya) - 0.24;
+            const elevB = getCanopySurfaceY(yb) - 0.24;
+
+            const p1 = new THREE.Vector3(xa, elevA, za);
+            const p2 = new THREE.Vector3(xb, elevB, zb);
+            const p3 = new THREE.Vector3(xa, elevB, zb);
+            const p4 = new THREE.Vector3(xb, elevA, za);
+
+            group.add(
+              createMemberBetween(p1, p2, 0.035, 0.035, braceRodMat, true),
+              createMemberBetween(p3, p4, 0.035, 0.035, braceRodMat, true)
+            );
           }
-          const spanW = xEnd - xStart;
-          if (spanW > 0.5 && !(siteShape === 'u-shape' && y2d < cl)) {
-            const purlin = new THREE.Mesh(new THREE.BoxGeometry(spanW, 0.08, 0.08), steelMat);
-            purlin.position.set((xStart + xEnd) / 2 - W / 2, getCanopySurfaceY(y2d) - 0.04, y2d - L / 2);
-            purlin.rotation.x = getCanopyTiltSigned(y2d);
-            group.add(purlin);
+        });
+
+        // 1.5 屋面 22 排 C150×50 檁條 (PP1~PP3，貫穿全長 -W/2 ~ +W/2)
+        const numPurlins = 22;
+        for (let ip = 0; ip < numPurlins; ip++) {
+          const y2d = 0.25 + (ip / (numPurlins - 1)) * (L - 0.5);
+          // 避開屋脊正中央分界
+          const z3d = y2d - L / 2;
+          const y3d = getCanopySurfaceY(y2d) - 0.1;
+          const purlinMesh = new THREE.Mesh(new THREE.BoxGeometry(W, 0.1, 0.06), purlinMat);
+          purlinMesh.position.set(0, y3d, z3d);
+          purlinMesh.rotation.x = getCanopyTiltSigned(y2d);
+          group.add(purlinMesh);
+        }
+
+        // 1.6 +4.5m 懸挑設備平台 (軸 5 / A~B 柱間，向球場內側懸挑 1.5m，含 F1~F5 平台梁 + BR1 雙斜撐 + 花紋鋼板 + 安全護欄)
+        const platX1 = frameX3DList[frameX3DList.length - 2];
+        const platX2 = frameX3DList[frameX3DList.length - 1];
+        const platMidX = (platX1 + platX2) / 2;
+        const platSpanX = platX2 - platX1;
+        const platY = Math.min(4.5, clearH * 0.65);
+        const platDepth = 1.6;
+        const zPlatOuter = zFront;
+        const zPlatInner = zFront - platDepth;
+
+        // 平台托梁 F1, F2, F5 與縱梁 F3, F4 + 斜撐 BR1 (2支)
+        for (const px of [platX1, platMidX, platX2]) {
+          group.add(
+            createMemberBetween(
+              new THREE.Vector3(px, platY, zPlatOuter),
+              new THREE.Vector3(px, platY, zPlatInner),
+              0.12,
+              0.15,
+              steelPrimaryMat
+            )
+          );
+        }
+        // BR1 雙斜撐 (由柱身 +3.0m 斜撐至平台前端)
+        for (const px of [platX1, platX2]) {
+          group.add(
+            createMemberBetween(
+              new THREE.Vector3(px, Math.max(1.8, platY - 1.5), zPlatOuter),
+              new THREE.Vector3(px, platY - 0.05, zPlatInner + 0.1),
+              0.12,
+              0.12,
+              steelPrimaryMat
+            )
+          );
+        }
+        // 平台花紋鋼板 D21/D22 與四周安全欄杆
+        const deckMesh = new THREE.Mesh(
+          new THREE.BoxGeometry(platSpanX + 0.2, 0.08, platDepth),
+          new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.6, roughness: 0.4 })
+        );
+        deckMesh.position.set(platMidX, platY + 0.08, (zPlatOuter + zPlatInner) / 2);
+        group.add(deckMesh);
+
+        const railMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.4, roughness: 0.4 });
+        for (const rh of [0.55, 1.05]) {
+          const frontRail = new THREE.Mesh(new THREE.BoxGeometry(platSpanX + 0.2, 0.04, 0.04), railMat);
+          frontRail.position.set(platMidX, platY + 0.1 + rh, zPlatInner);
+          group.add(frontRail);
+        }
+        for (const px of [platX1, platMidX, platX2]) {
+          const postR = new THREE.Mesh(new THREE.BoxGeometry(0.05, 1.1, 0.05), railMat);
+          postR.position.set(px, platY + 0.65, zPlatInner);
+          group.add(postR);
+        }
+
+        // 1.7 西南角安全護籠爬梯 (軸 1/G，直通屋面檢修步道)
+        const ladderMat = new THREE.MeshStandardMaterial({ color: 0xeab308, metalness: 0.45, roughness: 0.35 });
+        const ladX = xFirst - 0.45;
+        const ladZ = zBack;
+        const ladTopY = getCanopySurfaceY(y2dBack) + 0.4;
+        const railL = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, ladTopY, 8), ladderMat);
+        railL.position.set(ladX, ladTopY / 2, ladZ - 0.28);
+        const railR = railL.clone();
+        railR.position.set(ladX, ladTopY / 2, ladZ + 0.28);
+        group.add(railL, railR);
+
+        for (let ry = 0.35; ry < ladTopY; ry += 0.35) {
+          const rung = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.56, 8), ladderMat);
+          rung.rotation.x = Math.PI / 2;
+          rung.position.set(ladX, ry, ladZ);
+          group.add(rung);
+        }
+        for (let hy = 2.2; hy < ladTopY; hy += 0.75) {
+          const hoop = new THREE.Mesh(new THREE.TorusGeometry(0.38, 0.016, 8, 18), ladderMat);
+          hoop.rotation.x = Math.PI / 2;
+          hoop.position.set(ladX - 0.32, hy, ladZ);
+          group.add(hoop);
+        }
+
+        // =====================================================================
+        // ★ 屋面清浪板、30cm白鐵水槽、菱形網維修步道、四周安全母索、鋁軌腳座、逆變器與1F附CT電表箱
+        // =====================================================================
+        if (showMepAndRoof) {
+          // 3.1 半透明 0.6mm 四合一清浪板 + 屋脊中脊板
+          const sheetMat = new THREE.MeshStandardMaterial({
+            color: 0xcbd5e1,
+            metalness: 0.35,
+            roughness: 0.4,
+            transparent: true,
+            opacity: 0.48,
+            side: THREE.DoubleSide,
+          });
+          if (effectiveSlope === 'gable') {
+            const halfSlopeLen = (L / 2) / Math.cos(tiltRad);
+            const sheetBack = new THREE.Mesh(new THREE.BoxGeometry(W, 0.02, halfSlopeLen), sheetMat);
+            sheetBack.position.set(0, getCanopySurfaceY(L * 0.25) - 0.03, -L * 0.25);
+            sheetBack.rotation.x = -tiltRad;
+
+            const sheetFront = new THREE.Mesh(new THREE.BoxGeometry(W, 0.02, halfSlopeLen), sheetMat);
+            sheetFront.position.set(0, getCanopySurfaceY(L * 0.75) - 0.03, L * 0.25);
+            sheetFront.rotation.x = tiltRad;
+
+            const ridgeCap = new THREE.Mesh(
+              new THREE.BoxGeometry(W, 0.03, 0.6),
+              new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.5, roughness: 0.35 })
+            );
+            ridgeCap.position.set(0, getCanopySurfaceY(L / 2) - 0.01, 0);
+            group.add(sheetBack, sheetFront, ridgeCap);
+          }
+
+          // 3.2 兩側屋簷 30cm 白鐵排水水槽
+          const gutterMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.65, roughness: 0.25 });
+          for (const zG of [-L / 2 - 0.15, L / 2 + 0.15]) {
+            const gMesh = new THREE.Mesh(new THREE.BoxGeometry(W, 0.16, 0.28), gutterMat);
+            gMesh.position.set(0, getCanopySurfaceY(0) - 0.12, zG);
+            group.add(gMesh);
+          }
+
+          // 3.3 屋脊中央 + 西端聯絡菱形擴張網維修步道 (60.8m)
+          const catwalkMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.5, roughness: 0.5 });
+          const ridgeWalkway = new THREE.Mesh(new THREE.BoxGeometry(W - 0.4, 0.035, 0.62), catwalkMat);
+          ridgeWalkway.position.set(0, getCanopySurfaceY(L / 2) + 0.03, 0);
+          group.add(ridgeWalkway);
+
+          // 3.4 屋面四周角鐵安全母索立柱 (高 1.0m, 間距 2.5m) 與雙層紅色安全母索 (115.8m)
+          const lifelineMat = new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.4 });
+          const postCountX = Math.max(5, Math.round(W / 2.6));
+          for (const yEdge of [0.2, L - 0.2]) {
+            const zEdge = yEdge - L / 2;
+            const yBase = getCanopySurfaceY(yEdge);
+            for (let i = 0; i <= postCountX; i++) {
+              const px = -W / 2 + 0.2 + (i / postCountX) * (W - 0.4);
+              const post = new THREE.Mesh(new THREE.BoxGeometry(0.04, 1.0, 0.04), lifelineMat);
+              post.position.set(px, yBase + 0.5, zEdge);
+              group.add(post);
+            }
+            for (const dh of [0.5, 0.96]) {
+              const cable = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, W - 0.4, 8), lifelineMat);
+              cable.rotation.z = Math.PI / 2;
+              cable.position.set(0, yBase + dh, zEdge);
+              group.add(cable);
+            }
+          }
+
+          // 3.5 設備平台上的新望變流器 INV-1 (110kW)、INV-2 (30kW)、DC-1/2、AC-1 盤、#A 屋脊鋁線槽、#C/#D 橘色 RSG 幹線管、1F 3P4W 附 CT 雙門電表箱
+          const invBodyMat = new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.35, metalness: 0.3 });
+          const panelBoxMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.4, metalness: 0.5 });
+          const conduitMat = new THREE.MeshStandardMaterial({ color: 0xf97316, roughness: 0.35, metalness: 0.4 });
+
+          // INV-1 (110kW) & INV-2 (30kW) on platform
+          const inv1 = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.68, 0.35), invBodyMat);
+          inv1.position.set(platMidX + 0.7, platY + 1.1, zPlatOuter - 0.25);
+          const inv2 = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.54, 0.28), invBodyMat);
+          inv2.position.set(platMidX - 0.8, platY + 1.05, zPlatOuter - 0.25);
+          // DC-1, DC-2 & AC-1 boxes
+          const dc1Box = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.78, 0.25), panelBoxMat);
+          dc1Box.position.set(platX2 - 0.5, platY + 1.0, zPlatOuter - 0.25);
+          const ac1Box = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.98, 0.32), panelBoxMat);
+          ac1Box.position.set(platMidX, platY + 0.7, zPlatInner + 0.25);
+          group.add(inv1, inv2, dc1Box, ac1Box);
+
+          // #A 屋脊中央 100×100mm DC 主幹鋁線槽
+          const trayA = new THREE.Mesh(
+            new THREE.BoxGeometry(W - 1.2, 0.1, 0.12),
+            new THREE.MeshStandardMaterial({ color: 0x64748b, metalness: 0.6, roughness: 0.3 })
+          );
+          trayA.position.set(0, getCanopySurfaceY(L / 2) + 0.08, 0.38);
+          group.add(trayA);
+
+          // 1F 東北側地面新設 3Φ4W 低壓附 CT 雙門不鏽鋼電表箱 (寬 1350 × 高 2150 × 深 500 mm)
+          const meterX = xLast + 2.2;
+          const meterZ = zFront - 0.4;
+          const meterBox = new THREE.Mesh(
+            new THREE.BoxGeometry(1.35, 2.15, 0.5),
+            new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.65, roughness: 0.3 })
+          );
+          meterBox.position.set(meterX, 1.08, meterZ);
+          const meterWindow = new THREE.Mesh(
+            new THREE.BoxGeometry(0.45, 0.3, 0.54),
+            new THREE.MeshStandardMaterial({ color: 0xef4444 })
+          );
+          meterWindow.position.set(meterX - 0.3, 1.55, meterZ);
+          group.add(meterBox, meterWindow);
+
+          // #C & #D Ø82mm RSG 橘色金屬管幹線 (由平台 AC-1 沿東側最後一支鋼柱垂直下地再連至 1F 電表箱)
+          group.add(
+            createMemberBetween(
+              new THREE.Vector3(platX2 + 0.18, platY + 0.3, zFront),
+              new THREE.Vector3(platX2 + 0.18, 0.1, zFront),
+              0.1,
+              0.1,
+              conduitMat,
+              true
+            ),
+            createMemberBetween(
+              new THREE.Vector3(platX2 + 0.18, 0.12, zFront),
+              new THREE.Vector3(meterX, 0.12, meterZ),
+              0.1,
+              0.1,
+              conduitMat,
+              true
+            )
+          );
+        }
+      } else {
+        // =====================================================================
+        // 其他五大太陽能產品 (①魚電室外、②魚電室內、④屋頂棚架、⑤屋頂平鋪、⑥地面型) 鋼構與支架系統
+        // =====================================================================
+        const steelColor = productType === 'roof_flush' ? 0x94a3b8 : 0x475569;
+        const steelMat = new THREE.MeshStandardMaterial({
+          color: steelColor,
+          metalness: 0.55,
+          roughness: 0.35,
+        });
+        const pierMat = new THREE.MeshStandardMaterial({
+          color: 0xd6d3d1,
+          roughness: 0.85,
+        });
+
+        if (productType === 'roof_flush') {
+          const colSpan = Math.max(2.5, W / 8);
+          for (let x = 0.8; x <= W - 0.8; x += colSpan) {
+            for (const seg of effectiveSlope === 'gable' ? [0.25, 0.75] : [0.5]) {
+              const yMid = L * seg;
+              if (!isInsideFootprint(x, yMid)) continue;
+              const segLen = effectiveSlope === 'gable' ? L * 0.46 : L * 0.92;
+              const tilt = getCanopyTiltSigned(yMid);
+              const rail = new THREE.Mesh(
+                new THREE.BoxGeometry(0.06, 0.06, segLen / Math.cos(Math.abs(tilt))),
+                steelMat
+              );
+              rail.position.set(x - W / 2, getCanopySurfaceY(yMid) - 0.06, yMid - L / 2);
+              rail.rotation.x = tilt;
+              group.add(rail);
+            }
+          }
+        } else if (productType === 'ground_mount' && groundMountStyle === 'rows') {
+          const activePanels = panelsData.filter(p => p.isActive);
+          const rowsByY = new Map<string, PanelItem2D[]>();
+          activePanels.forEach(p => {
+            const key = p.y.toFixed(2);
+            if (!rowsByY.has(key)) rowsByY.set(key, []);
+            rowsByY.get(key)!.push(p);
+          });
+
+          rowsByY.forEach(rowPanels => {
+            if (rowPanels.length === 0) return;
+            const minX = Math.min(...rowPanels.map(p => p.x));
+            const maxX = Math.max(...rowPanels.map(p => p.x + p.w));
+            const y0 = rowPanels[0].y;
+            const ph = rowPanels[0].h;
+
+            const lowH = clearH;
+            const highH = clearH + ph * Math.sin(tiltRad);
+            const zFront = y0 + ph * 0.82 - L / 2;
+            const zBack = y0 + ph * 0.18 - L / 2;
+
+            const postStep = Math.max(2.5, (maxX - minX) / Math.max(1, Math.ceil((maxX - minX) / 3.5)));
+            for (let px = minX + 0.3; px <= maxX - 0.1; px += postStep) {
+              const x3d = px - W / 2;
+              const pierF = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.3, 0.35), pierMat);
+              pierF.position.set(x3d, 0.15, zFront);
+              const postF = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, lowH, 8), steelMat);
+              postF.position.set(x3d, lowH / 2, zFront);
+
+              const pierB = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.3, 0.35), pierMat);
+              pierB.position.set(x3d, 0.15, zBack);
+              const postB = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, highH, 8), steelMat);
+              postB.position.set(x3d, highH / 2, zBack);
+
+              const rafter = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.08, ph * 0.95), steelMat);
+              rafter.position.set(x3d, (lowH + highH) / 2 - 0.04, y0 + ph / 2 - L / 2);
+              rafter.rotation.x = tiltRad;
+
+              group.add(pierF, postF, pierB, postB, rafter);
+            }
+
+            const rowSpan = maxX - minX;
+            const purlin1 = new THREE.Mesh(new THREE.BoxGeometry(rowSpan, 0.06, 0.06), steelMat);
+            purlin1.position.set((minX + maxX) / 2 - W / 2, lowH + (highH - lowH) * 0.25, zFront);
+            const purlin2 = new THREE.Mesh(new THREE.BoxGeometry(rowSpan, 0.06, 0.06), steelMat);
+            purlin2.position.set((minX + maxX) / 2 - W / 2, lowH + (highH - lowH) * 0.75, zBack);
+            group.add(purlin1, purlin2);
+          });
+        } else {
+          // ① 魚電室外、② 魚電室內、④ 屋頂棚架、⑥ 地面型(連續棚架)
+          const numColsX = Math.max(2, Math.round(W / 5.5) + 1);
+          const numColsZ = Math.max(2, Math.round(L / 6) + 1);
+          const colSpacingX = (W - 1.2) / (numColsX - 1);
+          const colSpacingZ = (L - 1.2) / (numColsZ - 1);
+          const colW = productType === 'fish_outdoor' ? 0.24 : 0.2;
+          const pierH = productType === 'fish_outdoor' ? 1.1 : productType === 'roof_canopy' ? 0.65 : 0.45;
+
+          for (let ix = 0; ix < numColsX; ix++) {
+            const x2d = 0.6 + ix * colSpacingX;
+            const x3d = x2d - W / 2;
+
+            for (let iz = 0; iz < numColsZ; iz++) {
+              const isBoundaryZ = iz === 0 || iz === numColsZ - 1;
+              if (productType === 'fish_indoor' && !isBoundaryZ) {
+                continue;
+              }
+
+              const y2d = 0.6 + iz * colSpacingZ;
+              if (!isInsideFootprint(x2d, y2d)) continue;
+
+              const topY = getCanopySurfaceY(y2d) - 0.14;
+              const colHeight = Math.max(0.5, topY - baseElevation);
+              const z3d = y2d - L / 2;
+
+              const pier = new THREE.Mesh(new THREE.BoxGeometry(colW * 2.2, pierH, colW * 2.2), pierMat);
+              pier.position.set(x3d, baseElevation + pierH / 2, z3d);
+              pier.castShadow = true;
+              group.add(pier);
+
+              const hCol = createHBeamBetween(
+                new THREE.Vector3(x3d, baseElevation + pierH, z3d),
+                new THREE.Vector3(x3d, baseElevation + colHeight, z3d),
+                colW,
+                colW,
+                0.02,
+                0.03,
+                steelMat
+              );
+              group.add(hCol);
+            }
+
+            if (effectiveSlope === 'gable') {
+              const halfL = (L - 0.8) / 2;
+              const hyp = halfL / Math.cos(tiltRad);
+              const yMidF = L * 0.75;
+              if (isInsideFootprint(x2d, yMidF)) {
+                const rafF = new THREE.Mesh(new THREE.BoxGeometry(colW * 0.85, 0.24, hyp), steelMat);
+                rafF.position.set(x3d, getCanopySurfaceY(yMidF) - 0.14, yMidF - L / 2);
+                rafF.rotation.x = tiltRad;
+                group.add(rafF);
+              }
+              const yMidB = L * 0.25;
+              if (isInsideFootprint(x2d, yMidB)) {
+                const rafB = new THREE.Mesh(new THREE.BoxGeometry(colW * 0.85, 0.24, hyp), steelMat);
+                rafB.position.set(x3d, getCanopySurfaceY(yMidB) - 0.14, yMidB - L / 2);
+                rafB.rotation.x = -tiltRad;
+                group.add(rafB);
+              }
+            } else {
+              const hyp = (L - 0.8) / Math.cos(tiltRad);
+              const yMid = L * 0.5;
+              if (isInsideFootprint(x2d, yMid)) {
+                const raf = new THREE.Mesh(new THREE.BoxGeometry(colW * 0.85, 0.24, hyp), steelMat);
+                raf.position.set(x3d, getCanopySurfaceY(yMid) - 0.14, 0);
+                raf.rotation.x = tiltRad;
+                group.add(raf);
+              }
+            }
+          }
+
+          const purlinCount = Math.max(6, Math.round(L / 1.5));
+          for (let ip = 0; ip <= purlinCount; ip++) {
+            const y2d = 0.5 + (ip / purlinCount) * (L - 1.0);
+            let xStart = 0.4;
+            let xEnd = W - 0.4;
+            if (siteShape === 'l-shape' && y2d < cl) {
+              xEnd = Math.max(xStart, W - cw - 0.4);
+            }
+            const spanW = xEnd - xStart;
+            if (spanW > 0.5 && !(siteShape === 'u-shape' && y2d < cl)) {
+              const purlin = new THREE.Mesh(new THREE.BoxGeometry(spanW, 0.08, 0.08), steelMat);
+              purlin.position.set((xStart + xEnd) / 2 - W / 2, getCanopySurfaceY(y2d) - 0.04, y2d - L / 2);
+              purlin.rotation.x = getCanopyTiltSigned(y2d);
+              group.add(purlin);
+            }
           }
         }
       }
@@ -751,9 +1251,9 @@ export default function SolarSite3DView({
       roughness: 0.25,
     });
     const cellMat = new THREE.MeshStandardMaterial({
-      color: 0x1e3a8a,
-      metalness: 0.45,
-      roughness: 0.2,
+      color: 0x172554,
+      metalness: 0.48,
+      roughness: 0.18,
       emissive: 0x0f172a,
       emissiveIntensity: 0.15,
     });
@@ -767,14 +1267,13 @@ export default function SolarSite3DView({
       const x3d = centerX2D - W / 2;
       const z3d = centerY2D - L / 2;
 
-      let y3d = getCanopySurfaceY(centerY2D) + 0.04;
+      let y3d = getCanopySurfaceY(centerY2D) + 0.05;
       let panelTilt = getCanopyTiltSigned(centerY2D);
 
       if (productType === 'ground_mount' && groundMountStyle === 'rows') {
-        // Each row tilts individually around its front/center
         const lowH = clearH;
         const highH = clearH + panel.h * Math.sin(tiltRad);
-        y3d = (lowH + highH) / 2 + 0.04;
+        y3d = (lowH + highH) / 2 + 0.05;
         panelTilt = tiltRad;
       }
 
@@ -782,19 +1281,16 @@ export default function SolarSite3DView({
       pg.position.set(x3d, y3d, z3d);
       pg.rotation.x = panelTilt;
 
-      // Aluminum frame
       const frameGeo = new THREE.BoxGeometry(panel.w, 0.045, panel.h);
       const frameMesh = new THREE.Mesh(frameGeo, frameMat);
       frameMesh.castShadow = true;
       frameMesh.receiveShadow = true;
       pg.add(frameMesh);
 
-      // Deep-blue PV cell surface
       const cellGeo = new THREE.BoxGeometry(Math.max(0.05, panel.w - 0.05), 0.052, Math.max(0.05, panel.h - 0.05));
       const cellMesh = new THREE.Mesh(cellGeo, cellMat);
       pg.add(cellMesh);
 
-      // Subtle silver busbar lines on top of module
       const bar1 = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.056, panel.h - 0.06), gridLineMat);
       bar1.position.x = -panel.w * 0.17;
       const bar2 = bar1.clone();
@@ -817,23 +1313,24 @@ export default function SolarSite3DView({
     groundMountStyle,
     panelsData,
     showStructure,
+    showMepAndRoof,
     showEnvironment,
   ]);
 
   const setCameraPreset = (preset: 'iso' | 'front' | 'side' | 'top') => {
     if (!cameraRef.current || !controlsRef.current) return;
     const maxDim = Math.max(W, L);
-    const targetY = productType === 'roof_canopy' || productType === 'roof_flush' ? bldgH * 0.7 : 2;
+    const targetY = productType === 'roof_canopy' || productType === 'roof_flush' ? bldgH * 0.7 : 3.2;
     controlsRef.current.target.set(0, targetY, 0);
 
     if (preset === 'iso') {
-      cameraRef.current.position.set(maxDim * 1.15, maxDim * 0.85 + targetY, maxDim * 1.25);
+      cameraRef.current.position.set(maxDim * 1.05, maxDim * 0.75 + targetY, maxDim * 1.15);
     } else if (preset === 'front') {
-      cameraRef.current.position.set(0, targetY + maxDim * 0.35, maxDim * 1.45);
+      cameraRef.current.position.set(0, targetY + maxDim * 0.25, maxDim * 1.35);
     } else if (preset === 'side') {
-      cameraRef.current.position.set(maxDim * 1.45, targetY + maxDim * 0.3, 0);
+      cameraRef.current.position.set(maxDim * 1.35, targetY + maxDim * 0.22, 0);
     } else if (preset === 'top') {
-      cameraRef.current.position.set(0, maxDim * 1.7 + targetY, 0.01);
+      cameraRef.current.position.set(0, maxDim * 1.65 + targetY, 0.01);
     }
     controlsRef.current.update();
   };
@@ -849,7 +1346,7 @@ export default function SolarSite3DView({
   };
 
   return (
-    <div className="relative w-full h-full min-h-[460px] bg-slate-900 rounded-b-xl overflow-hidden flex flex-col">
+    <div className="relative w-full h-full min-h-[480px] bg-slate-900 rounded-b-xl overflow-hidden flex flex-col">
       {/* Top Floating Toolbar */}
       <div className="absolute top-3 left-3 right-3 z-10 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
         <div className="flex flex-wrap items-center gap-1.5 bg-slate-900/80 backdrop-blur-md text-white px-3 py-1.5 rounded-lg border border-slate-700/80 pointer-events-auto text-xs shadow-lg">
@@ -859,28 +1356,28 @@ export default function SolarSite3DView({
           <button
             type="button"
             onClick={() => setCameraPreset('iso')}
-            className="px-2 py-1 rounded hover:bg-slate-700 transition-colors font-medium"
+            className="px-2 py-1 rounded hover:bg-slate-700 transition-colors font-medium cursor-pointer"
           >
             3D 透視
           </button>
           <button
             type="button"
             onClick={() => setCameraPreset('front')}
-            className="px-2 py-1 rounded hover:bg-slate-700 transition-colors font-medium"
+            className="px-2 py-1 rounded hover:bg-slate-700 transition-colors font-medium cursor-pointer"
           >
             南向正視
           </button>
           <button
             type="button"
             onClick={() => setCameraPreset('side')}
-            className="px-2 py-1 rounded hover:bg-slate-700 transition-colors font-medium"
+            className="px-2 py-1 rounded hover:bg-slate-700 transition-colors font-medium cursor-pointer"
           >
-            剖面側視
+            山牆剖面
           </button>
           <button
             type="button"
             onClick={() => setCameraPreset('top')}
-            className="px-2 py-1 rounded hover:bg-slate-700 transition-colors font-medium"
+            className="px-2 py-1 rounded hover:bg-slate-700 transition-colors font-medium cursor-pointer"
           >
             俯視平面
           </button>
@@ -888,7 +1385,7 @@ export default function SolarSite3DView({
             type="button"
             onClick={() => setCameraPreset('iso')}
             title="重置視角"
-            className="p-1 rounded hover:bg-slate-700 text-slate-300 hover:text-white transition-colors ml-1"
+            className="p-1 rounded hover:bg-slate-700 text-slate-300 hover:text-white transition-colors ml-1 cursor-pointer"
           >
             <RotateCcw size={14} />
           </button>
@@ -898,16 +1395,27 @@ export default function SolarSite3DView({
           <button
             type="button"
             onClick={() => setShowStructure(v => !v)}
-            className={`px-2 py-1 rounded flex items-center gap-1 transition-colors font-medium ${
+            className={`px-2 py-1 rounded flex items-center gap-1 transition-colors font-medium cursor-pointer ${
               showStructure ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-700'
             }`}
           >
-            <Layers size={13} /> 鋼構支架
+            <Layers size={13} /> Tekla 鋼構與平台
           </button>
+          {productType === 'sport_court' && (
+            <button
+              type="button"
+              onClick={() => setShowMepAndRoof(v => !v)}
+              className={`px-2 py-1 rounded flex items-center gap-1 transition-colors font-medium cursor-pointer ${
+                showMepAndRoof ? 'bg-purple-600 text-white' : 'text-slate-300 hover:bg-slate-700'
+              }`}
+            >
+              <Zap size={13} /> 浪板/母索/機電表箱
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setShowEnvironment(v => !v)}
-            className={`px-2 py-1 rounded flex items-center gap-1 transition-colors font-medium ${
+            className={`px-2 py-1 rounded flex items-center gap-1 transition-colors font-medium cursor-pointer ${
               showEnvironment ? 'bg-emerald-600 text-white' : 'text-slate-300 hover:bg-slate-700'
             }`}
           >
@@ -916,7 +1424,7 @@ export default function SolarSite3DView({
           <button
             type="button"
             onClick={() => setAutoRotate(v => !v)}
-            className={`px-2 py-1 rounded flex items-center gap-1 transition-colors font-medium ${
+            className={`px-2 py-1 rounded flex items-center gap-1 transition-colors font-medium cursor-pointer ${
               autoRotate ? 'bg-amber-500 text-slate-950' : 'text-slate-300 hover:bg-slate-700'
             }`}
           >
@@ -925,7 +1433,7 @@ export default function SolarSite3DView({
           <button
             type="button"
             onClick={handleCaptureImage}
-            className="px-2.5 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white flex items-center gap-1 transition-colors font-medium ml-1"
+            className="px-2.5 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white flex items-center gap-1 transition-colors font-medium ml-1 cursor-pointer"
           >
             <Camera size={13} /> 匯出3D截圖
           </button>
@@ -936,6 +1444,11 @@ export default function SolarSite3DView({
       <div className="absolute bottom-3 left-3 right-3 z-10 flex flex-wrap items-center justify-between gap-2 pointer-events-none text-xs">
         <div className="bg-slate-900/75 backdrop-blur-md text-slate-200 px-3 py-1.5 rounded-lg border border-slate-700/70">
           操作提示：滑鼠<strong>左鍵拖曳</strong>旋轉視角 · <strong>右鍵拖曳</strong>平移 · <strong>滾輪</strong>縮放
+          {productType === 'sport_court' && (
+            <span className="ml-2 text-amber-300 font-bold">
+              （已套用嵵裡國小母版：22m無中柱雙坡大梁+H10斜隅+14座防撞墊+4.5m設備平台+護籠爬梯+CT表箱）
+            </span>
+          )}
         </div>
         <div className="bg-slate-900/80 backdrop-blur-md text-white px-3.5 py-1.5 rounded-lg border border-slate-700/70 flex items-center gap-3 font-medium">
           <span>場域：{W}m × {L}m</span>
@@ -947,7 +1460,7 @@ export default function SolarSite3DView({
       </div>
 
       {/* Three.js Canvas Mount */}
-      <div ref={mountRef} className="w-full flex-1 min-h-[460px] cursor-grab active:cursor-grabbing" />
+      <div ref={mountRef} className="w-full flex-1 min-h-[480px] cursor-grab active:cursor-grabbing" />
     </div>
   );
 }
