@@ -24,34 +24,33 @@ export const ENGINEERING_DISCIPLINES: DisciplineMeta[] = [
     id: 'CIVIL',
     code: 'C',
     name: '土木與基礎工程',
-    enName: 'Civil & Foundation Engineering',
+    enName: 'Civil & Foundation Engineering (F1 Rebar Cage)',
     badgeColor: 'from-amber-600 to-stone-800',
     borderColor: 'border-amber-300',
     bgLight: 'bg-amber-50/70',
     textColor: 'text-amber-900',
     summary:
-      '涵蓋現場收方測量、地下管溝/暗溝套繪、800×700mm 縱向連續基礎地梁、柱墩鋼筋籠配筋 (8-#6 主筋 + #4@15 箍筋)、8-M20×170L 化學錨栓、拉拔試驗、甲種安全圍籬與地坪漆面復原。',
+      '依據《基礎鋼筋綁紮示意圖(F1)》標準建模：總開挖深度 GL-1300mm（100mm 打底層 + 2000×2000×300mm RC 基礎底版 #4@15 雙向鋼筋網 + 700×700×700mm 柱墩：#6 主筋 16 支、#4 箍筋 5 支 [4@150=600]、#3 繫筋 30 支）+ 5cm 無收縮水泥 + A.B 8-M25 L=600 基礎螺栓 + PL-19×500×500 柱底板 + PL12 加勁板 + RH300×300×10×15 鋼柱。',
     deliverables: [
+      '基礎鋼筋綁紮示意圖 (F1：2000×2000 底版 + 700×700 柱墩配筋) (.pdf)',
+      '柱底板與基礎螺栓配置詳圖 (PL-19×500×500 + A.B 8-M25 L=600)',
       '現場收方及柱位退縮圖 (.dwg)',
-      '基礎開挖與縱向連續地梁配筋圖 (.dwg / .pdf)',
-      '柱底板植筋化學錨栓詳圖 (8-M20×170L)',
-      '工程預算書 - 肆、土木工程分項母版 (.xlsx)',
     ],
     checkpoints: [
       {
-        title: '1. 縱向連續地梁基礎 (800 × 700 mm)',
-        spec: '開挖深 -800mm (GL-100 ~ -800mm) + 柱墩凸出至 GL+0',
-        detail: '外島高風壓或球場抗拔需求高時，採用 800×700mm 連續地梁串聯同軸 7 支鋼柱基礎，主筋 8-#6、箍筋 #4@15cm。',
+        title: '1. 基礎底版 RC 與 #4@15 雙向鋼筋網 (GL-900 ~ GL-1200)',
+        spec: '底版 2000×2000×300mm（保護層 50mm，鋼筋網 1900×1900mm）+ 底部 100mm 打底 (GL-1300)',
+        detail: '底版採用 #4@15cm 雙向正交鋼筋網（雙向各 14 支 #4 鋼筋，四端向上 90° 標準彎鉤立腳）。',
       },
       {
-        title: '2. 柱底板 D1/D2 與 8-M20 化學錨栓',
-        spec: '底板 PL20×500×500 + 加勁板 PL8×100×8片 + 8-M20×170L',
-        detail: '柱底板下方灌注無收縮水泥砂漿，柱外包覆 200cm 高鮮黃色防撞護墊（全場 14 座），確保運動安全。',
+        title: '2. 700×700 柱墩鋼筋籠 (#6主筋16支 + #4箍筋5支 + #3繫筋30支)',
+        spec: '柱墩高 700mm (GL-200 ~ GL-900)，保護層 50mm (箍筋框 600×600mm)',
+        detail: '垂直主筋採 16 支 #6 鋼筋（四周每邊 5 支均佈，底部伸入底版 90° 向外彎鉤）；水平箍筋採 5 支 #4 鋼筋 (4@150=600)；每層箍筋內綁紮 6 支雙向 #3 繫筋（5層×6支 = 共 30 支 #3 繫筋）。',
       },
       {
-        title: '3. 地下暗溝與既有管網退縮檢核',
-        spec: '柱中心距離既有排水暗溝邊緣 ≥ 1.2m',
-        detail: '先期收方務必標示球場四周排水暗溝、化糞池與給排水管，一次定案跨距（如 22.0m 對稱跨距），避免開挖後改圖。',
+        title: '3. 柱腳 A.B 8-M25 (L=600) 基礎螺栓與 PL-19×500×500 底板',
+        spec: 'GL-200 柱墩頂面 + 5cm 無收縮水泥土 + PL-19×500×500 + PL12 加勁板 + RH300×300×10×15',
+        detail: '8 支 M25 基礎螺栓 (L=600mm，底部 J 型彎鉤預埋入柱墩鋼筋籠內)，孔位 X 向 50+200+200+50=500mm、Y 向 50+144+212+144+50=500mm，柱底板與基礎間灌注 5cm 無收縮水泥。',
       },
     ],
   },
@@ -317,184 +316,407 @@ export default function EngineeringDiscipline3DModal({
 
     if (activeDiscipline === 'CIVIL') {
       // =======================================================================
-      // 🧱 1. 土木與基礎工程 3D 演示：
-      //    - 800×700mm 縱向連續基礎地梁 (半透明混凝土可透視內部 8-#6 主筋與 #4@15 箍筋籠)
-      //    - 柱墩 + 無收縮水泥層 + PL20×500×500 柱底板 (D1) + 8 片加勁板 (D2) + 8-M20×170L 化學錨栓
-      //    - RH300×300 主鋼柱下段 + 2.0m 高鮮黃色防撞護墊
-      //    - 球場地坪與旁邊地下排水暗溝安全退縮距離示意
+      // 🧱 1. 土木與基礎工程 3D 演示 — 1:1 嚴格依據《基礎鋼筋綁紮示意圖.pdf (F1)》建模
+      //   (單位換算：1m = 2.0 3D 單位，讓鋼筋籠細節在視窗中極致清晰呈現)
+      //   高程對應 (以 GL+0 為 Y = +2.4, GL-1300 為 Y = -0.2)：
+      //   - GL-1300 ~ GL-1200 (厚 100mm)：底層 PC 打底混凝土層 (2100×2100×100mm)
+      //   - GL-1200 ~ GL-900  (厚 300mm)：獨立基礎底版 RC (2000×2000×300mm，保護層 50mm)
+      //       • 底版鋼筋網：1900×1900mm 範圍雙向 #4@15cm 正交鋼筋網 (雙向各 14 支 #4 鋼筋，兩端 90° 向上彎鉤 200mm)
+      //   - GL-900  ~ GL-200  (高 700mm)：700×700×700mm 柱墩 RC (保護層 50mm，鋼筋籠外框 600×600mm)
+      //       • #6 鋼筋(主筋) 16 支：沿 600×600mm 周界每邊 5 支均佈 (間距 150mm)，自 GL-1120 貫穿至 GL-250，底部向外 90° 彎鉤錨定於底版網
+      //       • #4 鋼筋(箍筋) 5 支：4@150 = 600mm (位於柱墩內 5 個高程)，600×600mm 閉合矩形箍筋
+      //       • #3 鋼筋(繫筋) 30 支：每層箍筋配置 X 向 3 支 + Z 向 3 支 = 6 支對拉繫筋 (含兩端 135° 彎鉤) × 5 層 = 30 支！
+      //   - GL-200  ~ GL-150  (厚 50mm) ：5CM 無收縮水泥土 (540×540×50mm)
+      //   - A.B 8-M25 L=600 基礎螺栓：8 支 M25 錨栓 (孔位 X: ±200, 0; Z: ±200, ±106/0)，埋入柱墩 500mm + 底部 J 型彎鉤
+      //   - PL-19×500×500 柱底板 + PL12 加勁板 + RH300×300×10×15 主鋼柱
       // =======================================================================
       if (cameraRef.current && controlsRef.current) {
-        controlsRef.current.target.set(0, 1.5, 0);
-        cameraRef.current.position.set(8.5, 6.2, 9.5);
+        controlsRef.current.target.set(0, 1.8, 0);
+        cameraRef.current.position.set(6.2, 5.2, 6.8);
         controlsRef.current.update();
       }
 
+      const S = 2.0; // 放大倍率：1 公尺 (1000mm) = 2.0 Three.js 單位
+      // 將 GL-1200 (底版底面) 設在 Y = 0，則：
+      // GL-1300 = -0.1m * S = -0.2
+      // GL-1200 =  0.0m * S =  0.0
+      // GL-900  = +0.3m * S = +0.6 (底版頂面 / 柱墩底面)
+      // GL-200  = +1.0m * S = +2.0 (柱墩頂面)
+      // GL+0    = +1.2m * S = +2.4 (地表線)
+
       const concreteMat = new THREE.MeshStandardMaterial({
         color: 0x94a3b8,
-        roughness: 0.75,
-        transparent: xrayMode,
-        opacity: xrayMode ? 0.38 : 0.96,
+        roughness: 0.65,
+        transparent: true,
+        opacity: xrayMode ? 0.24 : 0.92,
+        depthWrite: !xrayMode,
       });
-      const mainRebarMat = new THREE.MeshStandardMaterial({
-        color: 0x38bdf8, // 8-#6 縱向主筋 (亮青藍色標示)
-        metalness: 0.6,
+      const concreteWireMat = new THREE.LineBasicMaterial({
+        color: 0x64748b,
+        transparent: true,
+        opacity: 0.55,
+      });
+      const matFootingRebar = new THREE.MeshStandardMaterial({
+        color: 0x10b981, // 底版 #4@15 雙向鋼筋網 (祖母綠)
+        metalness: 0.55,
         roughness: 0.3,
       });
-      const stirrupMat = new THREE.MeshStandardMaterial({
-        color: 0xef4444, // #4@15 箍筋 (醒目紅色標示)
-        metalness: 0.5,
-        roughness: 0.35,
+      const matMainRebar6 = new THREE.MeshStandardMaterial({
+        color: 0x38bdf8, // #6 鋼筋(主筋) 16支 (亮天藍)
+        metalness: 0.65,
+        roughness: 0.25,
       });
-      const anchorBoltMat = new THREE.MeshStandardMaterial({
-        color: 0xfacc15, // 8-M20×170L 化學錨栓 (亮金色)
+      const matStirrup4 = new THREE.MeshStandardMaterial({
+        color: 0xef4444, // #4 鋼筋(箍筋) 5支 (4@150=600) (醒目紅)
+        metalness: 0.55,
+        roughness: 0.3,
+      });
+      const matCrossTie3 = new THREE.MeshStandardMaterial({
+        color: 0xa855f7, // #3 鋼筋(繫筋) 30支 (亮紫羅蘭色)
+        metalness: 0.55,
+        roughness: 0.3,
+      });
+      const matAnchorBolt = new THREE.MeshStandardMaterial({
+        color: 0xfacc15, // A.B 8-M25 L=600 基礎螺栓 (亮金色)
         metalness: 0.75,
         roughness: 0.2,
       });
-      const steelPlateMat = new THREE.MeshStandardMaterial({
-        color: 0x334155,
+      const matGrout = new THREE.MeshStandardMaterial({
+        color: 0xd6d3d1, // 5CM 無收縮水泥土
+        roughness: 0.8,
+      });
+      const matSteelPlate = new THREE.MeshStandardMaterial({
+        color: 0x334155, // PL-19×500×500 柱底板 + PL12 加勁板 + RH300×300×10×15
         metalness: 0.7,
         roughness: 0.28,
       });
-      const safetyPadMat = new THREE.MeshStandardMaterial({
-        color: 0xfacc15,
-        roughness: 0.45,
-        transparent: true,
-        opacity: xrayMode ? 0.45 : 0.95,
-      });
 
-      const beamLen = 9.0; // 演示 2 跨段 (含 2 座柱墩)
-      const beamW = 0.8; // 800mm 寬
-      const beamH = 0.7; // 700mm 深
-
-      // (a) 地下開挖槽與碎石級配底層 (PC 墊層)
-      const pcLayer = new THREE.Mesh(
-        new THREE.BoxGeometry(beamLen + 0.6, 0.1, beamW + 0.4),
+      // 1. GL-1300 ~ GL-1200 (100mm PC 打底層)
+      const pcGeo = new THREE.BoxGeometry(2.15 * S, 0.1 * S, 2.15 * S);
+      const pcMesh = new THREE.Mesh(
+        pcGeo,
         new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.9 })
       );
-      pcLayer.position.set(0, -0.85, 0);
-      group.add(pcLayer);
+      pcMesh.position.set(0, -0.05 * S, 0);
+      group.add(pcMesh);
 
-      // (b) 800×700mm 縱向連續地梁混凝土本體 (Z = -0.8m ~ -0.1m)
-      const gradeBeam = new THREE.Mesh(new THREE.BoxGeometry(beamLen, beamH, beamW), concreteMat);
-      gradeBeam.position.set(0, -0.45, 0);
-      group.add(gradeBeam);
+      // 2. GL-1200 ~ GL-900 (2000×2000×300mm RC 基礎底版)
+      const footGeo = new THREE.BoxGeometry(2.0 * S, 0.3 * S, 2.0 * S);
+      const footMesh = new THREE.Mesh(footGeo, concreteMat);
+      footMesh.position.set(0, 0.15 * S, 0);
+      const footEdges = new THREE.LineSegments(new THREE.EdgesGeometry(footGeo), concreteWireMat);
+      footEdges.position.copy(footMesh.position);
+      group.add(footMesh, footEdges);
 
-      // (c) 地梁內部鋼筋籠：8-#6 縱向主筋 (上下各3支+中段2支) + #4@15cm 矩形箍筋
-      const rebarYList = [-0.73, -0.45, -0.17];
-      const rebarZList = [-0.32, 0, 0.32];
-      rebarYList.forEach((ry, yIdx) => {
-        rebarZList.forEach((rz, zIdx) => {
-          if (yIdx === 1 && zIdx === 1) return; // 共 8 支 #6 主筋
-          const bar = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.019, 0.019, beamLen - 0.16, 10),
-            mainRebarMat
-          );
-          bar.rotation.z = Math.PI / 2;
-          bar.position.set(0, ry, rz);
-          group.add(bar);
-        });
-      });
+      // 3. 底版內部 1900×1900mm 雙向 #4@15 鋼筋網 (保護層 50mm，雙向各 14 支，間距 ~146mm ≈ 15cm)
+      const matSpan = 1.9 * S; // 1900mm
+      const numMatBars = 14; // 13 格 @ ~146mm = 1900mm (#4@15)
+      const barRad4 = 0.009 * S; // #4 鋼筋半徑示意
+      const yBottomX = 0.05 * S; // 底面保護層 50mm
+      const yBottomZ = 0.05 * S + barRad4 * 2.1; // 上下交疊
+      const hookHeight = 0.19 * S; // 兩端向上 90° 彎鉤立腳
 
-      // #4@15cm 箍筋 (每 0.25m 繪製一圈矩形閉合箍筋)
-      for (let sx = -beamLen / 2 + 0.2; sx <= beamLen / 2 - 0.2; sx += 0.25) {
-        const wStir = 0.66;
-        const hStir = 0.58;
-        const topBar = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.016, wStir), stirrupMat);
-        topBar.position.set(sx, -0.16, 0);
-        const botBar = topBar.clone();
-        botBar.position.set(sx, -0.74, 0);
-        const leftBar = new THREE.Mesh(new THREE.BoxGeometry(0.016, hStir, 0.016), stirrupMat);
-        leftBar.position.set(sx, -0.45, -wStir / 2);
-        const rightBar = leftBar.clone();
-        rightBar.position.set(sx, -0.45, wStir / 2);
-        group.add(topBar, botBar, leftBar, rightBar);
-      }
+      for (let i = 0; i < numMatBars; i++) {
+        const offset = -matSpan / 2 + (i / (numMatBars - 1)) * matSpan;
 
-      // (d) 兩座柱位 (-2.5m 與 +2.5m)：柱墩 + 8-M20×170L 化學錨栓 + D1 底板 (PL20×500×500) + D2 加勁板 (8片) + RH300×300 鋼柱 + 防撞護墊
-      for (const colX of [-2.5, 2.5]) {
-        // 柱墩混凝土 (650×650×250mm, 凸出至 GL+0.15)
-        const pedestal = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.28, 0.68), concreteMat);
-        pedestal.position.set(colX, 0.02, 0);
-        group.add(pedestal);
-
-        // 8-M20×170L 植化學錨栓 (含螺帽與華司)
-        const boltCoords = [
-          [-0.2, -0.2],
-          [0, -0.2],
-          [0.2, -0.2],
-          [-0.2, 0],
-          [0.2, 0],
-          [-0.2, 0.2],
-          [0, 0.2],
-          [0.2, 0.2],
-        ];
-        boltCoords.forEach(([bx, bz]) => {
-          const anchor = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.016, 0.016, 0.45, 10),
-            anchorBoltMat
-          );
-          anchor.position.set(colX + bx, 0.1 + expOffset * 0.35, bz);
-          const nut = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.03, 6), anchorBoltMat);
-          nut.position.set(colX + bx, 0.26 + expOffset * 0.5, bz);
-          group.add(anchor, nut);
-        });
-
-        // 柱底板 D1 (PL20×500×500)
-        const baseY = 0.2 + expOffset * 0.5;
-        const basePlate = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.03, 0.52), steelPlateMat);
-        basePlate.position.set(colX, baseY, 0);
-        group.add(basePlate);
-
-        // 柱底 8 片加勁板 D2 (PL8×100×100)
-        for (const sx of [-0.16, 0.16]) {
-          for (const sz of [-0.1, 0.1]) {
-            const stiff = new THREE.Mesh(new THREE.BoxGeometry(0.015, 0.14, 0.12), steelPlateMat);
-            stiff.position.set(colX + sx, baseY + 0.085, sz);
-            group.add(stiff);
-          }
-        }
-
-        // 主鋼柱 SC (RH300×300×10×15)
-        const colBotY = baseY + 0.02 + expOffset * 0.3;
-        const colTopY = colBotY + 3.4;
+        // X 向 #4 鋼筋 + 兩端向上 90° 彎鉤
         group.add(
-          createHBeamBetween(
-            new THREE.Vector3(colX, colBotY, 0),
-            new THREE.Vector3(colX, colTopY, 0),
-            0.3,
-            0.3,
-            0.02,
-            0.03,
-            steelPlateMat
+          createMemberBetween(
+            new THREE.Vector3(-matSpan / 2, yBottomX, offset),
+            new THREE.Vector3(matSpan / 2, yBottomX, offset),
+            barRad4 * 2,
+            barRad4 * 2,
+            matFootingRebar,
+            true
+          ),
+          createMemberBetween(
+            new THREE.Vector3(-matSpan / 2, yBottomX, offset),
+            new THREE.Vector3(-matSpan / 2, yBottomX + hookHeight, offset),
+            barRad4 * 2,
+            barRad4 * 2,
+            matFootingRebar,
+            true
+          ),
+          createMemberBetween(
+            new THREE.Vector3(matSpan / 2, yBottomX, offset),
+            new THREE.Vector3(matSpan / 2, yBottomX + hookHeight, offset),
+            barRad4 * 2,
+            barRad4 * 2,
+            matFootingRebar,
+            true
           )
         );
 
-        // 鋼柱防撞護墊 (高 2.0m 鮮黃色包覆)
-        const padMesh = new THREE.Mesh(new THREE.BoxGeometry(0.48, 2.0, 0.48), safetyPadMat);
-        padMesh.position.set(colX, colBotY + 1.0 + expOffset * 0.3, 0);
-        group.add(padMesh);
+        // Z 向 #4 鋼筋 + 兩端向上 90° 彎鉤
+        group.add(
+          createMemberBetween(
+            new THREE.Vector3(offset, yBottomZ, -matSpan / 2),
+            new THREE.Vector3(offset, yBottomZ, matSpan / 2),
+            barRad4 * 2,
+            barRad4 * 2,
+            matFootingRebar,
+            true
+          ),
+          createMemberBetween(
+            new THREE.Vector3(offset, yBottomZ, -matSpan / 2),
+            new THREE.Vector3(offset, yBottomZ + hookHeight, -matSpan / 2),
+            barRad4 * 2,
+            barRad4 * 2,
+            matFootingRebar,
+            true
+          ),
+          createMemberBetween(
+            new THREE.Vector3(offset, yBottomZ, matSpan / 2),
+            new THREE.Vector3(offset, yBottomZ + hookHeight, matSpan / 2),
+            barRad4 * 2,
+            barRad4 * 2,
+            matFootingRebar,
+            true
+          )
+        );
       }
 
-      // (e) 球場側地坪與外側既有地下排水暗溝 (示意柱位避開暗溝退縮)
-      const courtFloor = new THREE.Mesh(
-        new THREE.BoxGeometry(beamLen, 0.08, 3.2),
-        new THREE.MeshStandardMaterial({ color: 0x1d4ed8, roughness: 0.6 })
-      );
-      courtFloor.position.set(0, -0.02, -2.1);
-      group.add(courtFloor);
+      // 4. GL-900 ~ GL-200 (700×700×700mm 柱墩 RC 混凝土外廓，保護層 50mm)
+      const pedGeo = new THREE.BoxGeometry(0.7 * S, 0.7 * S, 0.7 * S);
+      const pedMesh = new THREE.Mesh(pedGeo, concreteMat);
+      pedMesh.position.set(0, (0.3 + 0.35) * S, 0);
+      const pedEdges = new THREE.LineSegments(new THREE.EdgesGeometry(pedGeo), concreteWireMat);
+      pedEdges.position.copy(pedMesh.position);
+      group.add(pedMesh, pedEdges);
 
-      // 既有排水暗溝 (位於外側 Z = +1.6m，附藍色水流與水溝蓋格柵)
-      const culvertOuter = new THREE.Mesh(
-        new THREE.BoxGeometry(beamLen, 0.65, 0.7),
-        new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.8 })
+      // 5. 柱墩鋼筋籠：
+      //    (a) #6 鋼筋(主筋) 16 支 (沿 600×600mm 箍筋框周界：每邊 5 支 = 16 支，座標 -300, -150, 0, +150, +300 mm)
+      const cageHalf = 0.3 * S; // 600mm / 2 = 300mm
+      const grid5 = [-0.3 * S, -0.15 * S, 0, 0.15 * S, 0.3 * S];
+      const mainBarCoords: [number, number][] = [];
+      grid5.forEach((x, ix) => {
+        grid5.forEach((z, iz) => {
+          // 僅取周界上的 16 個點 (5×5 外框 = 16 支)
+          if (ix === 0 || ix === 4 || iz === 0 || iz === 4) {
+            mainBarCoords.push([x, z]);
+          }
+        });
+      });
+
+      const barRad6 = 0.013 * S; // #6 主筋直徑 19mm
+      const mainBotY = 0.075 * S; // 深入底版鋼筋網頂面
+      const mainTopY = (1.0 - 0.05) * S; // GL-200 下方 50mm 保護層 (y = 0.95m)
+
+      mainBarCoords.forEach(([mx, mz]) => {
+        // 垂直主筋段
+        group.add(
+          createMemberBetween(
+            new THREE.Vector3(mx, mainBotY, mz),
+            new THREE.Vector3(mx, mainTopY, mz),
+            barRad6 * 2,
+            barRad6 * 2,
+            matMainRebar6,
+            true
+          )
+        );
+        // 底部向外 90° 標準錨定彎鉤 (長 220mm，貼於底版鋼筋網上)
+        const dirVec = new THREE.Vector3(mx, 0, mz).normalize();
+        const hookEnd = new THREE.Vector3(
+          mx + dirVec.x * 0.22 * S,
+          mainBotY,
+          mz + dirVec.z * 0.22 * S
+        );
+        group.add(
+          createMemberBetween(
+            new THREE.Vector3(mx, mainBotY, mz),
+            hookEnd,
+            barRad6 * 2,
+            barRad6 * 2,
+            matMainRebar6,
+            true
+          )
+        );
+      });
+
+      //    (b) #4 鋼筋(箍筋) 5 支 (4@150 = 600mm) + (c) #3 鋼筋(繫筋) 30 支 (5 層 × 每層 6 支雙向繫筋 = 30 支)
+      const stirrupElevationsM = [0.35, 0.5, 0.65, 0.8, 0.95]; // 4@150mm = 600mm (位於 GL-850 ~ GL-250)
+      const barRad3 = 0.0065 * S; // #3 繫筋
+
+      stirrupElevationsM.forEach(ym => {
+        const sy = ym * S;
+        const c1 = new THREE.Vector3(-cageHalf, sy, -cageHalf);
+        const c2 = new THREE.Vector3(cageHalf, sy, -cageHalf);
+        const c3 = new THREE.Vector3(cageHalf, sy, cageHalf);
+        const c4 = new THREE.Vector3(-cageHalf, sy, cageHalf);
+
+        // 外圈 600×600mm #4 閉合箍筋 (4 邊)
+        group.add(
+          createMemberBetween(c1, c2, barRad4 * 2, barRad4 * 2, matStirrup4, true),
+          createMemberBetween(c2, c3, barRad4 * 2, barRad4 * 2, matStirrup4, true),
+          createMemberBetween(c3, c4, barRad4 * 2, barRad4 * 2, matStirrup4, true),
+          createMemberBetween(c4, c1, barRad4 * 2, barRad4 * 2, matStirrup4, true)
+        );
+
+        // 內部 6 支 #3 雙向繫筋 (3 支平行 X 軸 + 3 支平行 Z 軸，勾住中間 3 排 #6 主筋，5 層 × 6 支 = 30 支！)
+        for (const midCoord of [-0.15 * S, 0, 0.15 * S]) {
+          // 平行 X 軸繫筋 + 兩端 135° 彎鉤
+          const pX1 = new THREE.Vector3(-cageHalf, sy + 0.01, midCoord);
+          const pX2 = new THREE.Vector3(cageHalf, sy + 0.01, midCoord);
+          group.add(
+            createMemberBetween(pX1, pX2, barRad3 * 2, barRad3 * 2, matCrossTie3, true),
+            createMemberBetween(
+              pX1,
+              new THREE.Vector3(-cageHalf + 0.045 * S, sy + 0.01, midCoord + 0.035 * S),
+              barRad3 * 1.8,
+              barRad3 * 1.8,
+              matCrossTie3,
+              true
+            ),
+            createMemberBetween(
+              pX2,
+              new THREE.Vector3(cageHalf - 0.045 * S, sy + 0.01, midCoord - 0.035 * S),
+              barRad3 * 1.8,
+              barRad3 * 1.8,
+              matCrossTie3,
+              true
+            )
+          );
+
+          // 平行 Z 軸繫筋 + 兩端 135° 彎鉤
+          const pZ1 = new THREE.Vector3(midCoord, sy - 0.01, -cageHalf);
+          const pZ2 = new THREE.Vector3(midCoord, sy - 0.01, cageHalf);
+          group.add(
+            createMemberBetween(pZ1, pZ2, barRad3 * 2, barRad3 * 2, matCrossTie3, true),
+            createMemberBetween(
+              pZ1,
+              new THREE.Vector3(midCoord + 0.035 * S, sy - 0.01, -cageHalf + 0.045 * S),
+              barRad3 * 1.8,
+              barRad3 * 1.8,
+              matCrossTie3,
+              true
+            ),
+            createMemberBetween(
+              pZ2,
+              new THREE.Vector3(midCoord - 0.035 * S, sy - 0.01, cageHalf - 0.045 * S),
+              barRad3 * 1.8,
+              barRad3 * 1.8,
+              matCrossTie3,
+              true
+            )
+          );
+        }
+      });
+
+      // 6. A.B 8-M25 L=600 基礎螺栓 (預埋入柱墩內，孔位嚴格對齊右上詳圖：500×500 底板，X: -200, 0, +200; Z: -200, ±106, +200)
+      const abLift = expOffset * 0.35;
+      const abCoordsM: [number, number][] = [
+        [-0.2, -0.2],
+        [0.0, -0.2],
+        [0.2, -0.2],
+        [-0.2, -0.056],
+        [0.2, 0.056],
+        [-0.2, 0.2],
+        [0.0, 0.2],
+        [0.2, 0.2],
+      ];
+      const boltRad = 0.014 * S; // M25
+      const boltTopY = 1.15 * S + abLift;
+      const boltBotY = (1.15 - 0.6) * S + abLift; // L = 600mm
+
+      abCoordsM.forEach(([bx, bz]) => {
+        const x3 = bx * S;
+        const z3 = bz * S;
+        group.add(
+          createMemberBetween(
+            new THREE.Vector3(x3, boltBotY, z3),
+            new THREE.Vector3(x3, boltTopY, z3),
+            boltRad * 2,
+            boltRad * 2,
+            matAnchorBolt,
+            true
+          ),
+          // 底部 90° J 型錨定彎鉤
+          createMemberBetween(
+            new THREE.Vector3(x3, boltBotY, z3),
+            new THREE.Vector3(x3 * 0.65, boltBotY, z3 * 0.65),
+            boltRad * 2,
+            boltRad * 2,
+            matAnchorBolt,
+            true
+          )
+        );
+        // 雙螺帽與華司
+        const nut = new THREE.Mesh(
+          new THREE.CylinderGeometry(boltRad * 1.8, boltRad * 1.8, 0.03 * S, 6),
+          matAnchorBolt
+        );
+        nut.position.set(x3, 1.09 * S + expOffset * 0.6, z3);
+        group.add(nut);
+      });
+
+      // 7. 5CM 無收縮水泥土 (GL-200 ~ GL-150，位於柱墩頂面與 PL-19×500×500 之間)
+      const groutY = 1.025 * S + expOffset * 0.45;
+      const groutMesh = new THREE.Mesh(
+        new THREE.BoxGeometry(0.54 * S, 0.05 * S, 0.54 * S),
+        matGrout
       );
-      culvertOuter.position.set(0, -0.35, 1.65);
-      const culvertWater = new THREE.Mesh(
-        new THREE.BoxGeometry(beamLen - 0.1, 0.25, 0.5),
-        new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.2 })
+      groutMesh.position.set(0, groutY, 0);
+      group.add(groutMesh);
+
+      // 8. PL-19×500×500 柱底板 + PL12 加勁板 + RH300×300×10×15 主鋼柱
+      const bpY = 1.06 * S + expOffset * 0.65;
+      const bpMesh = new THREE.Mesh(
+        new THREE.BoxGeometry(0.5 * S, 0.019 * S, 0.5 * S),
+        matSteelPlate
       );
-      culvertWater.position.set(0, -0.45, 1.65);
-      group.add(culvertOuter, culvertWater);
+      bpMesh.position.set(0, bpY, 0);
+      group.add(bpMesh);
+
+      // PL12 加勁板 (對齊右上詳圖：左右翼板外側與腹板兩側加勁板)
+      for (const sx of [-0.155 * S, 0.155 * S]) {
+        for (const sz of [-0.1 * S, 0.1 * S]) {
+          const stiff = new THREE.Mesh(
+            new THREE.BoxGeometry(0.095 * S, 0.16 * S, 0.012 * S),
+            matSteelPlate
+          );
+          stiff.position.set(sx + (sx > 0 ? 0.045 * S : -0.045 * S), bpY + 0.09 * S, sz);
+          group.add(stiff);
+        }
+      }
+      for (const sz of [-0.155 * S, 0.155 * S]) {
+        const webStiff = new THREE.Mesh(
+          new THREE.BoxGeometry(0.012 * S, 0.16 * S, 0.095 * S),
+          matSteelPlate
+        );
+        webStiff.position.set(0, bpY + 0.09 * S, sz + (sz > 0 ? 0.045 * S : -0.045 * S));
+        group.add(webStiff);
+      }
+
+      // RH300×300×10×15 主鋼柱 (自柱底板向上延伸至 GL+0 以上)
+      const colStart = bpY + 0.01 * S;
+      const colEnd = colStart + 1.15 * S;
+      group.add(
+        createHBeamBetween(
+          new THREE.Vector3(0, colStart, 0),
+          new THREE.Vector3(0, colEnd, 0),
+          0.3 * S,
+          0.3 * S,
+          0.01 * S,
+          0.015 * S,
+          matSteelPlate
+        )
+      );
+
+      // 9. GL+0 地表基準線半透明環框 (標示 GL+0 與柱墩頂 GL-200 之高程關係)
+      const glRingGeo = new THREE.RingGeometry(0.85 * S, 1.35 * S, 4);
+      glRingGeo.rotateY(Math.PI / 4);
+      glRingGeo.rotateX(-Math.PI / 2);
+      const glPlane = new THREE.Mesh(
+        glRingGeo,
+        new THREE.MeshBasicMaterial({
+          color: 0x38bdf8,
+          transparent: true,
+          opacity: 0.15,
+          side: THREE.DoubleSide,
+        })
+      );
+      glPlane.position.set(0, 1.2 * S, 0); // GL+0 (高於柱墩頂 GL-200 200mm)
+      group.add(glPlane);
     } else if (activeDiscipline === 'STEEL') {
       // =======================================================================
       // 🏗️ 2. 鋼構與支架工程 3D 演示：
@@ -1034,8 +1256,8 @@ export default function EngineeringDiscipline3DModal({
   const resetCamera = () => {
     if (!cameraRef.current || !controlsRef.current) return;
     if (activeDiscipline === 'CIVIL') {
-      controlsRef.current.target.set(0, 1.5, 0);
-      cameraRef.current.position.set(8.5, 6.2, 9.5);
+      controlsRef.current.target.set(0, 1.8, 0);
+      cameraRef.current.position.set(6.2, 5.2, 6.8);
     } else if (activeDiscipline === 'STEEL') {
       controlsRef.current.target.set(0, 4.2, 0);
       cameraRef.current.position.set(13.5, 9.5, 15.0);
@@ -1164,16 +1386,22 @@ export default function EngineeringDiscipline3DModal({
               {activeDiscipline === 'CIVIL' && (
                 <div className="flex flex-wrap items-center gap-3">
                   <span className="flex items-center gap-1.5">
-                    <span className="w-3 h-3 rounded-xs bg-sky-400 inline-block" /> 8-#6 連續地梁主筋
+                    <span className="w-3 h-3 rounded-xs bg-emerald-500 inline-block" /> 底版 1900×1900 #4@15 鋼筋網
                   </span>
                   <span className="flex items-center gap-1.5">
-                    <span className="w-3 h-3 rounded-xs bg-red-500 inline-block" /> #4@15cm 箍筋
+                    <span className="w-3 h-3 rounded-xs bg-sky-400 inline-block" /> #6 柱墩主筋 (16支)
                   </span>
                   <span className="flex items-center gap-1.5">
-                    <span className="w-3 h-3 rounded-xs bg-yellow-400 inline-block" /> 8-M20×170L 化學錨栓 & 防撞墊
+                    <span className="w-3 h-3 rounded-xs bg-red-500 inline-block" /> #4 箍筋 (5支, 4@150=600)
                   </span>
                   <span className="flex items-center gap-1.5">
-                    <span className="w-3 h-3 rounded-xs bg-slate-600 inline-block" /> PL20×500 柱底板 + 8片加勁板
+                    <span className="w-3 h-3 rounded-xs bg-purple-500 inline-block" /> #3 雙向繫筋 (30支)
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-3 h-3 rounded-xs bg-yellow-400 inline-block" /> A.B 8-M25 L=600 基礎螺栓
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-3 h-3 rounded-xs bg-slate-500 inline-block" /> 5cm無收縮水泥 + PL-19×500×500
                   </span>
                 </div>
               )}
