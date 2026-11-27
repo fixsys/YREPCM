@@ -18,6 +18,7 @@ import toolboxMeetingsRoutes from './routes/toolboxMeetings';
 import laborReportsRoutes from './routes/laborReports';
 import dispatchOrdersRoutes from './routes/dispatchOrders';
 import approvalsRoutes from './routes/approvals';
+import knowledgeBaseRoutes from './routes/knowledgeBase';
 import systemLogsRoutes, { systemAuditMiddleware } from './routes/systemLogs';
 import changelogRoutes from './routes/changelog';
 import path from 'path';
@@ -52,6 +53,7 @@ app.use('/api/toolbox-meetings', toolboxMeetingsRoutes);
 app.use('/api/labor-reports', laborReportsRoutes);
 app.use('/api/dispatch-orders', dispatchOrdersRoutes);
 app.use('/api/approvals', approvalsRoutes);
+app.use('/api/knowledge-base', knowledgeBaseRoutes);
 app.use('/api/system-logs', systemLogsRoutes);
 app.use('/api/changelog', changelogRoutes);
 

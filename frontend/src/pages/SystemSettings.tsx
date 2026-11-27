@@ -6,6 +6,7 @@ import { Save, Plus, Trash2, Settings as SettingsIcon, Mail, Users, Shield, Chec
 const AVAILABLE_MODULES = [
   { id: 'dashboard', name: '總覽看板' },
   { id: 'approvals', name: '電子簽核' },
+  { id: 'knowledge_base', name: '設計知識庫' },
   { id: 'crm', name: '業務開發' },
   { id: 'onsite', name: '現場報工' },
   { id: 'manufacturing', name: '製造報工' },
