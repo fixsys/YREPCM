@@ -9,13 +9,6 @@ const router = Router();
 const TEMPLATE_ROOT = path.resolve(__dirname, '../../../風雨球場設計模板');
 
 const STAGE_DESCRIPTIONS: Record<string, { title: string; subtitle: string; badge: string; order: number; checkPoint: string }> = {
-  '0.設計規範與總覽': {
-    title: '0. 標準設計規範與防呆檢核表',
-    subtitle: '太陽能風雨球場標準設計母版總綱（澎湖嵵裡國小 156.75 kWp 基準）',
-    badge: '核心規範',
-    order: 0,
-    checkPoint: '涵蓋空間幾何、結構參數、Tekla 構件命名、機電串併邏輯、預算估算公式與 6 大歷史改圖防呆檢核點。',
-  },
   '1.預算書及模配圖': {
     title: '1. 預算書及模配圖（提案與成本階段）',
     subtitle: '工程預算書參數化母版 (.xlsx)、模組配置圖 (.dwg/.pdf) 與航拍底圖 (.png)',
@@ -64,13 +57,6 @@ const STAGE_DESCRIPTIONS: Record<string, { title: string; subtitle: string; badg
     badge: '先期勘查',
     order: 7,
     checkPoint: '標示既有籃球場邊線、籃球架位置、階梯/出口動線、周邊建物樓高（2F 教室遮陰）、草地與地下暗溝位置（避開柱位開挖）。',
-  },
-  '8.FreeCAD_3D模型': {
-    title: '8. FreeCAD 3D 全模型與自動化建模腳本（BIM 3D 模型）',
-    subtitle: '風雨球場 3D 全模型 (.FCStd / .step) 與 Python 參數化 BIM 自動建模腳本 (.py)',
-    badge: '3D BIM 模型',
-    order: 8,
-    checkPoint: '涵蓋土建基礎、主次鋼構、設備平台、屋面浪板母索、285片太陽能模組、逆變器配電箱與全場 17 串 DC/AC 線路之完整 3D 模型。',
   },
 };
 
@@ -193,22 +179,12 @@ const scanFilesRecursive = (dirPath: string, folderKey: string, baseRel = ''): K
   return results;
 };
 
-// GET /api/knowledge-base - 取得設計知識庫完整結構、Markdown 規範全文與所有範例檔案清單
+// GET /api/knowledge-base - 取得設計知識庫完整結構與所有範例檔案清單 (第 1 項 ~ 第 7 項)
 router.get('/', authenticateToken, async (_req, res) => {
   try {
     if (!fs.existsSync(TEMPLATE_ROOT)) {
       return res.status(404).json({ error: '找不到風雨球場設計模板目錄' });
     }
-
-    const mdFilePath = path.join(TEMPLATE_ROOT, '00_風雨球場標準設計規範與檢核表.md');
-    const markdownContent = fs.existsSync(mdFilePath)
-      ? fs.readFileSync(mdFilePath, 'utf-8')
-      : '';
-
-    const pyScriptPath = path.join(TEMPLATE_ROOT, '8.FreeCAD_3D模型', 'build_wind_rain_court_freecad.py');
-    const freecadScriptContent = fs.existsSync(pyScriptPath)
-      ? fs.readFileSync(pyScriptPath, 'utf-8')
-      : '';
 
     const rootEntries = fs.readdirSync(TEMPLATE_ROOT, { withFileTypes: true });
     const folders: {
@@ -221,37 +197,13 @@ router.get('/', authenticateToken, async (_req, res) => {
       files: KnowledgeFileItem[];
     }[] = [];
 
-    // 0. Root markdown specification file
-    const rootFiles: KnowledgeFileItem[] = [];
-    if (fs.existsSync(mdFilePath)) {
-      const st = fs.statSync(mdFilePath);
-      const tInfo = getFileTypeInfo('00_風雨球場標準設計規範與檢核表.md');
-      rootFiles.push({
-        id: Buffer.from('00_風雨球場標準設計規範與檢核表.md', 'utf8').toString('base64url'),
-        name: '00_風雨球場標準設計規範與檢核表.md',
-        relativePath: '00_風雨球場標準設計規範與檢核表.md',
-        folderKey: '0.設計規範與總覽',
-        subFolder: '',
-        sizeBytes: st.size,
-        updatedAt: st.mtime.toISOString(),
-        ext: tInfo.ext,
-        typeCategory: tInfo.category,
-        previewable: tInfo.previewable,
-        products: ['sport_court', 'fish_outdoor', 'fish_indoor', 'roof_canopy', 'roof_flush', 'ground_mount'],
-        isUniversal: true,
-      });
-    }
-    const meta0 = STAGE_DESCRIPTIONS['0.設計規範與總覽'];
-    folders.push({
-      key: '0.設計規範與總覽',
-      ...meta0,
-      files: rootFiles,
-    });
-
-    // 1..8 Stage directories
+    // 1..7 Stage directories (排除第 0 項與第 8 項 FreeCAD_3D模型)
     for (const entry of rootEntries) {
       if (entry.isDirectory()) {
         const folderKey = entry.name;
+        if (folderKey.startsWith('0.') || folderKey.startsWith('8.')) {
+          continue;
+        }
         const fullDir = path.join(TEMPLATE_ROOT, folderKey);
         const files = scanFilesRecursive(fullDir, folderKey, '');
         const meta = STAGE_DESCRIPTIONS[folderKey] || {
@@ -274,8 +226,6 @@ router.get('/', authenticateToken, async (_req, res) => {
 
     res.json({
       templateName: '太陽能風雨球場標準設計模板（澎湖嵵裡國小 156.75 kWp 基準）',
-      markdownContent,
-      freecadScriptContent,
       totalFiles: allFiles.length,
       folders,
       allFiles,
