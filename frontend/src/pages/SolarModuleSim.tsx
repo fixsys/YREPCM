@@ -192,17 +192,17 @@ export default function SolarModuleSim() {
     }
     setGroundMountStyle(prod.defaultGroundStyle);
     if (prod.id === 'sport_court') {
-      // 對齊《風雨球場設計模板》（澎湖嵵裡國小 156.75kWp：19排 × 15列 = 285片 × 550Wp）
-      setSiteWidth(34.2);
-      setSiteLength(23.0);
-      setEdgeClearance(0.4);
+      // 對齊《風雨球場設計模板》（澎湖嵵裡國小 156.75kWp：19排 × 15列 = 285片 × 550Wp，預留西側爬梯斜坡走道與中央屋脊維修走道）
+      setSiteWidth(34.6);
+      setSiteLength(23.6);
+      setEdgeClearance(1.1);
       setPanelWidth(1.34);
       setPanelLength(1.72);
       setPanelPower(550);
       setPanelSpacing(0.04);
       setOrientation('landscape');
       setHWalkwayCount(1);
-      setHWalkwayWidth(0.8);
+      setHWalkwayWidth(1.1);
       setVWalkwayCount(0);
     } else if (prod.id === 'ground_mount' && hWalkwayCount === 0) {
       setHWalkwayCount(1);

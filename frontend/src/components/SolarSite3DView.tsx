@@ -921,29 +921,399 @@ export default function SolarSite3DView({
           group.add(postR);
         }
 
-        // 1.7 西南角安全護籠爬梯 (軸 1/G，直通屋面檢修步道)
-        const ladderMat = new THREE.MeshStandardMaterial({ color: 0xeab308, metalness: 0.45, roughness: 0.35 });
-        const ladX = xFirst - 0.45;
-        const ladZ = zBack;
-        const ladTopY = getCanopySurfaceY(y2dBack) + 0.4;
-        const railL = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, ladTopY, 8), ladderMat);
-        railL.position.set(ladX, ladTopY / 2, ladZ - 0.28);
+        // =====================================================================
+        // 1.7 ★ 強化版：西南角安全護籠爬梯 (軸 1/G，含柱身固定托架、7道縱向護籠扁鋼、鵝頸登頂扶手、屋簷跨越轉接平台)
+        // =====================================================================
+        const ladderYellowMat = new THREE.MeshStandardMaterial({
+          color: 0xfacc15,
+          metalness: 0.4,
+          roughness: 0.3,
+        });
+        const ladderOrangeMat = new THREE.MeshStandardMaterial({
+          color: 0xf97316,
+          metalness: 0.45,
+          roughness: 0.3,
+        });
+        const bracketMat = new THREE.MeshStandardMaterial({
+          color: 0x1e293b,
+          metalness: 0.65,
+          roughness: 0.3,
+        });
+        const catwalkFrameMat = new THREE.MeshStandardMaterial({
+          color: 0xf59e0b, // 醒目工安橘黃色角鐵邊框與踢腳板
+          metalness: 0.45,
+          roughness: 0.35,
+        });
+        const catwalkMeshMat = new THREE.MeshStandardMaterial({
+          color: 0x64748b, // 鍍鋅菱形擴張網底板
+          metalness: 0.65,
+          roughness: 0.35,
+        });
+        const catwalkGridMat = new THREE.MeshBasicMaterial({
+          color: 0xe2e8f0, // 菱形網格高光格線
+        });
+
+        const ladWidth = 0.62;
+        const ladX = xFirst - 0.55; // 位於西側第一榀柱列 (軸 G) 外側
+        const ladZ = zBack; // 對齊北/西側第一支主鋼柱 (軸 1/G)
+        const eaveAtLadderY = getCanopySurfaceY(y2dBack);
+        const ladLandingY = eaveAtLadderY + 0.14; // 登頂踏台高程 (高於屋面浪板)
+        const ladTopHandrailY = ladLandingY + 1.15; // 梯頂鵝頸安全扶手延伸高程
+
+        // (a) 左右兩支加粗主立管 (Ø56mm)
+        const railL = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.032, 0.032, ladTopHandrailY, 12),
+          ladderYellowMat
+        );
+        railL.position.set(ladX, ladTopHandrailY / 2, ladZ - ladWidth / 2);
+        railL.castShadow = true;
         const railR = railL.clone();
-        railR.position.set(ladX, ladTopY / 2, ladZ + 0.28);
+        railR.position.set(ladX, ladTopHandrailY / 2, ladZ + ladWidth / 2);
         group.add(railL, railR);
 
-        for (let ry = 0.35; ry < ladTopY; ry += 0.35) {
-          const rung = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.56, 8), ladderMat);
+        // (b) 加密防滑踏棍 (間距 0.30m，底部至登頂踏台)
+        for (let ry = 0.3; ry <= ladLandingY; ry += 0.3) {
+          const rung = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.016, 0.016, ladWidth, 10),
+            ladderOrangeMat
+          );
           rung.rotation.x = Math.PI / 2;
           rung.position.set(ladX, ry, ladZ);
           group.add(rung);
         }
-        for (let hy = 2.2; hy < ladTopY; hy += 0.75) {
-          const hoop = new THREE.Mesh(new THREE.TorusGeometry(0.38, 0.016, 8, 18), ladderMat);
-          hoop.rotation.x = Math.PI / 2;
-          hoop.position.set(ladX - 0.32, hy, ladZ);
-          group.add(hoop);
+
+        // (c) 爬梯與 SC1 主鋼柱之間的水平雙固定托架 (每隔 1.6m 一組，牢牢抱緊鋼柱)
+        for (let by = 1.2; by <= eaveAtLadderY - 0.3; by += 1.6) {
+          for (const dz of [-ladWidth / 2, ladWidth / 2]) {
+            group.add(
+              createMemberBetween(
+                new THREE.Vector3(xFirst, by, ladZ + dz * 0.45),
+                new THREE.Vector3(ladX, by, ladZ + dz),
+                0.05,
+                0.06,
+                bracketMat
+              )
+            );
+          }
+          // 橫向抱箍板
+          const tiePlate = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.08, ladWidth + 0.08), bracketMat);
+          tiePlate.position.set(ladX + 0.12, by, ladZ);
+          group.add(tiePlate);
         }
+
+        // (d) 立體防墜安全護籠 (自離地 2.2m 起至 ladTopHandrailY - 0.2m)
+        const cageStartY = 2.2;
+        const cageEndY = ladTopHandrailY - 0.15;
+        const cageRadius = 0.44;
+        const cageCenterX = ladX - 0.36;
+        const cageCenterZ = ladZ;
+
+        // 水平護籠扁鋼箍 (每 0.6m 一道，開口朝向爬梯踏棍側)
+        for (let hy = cageStartY; hy <= cageEndY; hy += 0.6) {
+          const hoop = new THREE.Mesh(
+            new THREE.TorusGeometry(cageRadius, 0.02, 10, 24, Math.PI * 1.45),
+            ladderYellowMat
+          );
+          hoop.rotation.x = Math.PI / 2;
+          hoop.rotation.z = Math.PI * 0.275;
+          hoop.position.set(cageCenterX, hy, cageCenterZ);
+          hoop.castShadow = true;
+          group.add(hoop);
+
+          // 護籠圓環兩端連回爬梯主立管的橫撐
+          for (const side of [-1, 1]) {
+            const pHoopEnd = new THREE.Vector3(
+              cageCenterX + cageRadius * 0.65,
+              hy,
+              cageCenterZ + side * (cageRadius * 0.75)
+            );
+            const pRail = new THREE.Vector3(ladX, hy, ladZ + side * (ladWidth / 2));
+            group.add(createMemberBetween(pHoopEnd, pRail, 0.025, 0.04, ladderYellowMat));
+          }
+        }
+
+        // 7 支垂直護籠縱向扁鋼條 (串聯所有水平護籠圓環，形成完整立體鳥籠結構)
+        const cageAngles = [-125, -90, -55, -20, 20, 55, 90, 125];
+        cageAngles.forEach(deg => {
+          const rad = (deg * Math.PI) / 180;
+          const vx = cageCenterX - Math.cos(rad) * cageRadius;
+          const vz = cageCenterZ + Math.sin(rad) * cageRadius;
+          const vBar = new THREE.Mesh(
+            new THREE.BoxGeometry(0.025, cageEndY - cageStartY, 0.04),
+            ladderOrangeMat
+          );
+          vBar.position.set(vx, (cageStartY + cageEndY) / 2, vz);
+          vBar.castShadow = true;
+          group.add(vBar);
+        });
+
+        // (e) 爬梯頂部鵝頸彎頭扶手與屋簷登頂轉接平台 (Landing Platform -> 銜接屋頂維修走道)
+        const walkStartX = xFirst - 0.15;
+        const landingCenterX = (ladX + walkStartX) / 2;
+        const landingLenX = Math.abs(walkStartX - ladX) + 0.45;
+        const landingPlatform = new THREE.Mesh(
+          new THREE.BoxGeometry(landingLenX, 0.06, 0.9),
+          catwalkMeshMat
+        );
+        landingPlatform.position.set(landingCenterX, ladLandingY, ladZ);
+        group.add(landingPlatform);
+
+        // 登頂平台兩側安全扶手與鵝頸連接桿
+        for (const side of [-1, 1]) {
+          const zRail = ladZ + side * 0.42;
+          // 頂部水平扶手
+          group.add(
+            createMemberBetween(
+              new THREE.Vector3(ladX, ladTopHandrailY, zRail),
+              new THREE.Vector3(walkStartX + 0.35, ladTopHandrailY, zRail),
+              0.038,
+              0.038,
+              ladderYellowMat,
+              true
+            ),
+            // 中層橫桿
+            createMemberBetween(
+              new THREE.Vector3(ladX, ladLandingY + 0.55, zRail),
+              new THREE.Vector3(walkStartX + 0.35, ladLandingY + 0.55, zRail),
+              0.028,
+              0.028,
+              ladderOrangeMat,
+              true
+            ),
+            // 平台內側立柱
+            createMemberBetween(
+              new THREE.Vector3(walkStartX + 0.32, ladLandingY, zRail),
+              new THREE.Vector3(walkStartX + 0.32, ladTopHandrailY, zRail),
+              0.035,
+              0.035,
+              ladderYellowMat,
+              true
+            ),
+            // 平台踢腳板 (Toe board)
+            createMemberBetween(
+              new THREE.Vector3(ladX, ladLandingY + 0.08, zRail),
+              new THREE.Vector3(walkStartX + 0.32, ladLandingY + 0.08, zRail),
+              0.03,
+              0.12,
+              catwalkFrameMat
+            )
+          );
+        }
+
+        // =====================================================================
+        // 1.8 ★ 強化版：屋頂菱形擴張網維修走道系統 (60.8m Catwalk System)
+        // 包含：
+        //   ① 西端順坡階梯式聯絡走道 (自西南角爬梯登頂口 -> 中央屋脊 -> 對側屋簷，含雙側安全扶手欄杆與防滑踏階)
+        //   ② 中央屋脊縱向主維修走道 (全長貫穿，含雙側亮橘黃色角鐵邊框/踢腳板、高對比菱形網紋理、支撐高架腳座與伴行雙層安全母索)
+        //   ③ 橫跨模組陣列的橫向/縱向檢修分支走道
+        // =====================================================================
+        const catwalkWidth = 0.72;
+        const ridgeY = getCanopySurfaceY(L / 2) + 0.14; // 高於太陽能模組頂面，確保完整可視且不被遮擋
+
+        // --- ② 中央屋脊縱向主維修走道 (沿 X 軸貫穿全場 -W/2+0.3 ~ +W/2-0.3) ---
+        const ridgeWalkLen = W - 0.4;
+        // 菱形擴張網主底板
+        const ridgeDeck = new THREE.Mesh(
+          new THREE.BoxGeometry(ridgeWalkLen, 0.04, catwalkWidth),
+          catwalkMeshMat
+        );
+        ridgeDeck.position.set(0, ridgeY, 0);
+        ridgeDeck.castShadow = true;
+        ridgeDeck.receiveShadow = true;
+        group.add(ridgeDeck);
+
+        // 雙側亮橘黃色 L 型角鐵邊框與 12cm 高防墜踢腳板 (Toe Boards)
+        for (const side of [-1, 1]) {
+          const zCurb = side * (catwalkWidth / 2 + 0.02);
+          const curb = new THREE.Mesh(
+            new THREE.BoxGeometry(ridgeWalkLen, 0.11, 0.045),
+            catwalkFrameMat
+          );
+          curb.position.set(0, ridgeY + 0.04, zCurb);
+          curb.castShadow = true;
+          group.add(curb);
+        }
+
+        // 屋脊走道表面的菱形網格橫向防滑肋條 + 下方高架支撐鞍座 (每隔 0.75m 一道)
+        const numRidgeCrossBars = Math.max(12, Math.round(ridgeWalkLen / 0.75));
+        for (let ic = 0; ic <= numRidgeCrossBars; ic++) {
+          const cx = -ridgeWalkLen / 2 + (ic / numRidgeCrossBars) * ridgeWalkLen;
+          // 表面格柵橫肋
+          const rib = new THREE.Mesh(
+            new THREE.BoxGeometry(0.035, 0.052, catwalkWidth - 0.02),
+            catwalkGridMat
+          );
+          rib.position.set(cx, ridgeY + 0.005, 0);
+          group.add(rib);
+
+          // 每隔 2 道設一組屋脊高架支撐腳座 (跨坐於中脊板上)
+          if (ic % 2 === 0) {
+            const saddle = new THREE.Mesh(
+              new THREE.BoxGeometry(0.08, 0.16, catwalkWidth + 0.16),
+              bracketMat
+            );
+            saddle.position.set(cx, ridgeY - 0.08, 0);
+            group.add(saddle);
+          }
+        }
+        // 縱向菱形網格中肋線 (3 條)
+        for (const zLine of [-catwalkWidth * 0.28, 0, catwalkWidth * 0.28]) {
+          const longRib = new THREE.Mesh(
+            new THREE.BoxGeometry(ridgeWalkLen, 0.05, 0.025),
+            catwalkGridMat
+          );
+          longRib.position.set(0, ridgeY + 0.005, zLine);
+          group.add(longRib);
+        }
+
+        // 中央屋脊走道伴行安全扶手與雙層母索立柱 (高 0.95m，設於走道北側邊緣，方便維運人員勾掛安全帶雙鉤)
+        const ridgeRailMat = new THREE.MeshStandardMaterial({ color: 0xeab308, metalness: 0.4, roughness: 0.35 });
+        const ridgeCableMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.3 });
+        const zRidgePost = -catwalkWidth / 2 - 0.06;
+        const numRidgePosts = Math.max(7, Math.round(ridgeWalkLen / 4.2));
+        for (let ip = 0; ip <= numRidgePosts; ip++) {
+          const px = -ridgeWalkLen / 2 + (ip / numRidgePosts) * ridgeWalkLen;
+          const post = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.95, 0.045), ridgeRailMat);
+          post.position.set(px, ridgeY + 0.48, zRidgePost);
+          group.add(post);
+        }
+        for (const dh of [0.48, 0.92]) {
+          const cable = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.015, 0.015, ridgeWalkLen, 8),
+            ridgeCableMat
+          );
+          cable.rotation.z = Math.PI / 2;
+          cable.position.set(0, ridgeY + dh, zRidgePost);
+          group.add(cable);
+        }
+
+        // --- ① 西端順坡階梯式聯絡走道 (自爬梯登頂平台 y2dBack -> 屋脊 L/2 -> 南側屋簷 y2dFront) ---
+        const slopeWalkX = walkStartX + 0.38; // 緊鄰西側端頭與爬梯出口
+        const slopeWalkWidth = 0.76;
+
+        // 分為兩段斜坡：北/西坡 (y2dBack -> L/2，連接爬梯口至中央屋脊) 與 南/東坡 (L/2 -> y2dFront)
+        const slopeSegments: [number, number][] =
+          effectiveSlope === 'gable'
+            ? [
+                [y2dBack, L / 2],
+                [L / 2, y2dFront],
+              ]
+            : [[y2dBack, y2dFront]];
+
+        slopeSegments.forEach(([yStart2D, yEnd2D]) => {
+          const zStart = yStart2D - L / 2;
+          const zEnd = yEnd2D - L / 2;
+          const elevStart = getCanopySurfaceY(yStart2D) + 0.14;
+          const elevEnd = getCanopySurfaceY(yEnd2D) + 0.14;
+
+          const pStart = new THREE.Vector3(slopeWalkX, elevStart, zStart);
+          const pEnd = new THREE.Vector3(slopeWalkX, elevEnd, zEnd);
+
+          // (1) 斜坡走道兩側鮮橘黃色 C 型鋼斜梁邊框 (Stringers)
+          for (const side of [-1, 1]) {
+            const xSide = slopeWalkX + side * (slopeWalkWidth / 2);
+            group.add(
+              createMemberBetween(
+                new THREE.Vector3(xSide, elevStart, zStart),
+                new THREE.Vector3(xSide, elevEnd, zEnd),
+                0.05,
+                0.12,
+                catwalkFrameMat
+              )
+            );
+          }
+
+          // (2) 斜坡走道底部連續菱形擴張網板 + 水平防滑踏階 (每隔 0.55m 一階水平防滑格柵踏板)
+          group.add(
+            createMemberBetween(pStart, pEnd, slopeWalkWidth - 0.04, 0.035, catwalkMeshMat)
+          );
+
+          const segHorizLen = Math.abs(yEnd2D - yStart2D);
+          const stepCount = Math.max(6, Math.round(segHorizLen / 0.55));
+          for (let is = 0; is <= stepCount; is++) {
+            const t = is / stepCount;
+            const yCurr2D = yStart2D + t * (yEnd2D - yStart2D);
+            const zCurr = yCurr2D - L / 2;
+            const elevCurr = getCanopySurfaceY(yCurr2D) + 0.165;
+
+            // 水平防滑格柵踏階 (保持水平讓維運人員踩踏不滑動)
+            const stepPlank = new THREE.Mesh(
+              new THREE.BoxGeometry(slopeWalkWidth - 0.04, 0.035, 0.28),
+              catwalkMeshMat
+            );
+            stepPlank.position.set(slopeWalkX, elevCurr, zCurr);
+            stepPlank.castShadow = true;
+
+            // 踏階前緣醒目黃色防滑鼻條 (Safety Nosing)
+            const stepNose = new THREE.Mesh(
+              new THREE.BoxGeometry(slopeWalkWidth - 0.02, 0.042, 0.04),
+              ladderYellowMat
+            );
+            stepNose.position.set(slopeWalkX, elevCurr + 0.005, zCurr + (yEnd2D > yStart2D ? -0.13 : 0.13));
+            group.add(stepPlank, stepNose);
+          }
+
+          // (3) 斜坡聯絡走道雙側安全護欄扶手 (高 1.0m，讓人員自爬梯登頂後全程有雙側扶手保護直達屋脊)
+          const handrailH = 1.0;
+          for (const side of [-1, 1]) {
+            const xRail = slopeWalkX + side * (slopeWalkWidth / 2 + 0.02);
+            // 頂部斜坡扶手管 & 中間橫桿
+            group.add(
+              createMemberBetween(
+                new THREE.Vector3(xRail, elevStart + handrailH, zStart),
+                new THREE.Vector3(xRail, elevEnd + handrailH, zEnd),
+                0.036,
+                0.036,
+                ladderYellowMat,
+                true
+              ),
+              createMemberBetween(
+                new THREE.Vector3(xRail, elevStart + handrailH * 0.52, zStart),
+                new THREE.Vector3(xRail, elevEnd + handrailH * 0.52, zEnd),
+                0.026,
+                0.026,
+                ladderOrangeMat,
+                true
+              )
+            );
+            // 扶手垂直立柱 (每 2.0m 一支)
+            const postSteps = Math.max(3, Math.round(segHorizLen / 2.0));
+            for (let ip = 0; ip <= postSteps; ip++) {
+              const t = ip / postSteps;
+              const yPost2D = yStart2D + t * (yEnd2D - yStart2D);
+              const zPost = yPost2D - L / 2;
+              const elevPost = getCanopySurfaceY(yPost2D) + 0.14;
+              const postMesh = new THREE.Mesh(
+                new THREE.BoxGeometry(0.04, handrailH, 0.04),
+                ladderYellowMat
+              );
+              postMesh.position.set(xRail, elevPost + handrailH / 2, zPost);
+              group.add(postMesh);
+            }
+          }
+        });
+
+        // --- ③ 東側設備平台上方檢修分支走道 (由中央屋脊延伸至東端軸 5/A 設備平台上方，方便巡檢 #A 線槽與日照計) ---
+        const eastWalkX = xLast - 0.35;
+        const pEastRidge = new THREE.Vector3(eastWalkX, getCanopySurfaceY(L / 2) + 0.14, 0);
+        const pEastFront = new THREE.Vector3(eastWalkX, getCanopySurfaceY(y2dFront) + 0.14, zFront);
+        group.add(
+          createMemberBetween(pEastRidge, pEastFront, 0.65, 0.035, catwalkMeshMat),
+          createMemberBetween(
+            new THREE.Vector3(eastWalkX - 0.33, getCanopySurfaceY(L / 2) + 0.17, 0),
+            new THREE.Vector3(eastWalkX - 0.33, getCanopySurfaceY(y2dFront) + 0.17, zFront),
+            0.04,
+            0.09,
+            catwalkFrameMat
+          ),
+          createMemberBetween(
+            new THREE.Vector3(eastWalkX + 0.33, getCanopySurfaceY(L / 2) + 0.17, 0),
+            new THREE.Vector3(eastWalkX + 0.33, getCanopySurfaceY(y2dFront) + 0.17, zFront),
+            0.04,
+            0.09,
+            catwalkFrameMat
+          )
+        );
 
         // =====================================================================
         // ★ 屋面清浪板、30cm白鐵水槽、菱形網維修步道、四周安全母索、鋁軌腳座、逆變器與1F附CT電表箱
@@ -983,12 +1353,6 @@ export default function SolarSite3DView({
             gMesh.position.set(0, getCanopySurfaceY(0) - 0.12, zG);
             group.add(gMesh);
           }
-
-          // 3.3 屋脊中央 + 西端聯絡菱形擴張網維修步道 (60.8m)
-          const catwalkMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.5, roughness: 0.5 });
-          const ridgeWalkway = new THREE.Mesh(new THREE.BoxGeometry(W - 0.4, 0.035, 0.62), catwalkMat);
-          ridgeWalkway.position.set(0, getCanopySurfaceY(L / 2) + 0.03, 0);
-          group.add(ridgeWalkway);
 
           // 3.4 屋面四周角鐵安全母索立柱 (高 1.0m, 間距 2.5m) 與雙層紅色安全母索 (115.8m)
           const lifelineMat = new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.4 });
@@ -1317,10 +1681,19 @@ export default function SolarSite3DView({
     showEnvironment,
   ]);
 
-  const setCameraPreset = (preset: 'iso' | 'front' | 'side' | 'top') => {
+  const setCameraPreset = (preset: 'iso' | 'front' | 'side' | 'top' | 'ladder') => {
     if (!cameraRef.current || !controlsRef.current) return;
     const maxDim = Math.max(W, L);
     const targetY = productType === 'roof_canopy' || productType === 'roof_flush' ? bldgH * 0.7 : 3.2;
+
+    if (preset === 'ladder') {
+      // 特寫聚焦於西南角安全護籠爬梯、登頂轉接踏台、西端斜坡階梯走道與屋脊主走道交會處
+      controlsRef.current.target.set(-W * 0.36, clearH * 0.85, -L * 0.22);
+      cameraRef.current.position.set(-W * 0.85, clearH * 1.45, -L * 0.75);
+      controlsRef.current.update();
+      return;
+    }
+
     controlsRef.current.target.set(0, targetY, 0);
 
     if (preset === 'iso') {
@@ -1381,6 +1754,15 @@ export default function SolarSite3DView({
           >
             俯視平面
           </button>
+          {productType === 'sport_court' && (
+            <button
+              type="button"
+              onClick={() => setCameraPreset('ladder')}
+              className="px-2.5 py-1 rounded bg-amber-500/90 hover:bg-amber-400 text-slate-950 transition-colors font-extrabold cursor-pointer"
+            >
+              🪜 爬梯與走道特寫
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setCameraPreset('iso')}
