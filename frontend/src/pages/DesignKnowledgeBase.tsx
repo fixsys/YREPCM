@@ -17,7 +17,14 @@ import {
   Image as ImageIcon,
   ArrowRight,
   Sparkles,
+  Upload,
+  Trash2,
+  Layers,
 } from 'lucide-react';
+import EngineeringDiscipline3DModal, {
+  ENGINEERING_DISCIPLINES,
+  type EngineeringDisciplineId,
+} from '../components/EngineeringDiscipline3DModal';
 
 interface KnowledgeFileItem {
   id: string;
@@ -32,6 +39,9 @@ interface KnowledgeFileItem {
   previewable: boolean;
   products: string[];
   isUniversal: boolean;
+  disciplines?: EngineeringDisciplineId[];
+  isCustomUpload?: boolean;
+  note?: string;
 }
 
 interface KnowledgeFolder {
@@ -303,10 +313,25 @@ const DesignKnowledgeBase: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'FILES' | 'SPECS'>('FILES');
 
-  // Filter states for file center
+  // Filter states for file center (包含「土木 / 鋼構 / 機電」工程項目分類篩選)
+  const [selectedDiscipline, setSelectedDiscipline] = useState<'ALL' | EngineeringDisciplineId>('ALL');
   const [selectedFolderKey, setSelectedFolderKey] = useState<string>('ALL');
   const [selectedFileExt, setSelectedFileExt] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // 工程項目 (土木 / 鋼構 / 機電) 3D 互動演示 Modal state
+  const [discipline3DModalTarget, setDiscipline3DModalTarget] = useState<EngineeringDisciplineId | null>(null);
+
+  // 上傳「土木 / 鋼構 / 機電」圖說母版 Modal state
+  const [showUploadModal, setShowUploadModal] = useState<boolean>(false);
+  const [uploadDiscipline, setUploadDiscipline] = useState<EngineeringDisciplineId>('STEEL');
+  const [uploadFolderKey, setUploadFolderKey] = useState<string>('5.拆料圖及組裝圖');
+  const [uploadSubFolder, setUploadSubFolder] = useState<string>('');
+  const [uploadIsUniversal, setUploadIsUniversal] = useState<boolean>(true);
+  const [uploadProducts, setUploadProducts] = useState<string[]>(SOLAR_PRODUCTS.map(p => p.id));
+  const [uploadNote, setUploadNote] = useState<string>('');
+  const [uploadFileObj, setUploadFileObj] = useState<File | null>(null);
+  const [uploading, setUploading] = useState<boolean>(false);
 
   // Preview Modal state
   const [previewFile, setPreviewFile] = useState<KnowledgeFileItem | null>(null);
@@ -321,23 +346,84 @@ const DesignKnowledgeBase: React.FC = () => {
     [selectedProductId]
   );
 
+  const fetchKb = async () => {
+    setLoading(true);
+    try {
+      const res = await axios.get('/api/knowledge-base', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setFolders(res.data.folders || []);
+      setAllFiles(res.data.allFiles || []);
+    } catch (err) {
+      console.error('Failed to load design knowledge base:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchKb = async () => {
-      setLoading(true);
-      try {
-        const res = await axios.get('/api/knowledge-base', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        setFolders(res.data.folders || []);
-        setAllFiles(res.data.allFiles || []);
-      } catch (err) {
-        console.error('Failed to load design knowledge base:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
     if (token) fetchKb();
   }, [token]);
+
+  const handleOpenUploadForDiscipline = (disc: EngineeringDisciplineId) => {
+    setUploadDiscipline(disc);
+    setUploadFolderKey(
+      disc === 'CIVIL'
+        ? '1.預算書及模配圖'
+        : disc === 'STEEL'
+        ? '5.拆料圖及組裝圖'
+        : '3.台電送審圖及施工圖'
+    );
+    setUploadFileObj(null);
+    setUploadNote('');
+    setShowUploadModal(true);
+  };
+
+  const handleUploadSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!uploadFileObj) {
+      alert('請先選擇要上傳的圖說或母版檔案');
+      return;
+    }
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', uploadFileObj);
+      formData.append('discipline', uploadDiscipline);
+      formData.append('folderKey', uploadFolderKey);
+      formData.append('subFolder', uploadSubFolder);
+      formData.append('isUniversal', String(uploadIsUniversal));
+      formData.append('products', JSON.stringify(uploadProducts));
+      formData.append('note', uploadNote);
+
+      await axios.post('/api/knowledge-base/upload', formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      setShowUploadModal(false);
+      setSelectedDiscipline(uploadDiscipline);
+      setActiveTab('FILES');
+      await fetchKb();
+    } catch (err: any) {
+      alert(err?.response?.data?.error || '上傳失敗，請稍後再試');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDeleteCustomFile = async (file: KnowledgeFileItem) => {
+    if (!window.confirm(`確定要刪除自訂上傳的母版檔案「${file.name}」嗎？`)) return;
+    try {
+      await axios.delete(`/api/knowledge-base/upload/${encodeURIComponent(file.id)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      await fetchKb();
+    } catch (err: any) {
+      alert(err?.response?.data?.error || '刪除失敗');
+    }
+  };
 
   const handleDownloadFile = (file: KnowledgeFileItem) => {
     const url = `/api/knowledge-base/file?path=${encodeURIComponent(file.relativePath)}&download=1`;
@@ -361,7 +447,7 @@ const DesignKnowledgeBase: React.FC = () => {
     return counts;
   }, [allFiles]);
 
-  // 依目前選取的產品過濾檔案（若勾選 showAllProductFiles 則顯示全庫 29 個檔案）
+  // 依目前選取的產品過濾檔案（若勾選 showAllProductFiles 則顯示全庫檔案）
   const productScopedFiles = useMemo(() => {
     if (showAllProductFiles || selectedProductId === 'sport_court') {
       return allFiles;
@@ -369,8 +455,26 @@ const DesignKnowledgeBase: React.FC = () => {
     return allFiles.filter(f => Array.isArray(f.products) && f.products.includes(selectedProductId));
   }, [allFiles, selectedProductId, showAllProductFiles]);
 
+  // 統計「土木 (CIVIL) / 鋼構 (STEEL) / 機電 (MEP)」三大工程分類在目前範圍內的檔案數
+  const disciplineFileCounts = useMemo(() => {
+    const counts: Record<EngineeringDisciplineId, number> = { CIVIL: 0, STEEL: 0, MEP: 0 };
+    productScopedFiles.forEach(f => {
+      const discs = Array.isArray(f.disciplines) ? f.disciplines : [];
+      discs.forEach(d => {
+        if (counts[d] !== undefined) counts[d]++;
+      });
+    });
+    return counts;
+  }, [productScopedFiles]);
+
   const filteredFiles = useMemo(() => {
     return productScopedFiles.filter(f => {
+      if (
+        selectedDiscipline !== 'ALL' &&
+        (!Array.isArray(f.disciplines) || !f.disciplines.includes(selectedDiscipline))
+      ) {
+        return false;
+      }
       if (selectedFolderKey !== 'ALL' && f.folderKey !== selectedFolderKey) return false;
       if (selectedFileExt !== 'ALL' && f.ext !== selectedFileExt) return false;
       if (searchQuery.trim() !== '') {
@@ -379,12 +483,13 @@ const DesignKnowledgeBase: React.FC = () => {
           f.name.toLowerCase().includes(q) ||
           f.folderKey.toLowerCase().includes(q) ||
           f.subFolder.toLowerCase().includes(q) ||
-          f.typeCategory.toLowerCase().includes(q)
+          f.typeCategory.toLowerCase().includes(q) ||
+          (f.note && f.note.toLowerCase().includes(q))
         );
       }
       return true;
     });
-  }, [productScopedFiles, selectedFolderKey, selectedFileExt, searchQuery]);
+  }, [productScopedFiles, selectedDiscipline, selectedFolderKey, selectedFileExt, searchQuery]);
 
   const extCounts = useMemo(() => {
     const map: Record<string, number> = {};
@@ -451,6 +556,13 @@ const DesignKnowledgeBase: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => handleOpenUploadForDiscipline(selectedDiscipline === 'ALL' ? 'STEEL' : selectedDiscipline)}
+              className="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs sm:text-sm font-black flex items-center gap-2 shadow-lg shadow-emerald-950/30 transition-all cursor-pointer"
+            >
+              <Upload size={16} /> 上傳工程圖說 / 母版
+            </button>
             <button
               type="button"
               onClick={() => setShowSixProductsDiagramModal(true)}
@@ -603,6 +715,124 @@ const DesignKnowledgeBase: React.FC = () => {
         </div>
       </div>
 
+      {/* =====================================================================
+          新增：三大工程項目分類專區 (① 土木工程、② 鋼構工程、③ 機電工程 — 支援篩選、3D 互動演示與上傳圖說母版)
+      ===================================================================== */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-base sm:text-lg font-extrabold text-slate-800 flex items-center gap-2">
+              <Layers size={20} className="text-indigo-600" />
+              三大工程專業項目分類（土木 × 鋼構 × 機電 — 圖說母版篩選、上傳與 3D 結構工序演示）
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              點擊下方任一工程分類可<strong>篩選該類工程圖說母版</strong>、啟動<strong>專屬 3D 結構/配筋/管槽互動演示</strong>，或直接<strong>上傳新母版檔案</strong>供設計同仁參考下載
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {selectedDiscipline !== 'ALL' && (
+              <button
+                type="button"
+                onClick={() => setSelectedDiscipline('ALL')}
+                className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-extrabold cursor-pointer"
+              >
+                顯示全部工程分類 ({productScopedFiles.length})
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => handleOpenUploadForDiscipline(selectedDiscipline === 'ALL' ? 'STEEL' : selectedDiscipline)}
+              className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold flex items-center gap-1.5 shadow-sm cursor-pointer"
+            >
+              <Upload size={14} /> 上傳土木/鋼構/機電圖說母版
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {ENGINEERING_DISCIPLINES.map(disc => {
+            const isSelected = selectedDiscipline === disc.id;
+            const count = disciplineFileCounts[disc.id] || 0;
+            const iconEmoji = disc.id === 'CIVIL' ? '🧱' : disc.id === 'STEEL' ? '🏗️' : '⚡';
+
+            return (
+              <div
+                key={disc.id}
+                onClick={() => {
+                  setSelectedDiscipline(prev => (prev === disc.id ? 'ALL' : disc.id));
+                  setSelectedFolderKey('ALL');
+                  setActiveTab('FILES');
+                }}
+                className={`rounded-xl border-2 p-4 transition-all cursor-pointer flex flex-col justify-between relative overflow-hidden ${
+                  isSelected
+                    ? 'border-indigo-600 bg-indigo-50/50 ring-2 ring-indigo-500/20 shadow-md -translate-y-0.5'
+                    : 'border-slate-200 bg-white hover:border-indigo-300 hover:bg-slate-50/70'
+                }`}
+              >
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`inline-flex items-center justify-center px-2.5 py-1 rounded-lg text-xs font-black text-white bg-gradient-to-r ${disc.badgeColor} shadow-2xs`}
+                      >
+                        {iconEmoji} {disc.code} 類｜{disc.name}
+                      </span>
+                    </div>
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-slate-100 text-slate-700 border border-slate-200">
+                      {count} 份圖說母版
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-slate-600 leading-relaxed line-clamp-2">{disc.summary}</p>
+
+                  <div className="pt-1 flex flex-wrap gap-1.5">
+                    {disc.checkpoints.map((cp, idx) => (
+                      <span
+                        key={idx}
+                        className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-[11px] font-bold truncate max-w-full"
+                      >
+                        • {cp.title.replace(/^\d+\.\s*/, '')}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-3.5 pt-3 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-xs font-extrabold text-indigo-700">
+                    {isSelected ? '● 已篩選此類圖說（點擊取消）' : '點擊篩選此類圖說'}
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={e => {
+                        e.stopPropagation();
+                        handleOpenUploadForDiscipline(disc.id);
+                      }}
+                      className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-lg text-xs font-extrabold flex items-center gap-1 transition-colors cursor-pointer"
+                      title={`上傳 ${disc.name} 圖說或母版`}
+                    >
+                      <Upload size={12} /> 上傳母版
+                    </button>
+                    <button
+                      type="button"
+                      onClick={e => {
+                        e.stopPropagation();
+                        setDiscipline3DModalTarget(disc.id);
+                      }}
+                      className={`px-3 py-1.5 bg-gradient-to-r ${disc.badgeColor} hover:opacity-90 text-white rounded-lg text-xs font-extrabold flex items-center gap-1 shadow-sm transition-all cursor-pointer`}
+                      title={`開啟 ${disc.name} 3D 結構與工序互動演示`}
+                    >
+                      <Box size={13} /> 3D 演示
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       {/* 知識庫子分頁導覽列 */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-2 flex gap-1.5 overflow-x-auto">
         {[
@@ -671,6 +901,51 @@ const DesignKnowledgeBase: React.FC = () => {
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* 依三大工程分類 (土木 / 鋼構 / 機電) 快速切換按鈕 */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-xs font-bold text-slate-500 mr-1">依工程專業分類：</span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedDiscipline('ALL')}
+                  className={`px-2.5 py-1 rounded-md text-xs font-bold transition-colors cursor-pointer ${
+                    selectedDiscipline === 'ALL'
+                      ? 'bg-slate-800 text-white font-extrabold'
+                      : 'text-slate-600 bg-slate-100 hover:bg-slate-200'
+                  }`}
+                >
+                  全部工程 ({productScopedFiles.length})
+                </button>
+                {ENGINEERING_DISCIPLINES.map(disc => (
+                  <button
+                    key={disc.id}
+                    type="button"
+                    onClick={() => setSelectedDiscipline(prev => (prev === disc.id ? 'ALL' : disc.id))}
+                    className={`px-2.5 py-1 rounded-md text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 ${
+                      selectedDiscipline === disc.id
+                        ? 'bg-indigo-600 text-white font-extrabold shadow-2xs'
+                        : 'text-slate-700 bg-slate-100 hover:bg-slate-200'
+                    }`}
+                  >
+                    <span>
+                      {disc.id === 'CIVIL' ? '🧱 土木' : disc.id === 'STEEL' ? '🏗️ 鋼構' : '⚡ 機電'} (
+                      {disciplineFileCounts[disc.id] || 0})
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              {selectedDiscipline !== 'ALL' && (
+                <button
+                  type="button"
+                  onClick={() => setDiscipline3DModalTarget(selectedDiscipline)}
+                  className="px-3 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-extrabold flex items-center gap-1 cursor-pointer"
+                >
+                  <Box size={13} /> 開啟此工程分類 3D 互動演示
+                </button>
+              )}
             </div>
 
             {/* 資料夾階段快速切換按鈕 */}
@@ -776,6 +1051,26 @@ const DesignKnowledgeBase: React.FC = () => {
                                   >
                                     {file.name}
                                   </span>
+                                  {Array.isArray(file.disciplines) &&
+                                    file.disciplines.map(dId => (
+                                      <span
+                                        key={dId}
+                                        className={`px-2 py-0.5 rounded text-[10px] font-extrabold border ${
+                                          dId === 'CIVIL'
+                                            ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                            : dId === 'STEEL'
+                                            ? 'bg-blue-50 text-blue-800 border-blue-200'
+                                            : 'bg-purple-50 text-purple-800 border-purple-200'
+                                        }`}
+                                      >
+                                        {dId === 'CIVIL' ? '🧱 土木' : dId === 'STEEL' ? '🏗️ 鋼構' : '⚡ 機電'}
+                                      </span>
+                                    ))}
+                                  {file.isCustomUpload && (
+                                    <span className="px-2 py-0.5 bg-rose-100 text-rose-800 border border-rose-200 rounded text-[10px] font-extrabold">
+                                      ★ 自訂上傳母版
+                                    </span>
+                                  )}
                                   {file.isUniversal ? (
                                     <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 border border-emerald-200 rounded text-[10px] font-extrabold">
                                       六大產品通用標準
@@ -794,11 +1089,24 @@ const DesignKnowledgeBase: React.FC = () => {
                                 <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400 mt-0.5">
                                   <span>類型：{file.typeCategory}</span>
                                   <span>大小：{formatFileSize(file.sizeBytes)}</span>
+                                  {file.note && (
+                                    <span className="text-indigo-600 font-semibold">備註：{file.note}</span>
+                                  )}
                                 </div>
                               </div>
                             </div>
 
                             <div className="flex items-center gap-2 shrink-0">
+                              {file.isCustomUpload && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteCustomFile(file)}
+                                  className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg border border-transparent hover:border-rose-200 transition-colors cursor-pointer"
+                                  title="刪除此自訂上傳檔案"
+                                >
+                                  <Trash2 size={15} />
+                                </button>
+                              )}
                               {file.previewable && (
                                 <button
                                   type="button"
@@ -920,6 +1228,206 @@ const DesignKnowledgeBase: React.FC = () => {
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 三大工程專業項目 (土木 / 鋼構 / 機電) 3D 結構與工序互動演示 Modal */}
+      {discipline3DModalTarget && (
+        <EngineeringDiscipline3DModal
+          initialDiscipline={discipline3DModalTarget}
+          onClose={() => setDiscipline3DModalTarget(null)}
+          onOpenUploadModal={disc => handleOpenUploadForDiscipline(disc)}
+          onFilterFilesByDiscipline={disc => {
+            setSelectedDiscipline(disc);
+            setSelectedFolderKey('ALL');
+            setActiveTab('FILES');
+          }}
+        />
+      )}
+
+      {/* 上傳「土木 / 鋼構 / 機電」工程圖說與母版 Modal */}
+      {showUploadModal && (
+        <div
+          className="fixed inset-0 z-[210] bg-slate-900/75 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setShowUploadModal(false)}
+        >
+          <div
+            className="bg-white rounded-2xl max-w-xl w-full overflow-hidden shadow-2xl border border-slate-200"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="px-5 py-4 bg-slate-900 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Upload size={18} className="text-emerald-400" />
+                <h3 className="font-black text-base">上傳工程項目圖說與設計母版（土木 / 鋼構 / 機電）</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowUploadModal(false)}
+                className="p-1 text-slate-400 hover:text-white rounded-lg cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleUploadSubmit} className="p-5 space-y-4 text-xs sm:text-sm">
+              {/* 1. 選擇工程分類 */}
+              <div>
+                <label className="block font-extrabold text-slate-700 mb-1.5">
+                  1. 選擇工程專業分類 <span className="text-rose-500">*</span>
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {ENGINEERING_DISCIPLINES.map(d => {
+                    const active = uploadDiscipline === d.id;
+                    return (
+                      <button
+                        key={d.id}
+                        type="button"
+                        onClick={() => {
+                          setUploadDiscipline(d.id);
+                          setUploadFolderKey(
+                            d.id === 'CIVIL'
+                              ? '1.預算書及模配圖'
+                              : d.id === 'STEEL'
+                              ? '5.拆料圖及組裝圖'
+                              : '3.台電送審圖及施工圖'
+                          );
+                        }}
+                        className={`p-2.5 rounded-xl border-2 font-extrabold text-center transition-all cursor-pointer ${
+                          active
+                            ? 'border-indigo-600 bg-indigo-50 text-indigo-900 shadow-2xs'
+                            : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        {d.id === 'CIVIL' ? '🧱 土木工程' : d.id === 'STEEL' ? '🏗️ 鋼構工程' : '⚡ 機電工程'}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 2. 歸檔設計階段資料夾 */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-extrabold text-slate-700 mb-1">
+                    2. 歸檔設計階段資料夾
+                  </label>
+                  <select
+                    value={uploadFolderKey}
+                    onChange={e => setUploadFolderKey(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs sm:text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    {folders.map(f => (
+                      <option key={f.key} value={f.key}>
+                        {f.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-extrabold text-slate-700 mb-1">
+                    子分類標籤（選填）
+                  </label>
+                  <input
+                    type="text"
+                    value={uploadSubFolder}
+                    onChange={e => setUploadSubFolder(e.target.value)}
+                    placeholder="例如：連續基礎配筋、Tekla拆料、單線圖..."
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs sm:text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+              </div>
+
+              {/* 3. 適用六大產品 */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="font-extrabold text-slate-700">3. 適用之六大太陽能產品線</label>
+                  <label className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={uploadIsUniversal}
+                      onChange={e => {
+                        setUploadIsUniversal(e.target.checked);
+                        if (e.target.checked) {
+                          setUploadProducts(SOLAR_PRODUCTS.map(p => p.id));
+                        }
+                      }}
+                    />
+                    標記為「六大產品通用母版」
+                  </label>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                  {SOLAR_PRODUCTS.map(prod => {
+                    const checked = uploadProducts.includes(prod.id);
+                    return (
+                      <label
+                        key={prod.id}
+                        className="flex items-center gap-1.5 text-xs font-bold text-slate-700 cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={e => {
+                            if (e.target.checked) {
+                              setUploadProducts(prev => [...prev, prod.id]);
+                            } else {
+                              setUploadProducts(prev => prev.filter(id => id !== prod.id));
+                              setUploadIsUniversal(false);
+                            }
+                          }}
+                        />
+                        <span>
+                          {prod.code}. {prod.name}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 4. 選擇檔案與備註 */}
+              <div>
+                <label className="block font-extrabold text-slate-700 mb-1">
+                  4. 選擇圖說或母版檔案 (.dwg / .pdf / .xlsx / .png / .step / .fcstd) <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="file"
+                  required
+                  onChange={e => setUploadFileObj(e.target.files?.[0] || null)}
+                  className="w-full px-3 py-2 border border-dashed border-indigo-300 bg-indigo-50/40 rounded-xl text-xs sm:text-sm cursor-pointer"
+                />
+              </div>
+
+              <div>
+                <label className="block font-extrabold text-slate-700 mb-1">
+                  5. 圖說說明或設計檢核備註（選填）
+                </label>
+                <input
+                  type="text"
+                  value={uploadNote}
+                  onChange={e => setUploadNote(e.target.value)}
+                  placeholder="例如：標準 800x700 連續地梁配筋母版、100kW 以上附 CT 雙門表箱標準圖..."
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs sm:text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-slate-200 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowUploadModal(false)}
+                  className="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 font-bold hover:bg-slate-100 cursor-pointer"
+                >
+                  取消
+                </button>
+                <button
+                  type="submit"
+                  disabled={uploading}
+                  className="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-extrabold flex items-center gap-1.5 shadow-sm cursor-pointer"
+                >
+                  <Upload size={15} /> {uploading ? '上傳中...' : '確認上傳至知識庫'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
