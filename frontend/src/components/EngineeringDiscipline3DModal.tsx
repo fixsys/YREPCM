@@ -38,19 +38,19 @@ export const ENGINEERING_DISCIPLINES: DisciplineMeta[] = [
     ],
     checkpoints: [
       {
-        title: '1. 基礎底版 RC 與「上下兩層」#4@15 雙向鋼筋地網 (GL-900 ~ GL-1200)',
-        spec: '底版 2000×2000×300mm（保護層 50mm，雙層鋼筋網 1900×1900mm）+ 底部 100mm 打底 (GL-1300)',
-        detail: '底版配置「下層 + 上層」共兩層 #4@15cm 雙向正交鋼筋地網（每層雙向各 14 支 #4 鋼筋，下層四端向上 90° 彎鉤、上層四端向下 90° 彎鉤包絡成雙層底版鋼筋網籠）。',
+        title: '1. 基礎底版上下兩層獨立 #4@15 鋼筋地網（平直疊放、上下層不互連）',
+        spec: '底版 2000×2000×300mm（上下保護層各 50mm，1900×1900mm 獨立雙層地網）',
+        detail: '依剖面圖：下層地網（橫筋在下、縱筋疊於上）與上層地網（縱筋在下、橫筋疊於上）各自一根一根十字交疊綁紮，上下兩層地網彼此分離不互連。',
       },
       {
-        title: '2. 700×700 柱墩鋼筋籠 (#6主筋16支 + #4箍筋5支 + #3繫筋30支)',
-        spec: '柱墩高 700mm (GL-200 ~ GL-900)，保護層 50mm (箍筋框 600×600mm)',
-        detail: '垂直主筋採 16 支 #6 鋼筋（四周每邊 5 支均佈，底部伸入底版下層網並向外 90° 彎鉤錨定）；水平箍筋採 5 支 #4 鋼筋 (4@150=600)；每層箍筋內綁紮 6 支雙向 #3 繫筋（5層×6支 = 共 30 支 #3 繫筋）。',
+        title: '2. 700×700 柱墩耐震綁紮（左上 135° 箍筋鉤 + 一端 135° / 一端 90° 繫筋）',
+        spec: '#6主筋16支 + #4外箍筋5支 (4@150=600) + #3耐震繫筋30支 (每層6支)',
+        detail: '依柱墩斷面圖：#4 外箍筋於角隅設雙 135° 彎鉤；每層 6 支 #3 繫筋（橫3+縱3）嚴格採「一端 135° 斜鉤、另一端 90° 直角鉤」包絡主筋綁紮，共 5 層計 30 支。',
       },
       {
         title: '3. GL+0 地面基準、A.B 8-M25 (L=600) 預埋螺栓與由下而上施工工序',
         spec: 'GL+0 為地面高程｜GL-200 柱墩頂 + 5cm 無收縮水泥 + PL-19×500×500 + RH300×300×10×15',
-        detail: 'GL+0 即為現場地面位置；8 支 M25 基礎螺栓預埋於 GL-200 柱墩內，柱底板下灌注 5cm 無收縮水泥，鋼柱穿出 GL+0 地面並完成土方回填。',
+        detail: '8 支 M25 基礎螺栓（孔距 200×200mm 周界 8 孔，底部 90° 內折彎鉤位於第 2 道箍筋上方）預埋於柱墩內，柱底板下灌注 5cm 無收縮水泥。',
       },
     ],
   },
@@ -204,15 +204,15 @@ export const CIVIL_CONSTRUCTION_STEPS = [
   },
   {
     step: 2,
-    label: '步驟 2：底版「下層 + 上層」雙層 #4@15 鋼筋地網綁紮',
-    shortLabel: '2.雙層鋼筋地網',
-    desc: '於 GL-1200 ~ GL-900 底版範圍綁紮 1900×1900mm「上下兩層」雙向 #4@15cm 鋼筋地網（下層網彎鉤向上、上層網彎鉤向下）。',
+    label: '步驟 2：底版「下層 + 上層」兩層獨立 #4@15 鋼筋地網疊放綁紮',
+    shortLabel: '2.雙層獨立地網',
+    desc: '於 GL-1200 ~ GL-900 底版內綁紮 1900×1900mm 上下兩層獨立 #4@15 直筋地網（一根一根十字交疊以鐵絲綁紮，上下兩層分離不互連）。',
   },
   {
     step: 3,
-    label: '步驟 3：柱墩鋼筋籠綁紮 (#6主筋16支 + #4箍筋5支 + #3繫筋30支)',
+    label: '步驟 3：柱墩鋼筋籠綁紮 (#6主筋16支 + #4箍筋5支 + 135°/90° #3繫筋30支)',
     shortLabel: '3.柱墩鋼筋籠',
-    desc: '立設 16 支 #6 柱墩垂直主筋（底部外折 90° 錨定於底版網），綁紮 5 層 #4 閉合箍筋 (4@150=600) 及 30 支 #3 雙向繫筋 (每層 6 支)。',
+    desc: '立設 16 支 #6 主筋落地 L 鉤錨定於下層網，綁紮 5 道 #4 箍筋（左上角雙 135° 彎鉤，4@150=600）與 30 支 #3 繫筋（一端 135° 鉤、另一端 90° 鉤包住主筋）。',
   },
   {
     step: 4,
@@ -536,27 +536,39 @@ export default function EngineeringDiscipline3DModal({
       }
 
       // -----------------------------------------------------------------------
-      // Step 2 (含以上)：底版 1900×1900mm 「下層 + 上層」兩層雙向 #4@15 鋼筋地網
+      // Step 2 (含以上)：底版 1900×1900mm 「下層 + 上層」兩層獨立直筋地網 (#4@15)
+      //   ★ 嚴格對齊剖面圖 1：
+      //     - 一根一根直筋十字交疊疊放，兩端平直收頭，上下兩層地網彼此「完全獨立不互連」(無垂直立腳相連)！
+      //     - 下層網 (距底面 50mm)：X 向直筋在下 (yBotLayerX)，Z 向直筋疊在正上方 (yBotLayerZ)，交點以鐵絲綁紮
+      //     - 上層網 (距頂面 50mm)：Z 向直筋在下 (yTopLayerZ)，X 向直筋疊在正上方 (yTopLayerX)，與剖面圖圓點在橫筋下方完全一致！
       // -----------------------------------------------------------------------
       const matSpan = 1.9 * S; // 1900mm (保護層各 50mm)
       const numMatBars = 14; // 13 格 @ ~146mm = 1900mm (#4@15)
-      const barRad4 = 0.009 * S; // #4 鋼筋半徑示意
+      const barRad4 = 0.0085 * S; // #4 鋼筋半徑 (D13)
+      const tieWireMat = new THREE.MeshStandardMaterial({
+        color: 0xe2e8f0, // 鍍鋅綁紮鐵絲節點
+        metalness: 0.85,
+        roughness: 0.25,
+      });
 
-      // 下層鋼筋地網高程 (距底版底面 GL-1200 保護層 50mm -> GL-1150)
+      // 下層鋼筋地網高程：X 向在下 (距底面 50mm -> GL-1150)，Z 向緊貼疊在上方
       const yBotLayerX = yGL1200 + 0.05 * S;
-      const yBotLayerZ = yBotLayerX + barRad4 * 2.1;
-      // 上層鋼筋地網高程 (距底版頂面 GL-900 保護層 50mm -> GL-950)
-      const yTopLayerZ = yGL900 - 0.05 * S;
-      const yTopLayerX = yTopLayerZ - barRad4 * 2.1;
-      const hookLen = 0.18 * S; // 端部 90° 標準彎鉤長度
+      const yBotLayerZ = yBotLayerX + barRad4 * 2.0;
+
+      // 上層鋼筋地網高程：X 向在上 (距頂面 50mm -> GL-950)，Z 向緊貼在下方 (對應剖面圖圓點位於橫筋正下方)
+      const yTopLayerX = yGL900 - 0.05 * S;
+      const yTopLayerZ = yTopLayerX - barRad4 * 2.0;
+
+      const matCoords: number[] = [];
+      for (let i = 0; i < numMatBars; i++) {
+        matCoords.push(-matSpan / 2 + (i / (numMatBars - 1)) * matSpan);
+      }
 
       if (civilStep >= 2) {
-        for (let i = 0; i < numMatBars; i++) {
-          const offset = -matSpan / 2 + (i / (numMatBars - 1)) * matSpan;
-
-          // === (A) 下層 #4@15 雙向鋼筋地網 (四端向上 90° 彎鉤) ===
-          // 下層 X 向
+        for (const offset of matCoords) {
+          // === (A) 下層 #4@15 獨立平板地網 (平直直筋一根一根十字疊放，無上下互連立腳) ===
           group.add(
+            // 下層下排 (X 向直筋)
             createMemberBetween(
               new THREE.Vector3(-matSpan / 2, yBotLayerX, offset),
               new THREE.Vector3(matSpan / 2, yBotLayerX, offset),
@@ -565,44 +577,10 @@ export default function EngineeringDiscipline3DModal({
               matFootingRebarBot,
               true
             ),
-            createMemberBetween(
-              new THREE.Vector3(-matSpan / 2, yBotLayerX, offset),
-              new THREE.Vector3(-matSpan / 2, yBotLayerX + hookLen, offset),
-              barRad4 * 2,
-              barRad4 * 2,
-              matFootingRebarBot,
-              true
-            ),
-            createMemberBetween(
-              new THREE.Vector3(matSpan / 2, yBotLayerX, offset),
-              new THREE.Vector3(matSpan / 2, yBotLayerX + hookLen, offset),
-              barRad4 * 2,
-              barRad4 * 2,
-              matFootingRebarBot,
-              true
-            )
-          );
-          // 下層 Z 向
-          group.add(
+            // 下層上排 (Z 向直筋直接疊在 X 向直筋上)
             createMemberBetween(
               new THREE.Vector3(offset, yBotLayerZ, -matSpan / 2),
               new THREE.Vector3(offset, yBotLayerZ, matSpan / 2),
-              barRad4 * 2,
-              barRad4 * 2,
-              matFootingRebarBot,
-              true
-            ),
-            createMemberBetween(
-              new THREE.Vector3(offset, yBotLayerZ, -matSpan / 2),
-              new THREE.Vector3(offset, yBotLayerZ + hookLen, -matSpan / 2),
-              barRad4 * 2,
-              barRad4 * 2,
-              matFootingRebarBot,
-              true
-            ),
-            createMemberBetween(
-              new THREE.Vector3(offset, yBotLayerZ, matSpan / 2),
-              new THREE.Vector3(offset, yBotLayerZ + hookLen, matSpan / 2),
               barRad4 * 2,
               barRad4 * 2,
               matFootingRebarBot,
@@ -610,36 +588,9 @@ export default function EngineeringDiscipline3DModal({
             )
           );
 
-          // === (B) 上層 #4@15 雙向鋼筋地網 (四端向下 90° 彎鉤，與下層網構成完整雙層地網籠) ===
-          // 上層 X 向
+          // === (B) 上層 #4@15 獨立平板地網 (與下層分離不互連，X 向在上、Z 向在正下方) ===
           group.add(
-            createMemberBetween(
-              new THREE.Vector3(-matSpan / 2, yTopLayerX, offset),
-              new THREE.Vector3(matSpan / 2, yTopLayerX, offset),
-              barRad4 * 2,
-              barRad4 * 2,
-              matFootingRebarTop,
-              true
-            ),
-            createMemberBetween(
-              new THREE.Vector3(-matSpan / 2, yTopLayerX, offset),
-              new THREE.Vector3(-matSpan / 2, yTopLayerX - hookLen, offset),
-              barRad4 * 2,
-              barRad4 * 2,
-              matFootingRebarTop,
-              true
-            ),
-            createMemberBetween(
-              new THREE.Vector3(matSpan / 2, yTopLayerX, offset),
-              new THREE.Vector3(matSpan / 2, yTopLayerX - hookLen, offset),
-              barRad4 * 2,
-              barRad4 * 2,
-              matFootingRebarTop,
-              true
-            )
-          );
-          // 上層 Z 向
-          group.add(
+            // 上層下排 (Z 向直筋)
             createMemberBetween(
               new THREE.Vector3(offset, yTopLayerZ, -matSpan / 2),
               new THREE.Vector3(offset, yTopLayerZ, matSpan / 2),
@@ -648,17 +599,10 @@ export default function EngineeringDiscipline3DModal({
               matFootingRebarTop,
               true
             ),
+            // 上層上排 (X 向直筋疊在 Z 向直筋上)
             createMemberBetween(
-              new THREE.Vector3(offset, yTopLayerZ, -matSpan / 2),
-              new THREE.Vector3(offset, yTopLayerZ - hookLen, -matSpan / 2),
-              barRad4 * 2,
-              barRad4 * 2,
-              matFootingRebarTop,
-              true
-            ),
-            createMemberBetween(
-              new THREE.Vector3(offset, yTopLayerZ, matSpan / 2),
-              new THREE.Vector3(offset, yTopLayerZ - hookLen, matSpan / 2),
+              new THREE.Vector3(-matSpan / 2, yTopLayerX, offset),
+              new THREE.Vector3(matSpan / 2, yTopLayerX, offset),
               barRad4 * 2,
               barRad4 * 2,
               matFootingRebarTop,
@@ -666,14 +610,50 @@ export default function EngineeringDiscipline3DModal({
             )
           );
         }
+
+        // 地網十字交點鐵絲綁紮結 (InstancedMesh 高效繪製上下兩層共 14×14×2 = 392 處十字鐵絲綁紮點)
+        const tieGeo = new THREE.TorusGeometry(barRad4 * 1.45, barRad4 * 0.28, 6, 10);
+        const totalTies = numMatBars * numMatBars * 2;
+        const tieInst = new THREE.InstancedMesh(tieGeo, tieWireMat, totalTies);
+        const dummy = new THREE.Object3D();
+        let idx = 0;
+        for (const tx of matCoords) {
+          for (const tz of matCoords) {
+            // 下層交點鐵絲斜向十字綁紮
+            dummy.position.set(tx, (yBotLayerX + yBotLayerZ) / 2, tz);
+            dummy.rotation.set(Math.PI / 4, Math.PI / 4, 0);
+            dummy.updateMatrix();
+            tieInst.setMatrixAt(idx++, dummy.matrix);
+
+            // 上層交點鐵絲斜向十字綁紮
+            dummy.position.set(tx, (yTopLayerX + yTopLayerZ) / 2, tz);
+            dummy.rotation.set(-Math.PI / 4, Math.PI / 4, 0);
+            dummy.updateMatrix();
+            tieInst.setMatrixAt(idx++, dummy.matrix);
+          }
+        }
+        tieInst.instanceMatrix.needsUpdate = true;
+        group.add(tieInst);
       }
 
       // -----------------------------------------------------------------------
-      // Step 3 (含以上)：柱墩鋼筋籠 (#6主筋16支 + #4箍筋5支 [4@150=600] + #3雙向繫筋30支)
+      // Step 3 (含以上)：柱墩鋼筋籠 — 1:1 嚴格依照圖 1 剖面與圖 2 柱墩斷面綁紮詳圖
+      //   • 700×700mm 柱墩，四周保護層 50mm -> #4 外箍筋外緣範圍 600×600mm
+      //   • #6 主筋 16 支：緊貼於外箍筋內側 (每邊 5 支均佈)，向下穿過上層地網直抵下層地網，底部做 90° 平貼彎鉤錨定
+      //   • #4 外箍筋 5 支：自 GL-900 上方 50mm (GL-850) 起，4@150=600mm 至 GL-250 (距柱墩頂 GL-200 50mm)，
+      //     且依圖 2 左上角隅設置「雙 135° 斜向柱心耐震彎鉤」！
+      //   • #3 繫筋 30 支 (5 層 × 每層 6 支 = 30 支)：
+      //     依圖 2 斷面圖，中間 3 道水平繫筋 + 3 道垂直繫筋，每一支皆嚴格採用標準耐震繫筋綁法：
+      //     「一端 135° 斜向回折彎鉤 (左上/上端) + 另一端 90° 直角彎鉤 (右/下端)」精準勾住對向 #6 主筋！
       // -----------------------------------------------------------------------
       if (civilStep >= 3) {
-        const cageHalf = 0.3 * S; // 600mm / 2 = 300mm
-        const grid5 = [-0.3 * S, -0.15 * S, 0, 0.15 * S, 0.3 * S];
+        const stirrupCenterHalf = (0.3 - 0.0085) * S; // 600mm 外緣扣除箍筋半徑
+        const barRad6 = 0.0125 * S; // #6 主筋半徑 (D19)
+        const barRad3 = 0.006 * S; // #3 繫筋半徑 (D10)
+
+        // 主筋中心緊貼外箍筋內側
+        const mainHalf = stirrupCenterHalf - barRad4 - barRad6;
+        const grid5 = [-mainHalf, -mainHalf / 2, 0, mainHalf / 2, mainHalf];
         const mainBarCoords: [number, number][] = [];
         grid5.forEach((x, ix) => {
           grid5.forEach((z, iz) => {
@@ -683,12 +663,11 @@ export default function EngineeringDiscipline3DModal({
           });
         });
 
-        const barRad6 = 0.013 * S; // #6 主筋
-        const mainBotY = yBotLayerZ + barRad6; // 坐落於底版下層鋼筋網上
-        const mainTopY = yGL200 - 0.05 * S; // GL-250 (柱墩頂保護層 50mm)
+        const mainBotY = yBotLayerZ + barRad6; // 坐落於下層地網頂面，與圖 1 剖面一致
+        const mainTopY = yGL200 - 0.035 * S; // 略高於最上層箍筋 (GL-250)，保護層內收頭
 
         mainBarCoords.forEach(([mx, mz]) => {
-          // 垂直主筋段
+          // 垂直 #6 主筋本體
           group.add(
             createMemberBetween(
               new THREE.Vector3(mx, mainBotY, mz),
@@ -699,12 +678,12 @@ export default function EngineeringDiscipline3DModal({
               true
             )
           );
-          // 底部向外 90° 標準錨定彎鉤 (長 220mm，錨定於底版下層網)
+          // 底部 90° 標準彎鉤 (平貼於下層地網上，依圖 1 剖面水平延伸 180mm 並以鐵絲綁結於地網)
           const dirVec = new THREE.Vector3(mx, 0, mz).normalize();
           const hookEnd = new THREE.Vector3(
-            mx + dirVec.x * 0.22 * S,
+            mx + dirVec.x * 0.18 * S,
             mainBotY,
-            mz + dirVec.z * 0.22 * S
+            mz + dirVec.z * 0.18 * S
           );
           group.add(
             createMemberBetween(
@@ -718,91 +697,148 @@ export default function EngineeringDiscipline3DModal({
           );
         });
 
-        // #4 箍筋 5 支 (4@150 = 600mm，位於 GL-850, GL-700, GL-550, GL-400, GL-250) + #3 繫筋 30 支
+        // 5 層箍筋高程：GL-900 上方 50mm (-0.85m) 起，4@150=600mm -> -0.85, -0.70, -0.55, -0.40, -0.25m (距 GL-200 剛好 50mm)
         const stirrupElevationsM = [-0.85, -0.7, -0.55, -0.4, -0.25];
-        const barRad3 = 0.0065 * S; // #3 繫筋
+        const innerCoords = [-mainHalf / 2, 0, mainHalf / 2]; // 中間 3 排主筋座標
+
+        // 輔助函式：建立符合圖 2 的單支耐震繫筋 (一端包繞主筋做 135° 斜回鉤，另一端包繞主筋做 90° 直角鉤)
+        const addSeismicCrossTie = (
+          pStartMain: THREE.Vector3, // 135° 彎鉤端主筋中心
+          pEndMain: THREE.Vector3, // 90° 彎鉤端主筋中心
+          sideNormal: THREE.Vector3, // 繫筋貼靠主筋哪一側之單位法向量 (水平面)
+          yLevel: number
+        ) => {
+          const axisDir = new THREE.Vector3().subVectors(pEndMain, pStartMain).normalize(); // 由起點指向終點
+          const offsetDist = barRad6 + barRad3 * 1.1;
+
+          // 直桿段起點與終點 (貼在兩端主筋側邊，並略微延伸包過主筋中心至外側)
+          const shaftStart = pStartMain
+            .clone()
+            .addScaledVector(sideNormal, offsetDist)
+            .addScaledVector(axisDir, -offsetDist);
+          shaftStart.y = yLevel;
+
+          const shaftEnd = pEndMain
+            .clone()
+            .addScaledVector(sideNormal, offsetDist)
+            .addScaledVector(axisDir, offsetDist);
+          shaftEnd.y = yLevel;
+
+          // 1. 繫筋主直桿
+          group.add(
+            createMemberBetween(shaftStart, shaftEnd, barRad3 * 2, barRad3 * 2, matCrossTie3, true)
+          );
+
+          // 2. 起點端 (左端 / 上端)：包過主筋外側後，以 135° 斜角向內回折 (依圖 2 斷面放大圖)
+          const wrap135Corner = shaftStart.clone().addScaledVector(sideNormal, -offsetDist * 1.9);
+          const hook135Tip = wrap135Corner
+            .clone()
+            .addScaledVector(axisDir, 0.065 * S)
+            .addScaledVector(sideNormal, -0.045 * S);
+          group.add(
+            createMemberBetween(
+              shaftStart,
+              wrap135Corner,
+              barRad3 * 2,
+              barRad3 * 2,
+              matCrossTie3,
+              true
+            ),
+            createMemberBetween(
+              wrap135Corner,
+              hook135Tip,
+              barRad3 * 2,
+              barRad3 * 2,
+              matCrossTie3,
+              true
+            )
+          );
+
+          // 3. 終點端 (右端 / 下端)：包過主筋外側後，以 90° 直角彎鉤收頭 (依圖 2 斷面放大圖右側與下側)
+          const hook90Tip = shaftEnd.clone().addScaledVector(sideNormal, -offsetDist * 2.4);
+          group.add(
+            createMemberBetween(shaftEnd, hook90Tip, barRad3 * 2, barRad3 * 2, matCrossTie3, true)
+          );
+        };
 
         stirrupElevationsM.forEach(ym => {
           const sy = ym * S;
-          const c1 = new THREE.Vector3(-cageHalf, sy, -cageHalf);
-          const c2 = new THREE.Vector3(cageHalf, sy, -cageHalf);
-          const c3 = new THREE.Vector3(cageHalf, sy, cageHalf);
-          const c4 = new THREE.Vector3(-cageHalf, sy, cageHalf);
+          const cNW = new THREE.Vector3(-stirrupCenterHalf, sy, -stirrupCenterHalf); // 左上角 (圖 2 雙 135° 箍筋彎鉤處)
+          const cNE = new THREE.Vector3(stirrupCenterHalf, sy, -stirrupCenterHalf); // 右上角
+          const cSE = new THREE.Vector3(stirrupCenterHalf, sy, stirrupCenterHalf); // 右下角
+          const cSW = new THREE.Vector3(-stirrupCenterHalf, sy, stirrupCenterHalf); // 左下角
 
-          // 外圈 600×600mm #4 閉合箍筋
+          // (1) 外圈 600×600mm #4 閉合矩形箍筋四邊
           group.add(
-            createMemberBetween(c1, c2, barRad4 * 2, barRad4 * 2, matStirrup4, true),
-            createMemberBetween(c2, c3, barRad4 * 2, barRad4 * 2, matStirrup4, true),
-            createMemberBetween(c3, c4, barRad4 * 2, barRad4 * 2, matStirrup4, true),
-            createMemberBetween(c4, c1, barRad4 * 2, barRad4 * 2, matStirrup4, true)
+            createMemberBetween(cNW, cNE, barRad4 * 2, barRad4 * 2, matStirrup4, true),
+            createMemberBetween(cNE, cSE, barRad4 * 2, barRad4 * 2, matStirrup4, true),
+            createMemberBetween(cSE, cSW, barRad4 * 2, barRad4 * 2, matStirrup4, true),
+            createMemberBetween(cSW, cNW, barRad4 * 2, barRad4 * 2, matStirrup4, true)
           );
 
-          // 內部 6 支 #3 雙向繫筋 (3 支 X 向 + 3 支 Z 向，含兩端 135° 耐震彎鉤) × 5 層 = 30 支
-          for (const midCoord of [-0.15 * S, 0, 0.15 * S]) {
-            const pX1 = new THREE.Vector3(-cageHalf, sy + 0.01, midCoord);
-            const pX2 = new THREE.Vector3(cageHalf, sy + 0.01, midCoord);
-            group.add(
-              createMemberBetween(pX1, pX2, barRad3 * 2, barRad3 * 2, matCrossTie3, true),
-              createMemberBetween(
-                pX1,
-                new THREE.Vector3(-cageHalf + 0.045 * S, sy + 0.01, midCoord + 0.035 * S),
-                barRad3 * 1.8,
-                barRad3 * 1.8,
-                matCrossTie3,
-                true
-              ),
-              createMemberBetween(
-                pX2,
-                new THREE.Vector3(cageHalf - 0.045 * S, sy + 0.01, midCoord - 0.035 * S),
-                barRad3 * 1.8,
-                barRad3 * 1.8,
-                matCrossTie3,
-                true
-              )
-            );
+          // (2) 圖 2 左上角隅 (cNW) 箍筋雙 135° 耐震彎鉤 (兩肢繞過左上角 #6 主筋後向柱心 45° 平行伸入)
+          const nwHook1Start = new THREE.Vector3(-mainHalf + barRad6, sy + barRad4 * 0.6, -stirrupCenterHalf);
+          const nwHook1End = nwHook1Start.clone().add(new THREE.Vector3(0.085 * S, 0, 0.085 * S));
+          const nwHook2Start = new THREE.Vector3(-stirrupCenterHalf, sy - barRad4 * 0.6, -mainHalf + barRad6);
+          const nwHook2End = nwHook2Start.clone().add(new THREE.Vector3(0.085 * S, 0, 0.085 * S));
+          group.add(
+            createMemberBetween(nwHook1Start, nwHook1End, barRad4 * 1.9, barRad4 * 1.9, matStirrup4, true),
+            createMemberBetween(nwHook2Start, nwHook2End, barRad4 * 1.9, barRad4 * 1.9, matStirrup4, true)
+          );
 
-            const pZ1 = new THREE.Vector3(midCoord, sy - 0.01, -cageHalf);
-            const pZ2 = new THREE.Vector3(midCoord, sy - 0.01, cageHalf);
-            group.add(
-              createMemberBetween(pZ1, pZ2, barRad3 * 2, barRad3 * 2, matCrossTie3, true),
-              createMemberBetween(
-                pZ1,
-                new THREE.Vector3(midCoord + 0.035 * S, sy - 0.01, -cageHalf + 0.045 * S),
-                barRad3 * 1.8,
-                barRad3 * 1.8,
-                matCrossTie3,
-                true
-              ),
-              createMemberBetween(
-                pZ2,
-                new THREE.Vector3(midCoord - 0.035 * S, sy - 0.01, cageHalf - 0.045 * S),
-                barRad3 * 1.8,
-                barRad3 * 1.8,
-                matCrossTie3,
-                true
-              )
+          // (3) 圖 2 每層 6 支 #3 雙向耐震繫筋 (5 層 × 6 支 = 30 支)：
+          //   • 3 支水平向 (X 向) 繫筋：左端 (-X) 為 135° 斜鉤，右端 (+X) 為 90° 直角鉤 (貼主筋上側 -Z，彎鉤向下 +Z)
+          for (const mz of innerCoords) {
+            addSeismicCrossTie(
+              new THREE.Vector3(-mainHalf, sy, mz),
+              new THREE.Vector3(mainHalf, sy, mz),
+              new THREE.Vector3(0, 0, -1), // 直桿貼於主筋北側 (-Z)，兩端向南 (+Z) 包繞主筋，100% 還原圖 2 水平繫筋！
+              sy + barRad4 + barRad3
             );
           }
+
+          //   • 3 支垂直向 (Z 向) 繫筋：上端 (-Z) 為 135° 斜鉤，下端 (+Z) 為 90° 直角鉤 (貼主筋西側 -X，彎鉤向右 +X)
+          for (const mx of innerCoords) {
+            addSeismicCrossTie(
+              new THREE.Vector3(mx, sy, -mainHalf),
+              new THREE.Vector3(mx, sy, mainHalf),
+              new THREE.Vector3(-1, 0, 0), // 直桿貼於主筋西側 (-X)，兩端向東 (+X) 包繞主筋，100% 還原圖 2 垂直繫筋！
+              sy - barRad4 - barRad3
+            );
+          }
+
+          // (4) 外箍筋與 16 支主筋交點之鐵絲綁紮環
+          mainBarCoords.forEach(([mx, mz]) => {
+            const tieRing = new THREE.Mesh(
+              new THREE.TorusGeometry(barRad6 * 1.35, barRad3 * 0.35, 6, 10),
+              tieWireMat
+            );
+            tieRing.position.set(mx, sy, mz);
+            tieRing.rotation.x = Math.PI / 4;
+            group.add(tieRing);
+          });
         });
       }
 
       // -----------------------------------------------------------------------
       // Step 4 (含以上)：預埋 A.B 8-M25 L=600 基礎螺栓 + 第一階段底版 RC 澆置 (GL-1200 ~ GL-900)
+      //   ★ 對齊右上角 500×500 詳圖：螺栓周界 8 孔 (50 + 200 + 200 + 50 = 500mm -> X,Z ∈ {-0.2, 0, +0.2})
+      //     且依圖 1 剖面：L=600mm 底部 90° L 型錨定彎鉤位於第 2 道箍筋 (-0.70m) 與第 3 道箍筋 (-0.55m) 之間！
       // -----------------------------------------------------------------------
       const abLift = expOffset * 0.35;
       const abCoordsM: [number, number][] = [
         [-0.2, -0.2],
         [0.0, -0.2],
         [0.2, -0.2],
-        [-0.2, -0.056],
-        [0.2, 0.056],
+        [-0.2, 0.0],
+        [0.2, 0.0],
         [-0.2, 0.2],
         [0.0, 0.2],
         [0.2, 0.2],
       ];
-      const boltRad = 0.014 * S; // M25
-      const boltTopY = (yGL200 + 0.14 * S) + abLift; // 露出柱墩頂至 GL-60mm
-      const boltBotY = boltTopY - 0.6 * S; // L = 600mm
+      const boltRad = 0.013 * S; // M25
+      const boltTopY = (yGL200 + 0.12 * S) + abLift; // 頂端露出 PL-19 柱底板上方供雙螺帽鎖固 (GL-80)
+      const boltBotY = boltTopY - 0.6 * S; // GL-680 (精準落在圖 1 剖面第 2 道箍筋 GL-700 正上方！)
 
       if (civilStep >= 4) {
         // 第一階段 2000×2000×300mm 基礎底版混凝土 (GL-1200 ~ GL-900)
@@ -813,10 +849,12 @@ export default function EngineeringDiscipline3DModal({
         footEdges.position.copy(footMesh.position);
         group.add(footMesh, footEdges);
 
-        // 8-M25 L=600 基礎螺栓
+        // 8-M25 L=600 基礎螺栓 (底部 90° L 型錨定彎鉤)
         abCoordsM.forEach(([bx, bz]) => {
           const x3 = bx * S;
           const z3 = bz * S;
+          // 依圖 1 剖面：左排向內 (+X)、中排向右 (+X)、右排向右/內折
+          const hookDirX = bx < 0 ? 0.09 * S : bx === 0 ? 0.09 * S : -0.09 * S;
           group.add(
             createMemberBetween(
               new THREE.Vector3(x3, boltBotY, z3),
@@ -828,7 +866,7 @@ export default function EngineeringDiscipline3DModal({
             ),
             createMemberBetween(
               new THREE.Vector3(x3, boltBotY, z3),
-              new THREE.Vector3(x3 * 0.65, boltBotY, z3 * 0.65),
+              new THREE.Vector3(x3 + hookDirX, boltBotY, z3),
               boltRad * 2,
               boltRad * 2,
               matAnchorBolt,
